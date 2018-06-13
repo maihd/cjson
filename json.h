@@ -173,14 +173,13 @@ typedef struct json_pool
 struct json_state
 {
     struct json_state* next;
-
+    json_pool_t* value_pool;
+    
     int line;
     int column;
     int cursor;
     
     const char* buffer;
-
-    json_pool_t* value_pool;
     
     json_error_t errnum;
     char*        errmsg;
@@ -351,10 +350,13 @@ static void free_state(json_state_t* state)
 {
     if (state)
     {
-	free_state(state->next);
+	json_state_t* next = state->next;
+
 	free_pool(state->value_pool);
 	free(state->errmsg);
 	free(state);
+
+	free_state(next);
     }
 }
 
@@ -760,6 +762,10 @@ json_error_t json_get_errno(const json_state_t* state)
     {
 	return state->errnum;
     }
+    else
+    {
+	return JSON_ERROR_NONE;
+    }
 }
 
 const char* json_get_error(const json_state_t* state)
@@ -767,6 +773,10 @@ const char* json_get_error(const json_state_t* state)
     if (state)
     {
 	return state->errmsg;
+    }
+    else
+    {
+	return NULL;
     }
 }
 #endif
