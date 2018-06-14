@@ -1,3 +1,5 @@
 .DS_Store
 vctest/.vs
+vctest/obj
 vctest/Debug
+vctest/Release
