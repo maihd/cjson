@@ -167,13 +167,16 @@ typedef struct json_pool
 {
     struct json_pool* next;
 
-    void* head;
+    void** head;
 } json_pool_t;
 
 struct json_state
 {
     struct json_state* next;
     json_pool_t* value_pool;
+
+    //json_bucket_t* values;
+    //json_bucket_t* string;
     
     int line;
     int column;
@@ -218,21 +221,21 @@ static json_pool_t* make_pool(json_pool_t* next, int count, int size)
     {
 	return NULL;
     }
-    
+
     int pool_size = count * (sizeof(void*) + size);
     json_pool_t* pool = (json_pool_t*)malloc(sizeof(json_pool_t) + pool_size);
     if (pool)
     {
 	pool->next = next;
-	pool->head = (char*)pool + sizeof(json_pool_t);
-
-	void** head = (void**)pool->head;
+	pool->head = (void**)((char*)pool + sizeof(json_pool_t));
+	
 	int i;
-	for (i = 0; i < count; i++)
+	void** node = pool->head;
+	for (i = 0; i < count - 1; i++)
 	{
-	    head = (void**)(*head = (char*)head + sizeof(void*) + size);
+	    node = (void**)(*node = (char*)node + sizeof(void*) + size);
 	}
-	*head = NULL;
+	*node = NULL;
     }
     
     return pool;
@@ -243,7 +246,7 @@ static void free_pool(json_pool_t* pool)
     if (pool)
     {
 	free_pool(pool->next);
-	free(pool);
+ 	free(pool);
     }
 }
 
@@ -251,9 +254,15 @@ static void* pool_extract(json_pool_t* pool)
 {
     if (pool->head)
     {
-	void** head = (void**)pool->head;
-	pool->head  = *head;
-	return head + sizeof(json_pool_t);
+	void** head = pool->head;
+	void** next = (void**)(*head);
+	
+	pool->head = next;
+	return (void*)((char*)head + sizeof(void*));
+    }
+    else
+    {
+	return NULL;
     }
 }
 
@@ -261,9 +270,9 @@ static void pool_collect(json_pool_t* pool, void* ptr)
 {
     if (ptr)
     {
-	void** node = (void**)ptr;
-	*node       = pool->head;
-	pool->head  = node;
+	void** node = (void**)((char*)ptr - sizeof(void*));
+	*node = pool->head;
+	pool->head = node;
     }
 }
 
@@ -442,6 +451,8 @@ static json_value_t* parse_number(json_state_t* state)
 	if (c == '+')
 	{
 	    c = next_char(state);
+	    croak(state, JSON_ERROR_UNEXPECTED,
+		  "JSON does not support number start with '+'");
 	}
 	else if (c == '-')
 	{
@@ -451,9 +462,12 @@ static json_value_t* parse_number(json_state_t* state)
 	else if (c == '0')
         {
 	    c = next_char(state);
-	    croak(state, JSON_ERROR_UNEXPECTED,
-		  "JSON does not support number start with '0'"
-		  " (only standalone '0' is accepted)");
+	    if (!isspace(c) && !ispunct(c))
+	    {
+		croak(state, JSON_ERROR_UNEXPECTED,
+		      "JSON does not support number start with '0'"
+		      " (only standalone '0' is accepted)");
+	    }
 	}
 	else if (!isdigit(c))
 	{
@@ -469,6 +483,11 @@ static json_value_t* parse_number(json_state_t* state)
 	{
 	    if (c == '.')
 	    {
+		if (dot)
+		{
+		    croak(state, JSON_ERROR_UNEXPECTED,
+			  "Too many '.' are presented");
+		}
 		if (!dotchk)
 		{
 		    croak(state, JSON_ERROR_UNEXPECTED, "Unexpected '%c'", c);
@@ -476,37 +495,42 @@ static json_value_t* parse_number(json_state_t* state)
 		else
 		{
 		    dot    = 1;
-		    dotchk = 1;
+		    dotchk = 0;
 		    numpow = 1;
 		}
 	    }
-	    else if (dot)
-	    {
-		numpow *= 10;
-		number += (c - '0') / numpow;
-	    }
-	    else if (isspace(c) || ispunct(c))
+	    else if (!isdigit(c))
 	    {
 		break;
 	    }
 	    else
 	    {
-		number = number * 10 + (c - '0');
-		dotchk = 0;
+		dotchk = 1;
+		if (dot)
+		{
+		    numpow *= 10;
+		    number += (c - '0') / (double)numpow;
+		}
+		else
+		{
+		    number = number * 10 + (c - '0');
+		}
 	    }
 
 	    c = next_char(state);
 	}
 
-	if (dot && dotchk)
+	if (dot && !dotchk)
 	{
-	    croak(state, JSON_ERROR_UNKNOWN, "Unknown token");
+	    croak(state, JSON_ERROR_UNEXPECTED,
+		  "'.' is presented in number token, "
+		  "but require a digit after '.' ('%c')", c);
 	    return NULL;
 	}
 	else
 	{
 	    json_value_t* value = make_value(state, JSON_NUMBER);
-	    value->number = number;
+	    value->number = sign * number;
 	    return value;
 	}
     }

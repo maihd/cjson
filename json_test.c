@@ -5,9 +5,12 @@
 #endif
 
 #include <signal.h>
+#include <setjmp.h>
 
 #define JSON_IMPL
 #include "json.h"
+
+static jmp_buf jmpenv;
 
 void _sighandler(int sig)
 {
@@ -15,7 +18,7 @@ void _sighandler(int sig)
     {
 	printf("\n");
 	printf("Type '.exit' to exit\n");
-	printf("> ");
+	longjmp(jmpenv, 1);
     }
 }
 
@@ -141,30 +144,33 @@ int main(int argc, char* argv[])
     char input[1024];
     while (1)
     {
-	printf("> ");
-	fgets(input, sizeof(input), stdin);
+	if (setjmp(jmpenv) == 0)
+	{
+	    printf("> ");
+	    fgets(input, sizeof(input), stdin);
 
-	const char* json = strtrim_fast(input);
-	if (strcmp(json, ".exit") == 0)
-	{
-	    break;
-	}
-	else
-	{
-	    json_state_t* state;
-	    json_value_t* value = json_parse(json, &state);
-	    
-	    if (json_get_errno(state) != JSON_ERROR_NONE)
+	    const char* json = strtrim_fast(input);
+	    if (strcmp(json, ".exit") == 0)
 	    {
-		value = NULL;
-		printf("[ERROR]: %s\n", json_get_error(state));
+		break;
 	    }
 	    else
 	    {
-		json_print(value); printf("\n");
-	    }
+		json_state_t* state;
+		json_value_t* value = json_parse(json, &state);
 	    
-	    json_release(value, state);
+		if (json_get_errno(state) != JSON_ERROR_NONE)
+		{
+		    value = NULL;
+		    printf("[ERROR]: %s\n", json_get_error(state));
+		}
+		else
+		{
+		    json_print(value); printf("\n");
+		}
+	    
+		json_release(value, state);
+	    }
 	}
     }
     
