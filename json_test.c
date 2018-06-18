@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    json_display(value); printf("\n");
+                    json_display(value, stdout); printf("\n");
                 }
 	    
                 json_release(value, state);

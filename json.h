@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+#include <stdio.h>
+
 typedef enum
 {
     JSON_NONE,
@@ -141,8 +143,8 @@ JSON_API void          json_release(json_value_t* value, json_state_t* state);
 JSON_API json_error_t  json_get_errno(const json_state_t* state);
 JSON_API const char*   json_get_error(const json_state_t* state);
  
-JSON_API void          json_print(const json_value_t* value);
-JSON_API void          json_display(const json_value_t* value);
+JSON_API void          json_print(const json_value_t* value, FILE* out);
+JSON_API void          json_display(const json_value_t* value, FILE* out);
 
 #ifdef __cplusplus
 }
@@ -806,7 +808,7 @@ const char* json_get_error(const json_state_t* state)
     }
 }
 
-void json_print(const json_value_t* value)
+void json_print(const json_value_t* value, FILE* out)
 {
     if (value)
     {
@@ -815,47 +817,47 @@ void json_print(const json_value_t* value)
         switch (value->type)
         {
         case JSON_NULL:
-            printf("null");
+            fprintf(out, "null");
             break;
 
         case JSON_NUMBER:
-            printf("%lf", value->number);
+            fprintf(out, "%lf", value->number);
             break;
 
         case JSON_BOOLEAN:
-            printf("%s", value->boolean ? "true" : "false");
+            fprintf(out, "%s", value->boolean ? "true" : "false");
             break;
 
         case JSON_STRING:
-            printf("\"%s\"", value->string.buffer);
+            fprintf(out, "\"%s\"", value->string.buffer);
             break;
 
         case JSON_ARRAY:
-            printf("[");
+            fprintf(out, "[");
             for (i = 0, n = value->array.length; i < n; i++)
             {
-                json_print(value->array.values[i]);
+                json_print(value->array.values[i], out);
                 if (i < n - 1)
                 {
-                    printf(",");
+                    fprintf(out, ",");
                 }
             }
-            printf("]");
+            fprintf(out, "]");
             break;
 
         case JSON_OBJECT:
-            printf("{");
+            fprintf(out, "{");
             for (i = 0, n = value->object.length; i < n; i++)
             {
-                json_print(value->object.values[i].name);
-                printf(" : ");
-                json_print(value->object.values[i].value);
+                json_print(value->object.values[i].name, out);
+                fprintf(out, " : ");
+                json_print(value->object.values[i].value, out);
                 if (i < n - 1)
                 {
-                    printf(",");
+                    fprintf(out, ",");
                 }            
             }
-            printf("}");
+            fprintf(out, "}");
             break;
 
         case JSON_NONE:
@@ -865,7 +867,7 @@ void json_print(const json_value_t* value)
     }
 }          
 
-void json_display(const json_value_t* value)
+void json_display(const json_value_t* value, FILE* out)
 {
     if (value)
     {
@@ -875,23 +877,23 @@ void json_display(const json_value_t* value)
         switch (value->type)
         {
         case JSON_NULL:
-            printf("null");
+            fprintf(out, "null");
             break;
 
         case JSON_NUMBER:
-            printf("%lf", value->number);
+            fprintf(out, "%lf", value->number);
             break;
 
         case JSON_BOOLEAN:
-            printf("%s", value->boolean ? "true" : "false");
+            fprintf(out, "%s", value->boolean ? "true" : "false");
             break;
 
         case JSON_STRING:
-            printf("\"%s\"", value->string.buffer);
+            fprintf(out, "\"%s\"", value->string.buffer);
             break;
 
         case JSON_ARRAY:
-            printf("[\n");
+            fprintf(out, "[\n");
 
             indent++;
             for (i = 0, n = value->array.length; i < n; i++)
@@ -899,27 +901,27 @@ void json_display(const json_value_t* value)
                 int j, m;
                 for (j = 0, m = indent * 4; j < m; j++)
                 {
-                    printf(" ");
+                    fprintf(out, " ");
                 }
 
-                json_print(value->array.values[i]);
+                json_print(value->array.values[i], out);
                 if (i < n - 1)
                 {
-                    printf(",");
+                    fprintf(out, ",");
                 }
-                printf("\n");
+                fprintf(out, "\n");
             }
             indent--;
 
             for (i = 0, n = indent * 4; i < n; i++)
             {
-                printf(" ");
+                fprintf(out, " ");
             }
-            printf("]");
+            fprintf(out, "]");
             break;
 
         case JSON_OBJECT:
-            printf("{\n");
+            fprintf(out, "{\n");
 
             indent++;
             for (i = 0, n = value->object.length; i < n; i++)
@@ -927,25 +929,25 @@ void json_display(const json_value_t* value)
                 int j, m;
                 for (j = 0, m = indent * 4; j < m; j++)
                 {
-                    printf(" ");
+                    fprintf(out, " ");
                 }
 
-                json_print(value->object.values[i].name);
-                printf(" : ");
-                json_print(value->object.values[i].value);
+                json_print(value->object.values[i].name, out);
+                fprintf(out, " : ");
+                json_print(value->object.values[i].value, out);
                 if (i < n - 1)
                 {
-                    printf(",");
+                    fprintf(out, ",");
                 }
-                printf("\n");
+                fprintf(out, "\n");
             }
             indent--;
 
             for (i = 0, n = indent * 4; i < n; i++)
             {
-                printf(" ");
+                fprintf(out, " ");
             }
-            printf("}");
+            fprintf(out, "}");
             break;
 
         case JSON_NONE:
