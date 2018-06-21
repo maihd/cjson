@@ -1,5 +1,17 @@
+/******************************************************
+ * Simple json parser written in ANSI C
+ *
+ * @author: MaiHD
+ * @license: NULL
+ * @copyright: MaiHD @ ${HOME}, 2018
+ ******************************************************/
+
 #ifndef __JSON_H__
 #define __JSON_H__
+
+#define JSON_LIBNAME "libjson"
+#define JSON_VERSION "v1.0.00"
+#define JSON_VERCODE 10000
 
 #ifndef JSON_API
 #define JSON_API
@@ -137,9 +149,18 @@ public:
 static const json_value_t JSON_VALUE_NONE; /* auto fill with zero */
 
 typedef struct json_state json_state_t;
+typedef struct
+{
+    void* data;
+    void* (*malloc)(void* data, size_t size);
+    void  (*free)(void* data, void* pointer);
+} json_settings_t;
 
 JSON_API json_value_t* json_parse(const char* json, json_state_t** state);
+JSON_API json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** state);
+
 JSON_API void          json_release(json_state_t* state);
+
 JSON_API json_error_t  json_get_errno(const json_state_t* state);
 JSON_API const char*   json_get_error(const json_state_t* state);
  
@@ -201,9 +222,23 @@ struct json_state
     json_error_t errnum;
     char*        errmsg;
     jmp_buf      errjmp;
+
+    json_settings_t settings; /* Runtime settings */
 };
 
 static json_state_t* root_state = NULL;
+
+static void* def_malloc(void* data, size_t size)
+{
+    (void)data;
+    return malloc(size);
+}
+
+static void def_free(void* data, void* pointer)
+{
+    (void)data;
+    free(pointer);
+}
 
 #if __GNUC__
 __attribute__((noreturn))
@@ -216,7 +251,7 @@ static void croak(json_state_t* state, json_error_t code, const char* fmt, ...)
     
     if (state->errmsg == NULL)
     {
-		state->errmsg = malloc(errmsg_size);
+		state->errmsg = state->settings.malloc(state->settings.data, errmsg_size);
     }
 
     state->errnum = code;
@@ -229,7 +264,7 @@ static void croak(json_state_t* state, json_error_t code, const char* fmt, ...)
     longjmp(state->errjmp, code);
 }
 
-static json_pool_t* make_pool(json_pool_t* next, int count, int size)
+static json_pool_t* make_pool(json_state_t* state, json_pool_t* next, int count, int size)
 {
     if (count <= 0 || size <= 0)
     {
@@ -237,7 +272,7 @@ static json_pool_t* make_pool(json_pool_t* next, int count, int size)
     }
 
     int pool_size = count * (sizeof(void*) + size);
-    json_pool_t* pool = (json_pool_t*)malloc(sizeof(json_pool_t) + pool_size);
+    json_pool_t* pool = (json_pool_t*)state->settings.malloc(state->settings.data, sizeof(json_pool_t) + pool_size);
     if (pool)
     {
 		pool->next = next;
@@ -255,12 +290,12 @@ static json_pool_t* make_pool(json_pool_t* next, int count, int size)
     return pool;
 }
 
-static void free_pool(json_pool_t* pool)
+static void free_pool(json_state_t* state, json_pool_t* pool)
 {
     if (pool)
     {
-		free_pool(pool->next);
-		free(pool);
+		free_pool(state, pool->next);
+		state->settings.free(state->settings.data, pool);
     }
 }
 
@@ -290,14 +325,16 @@ static void pool_collect(json_pool_t* pool, void* ptr)
     }
 }
 
-static json_bucket_t* make_bucket(json_bucket_t* next, int count, int size)
+static json_bucket_t* make_bucket(json_state_t* state, json_bucket_t* next, int count, int size)
 {
     if (count <= 0 || size <= 0)
     {
         return 0;
     }
 
-    json_bucket_t* bucket = (json_bucket_t*)malloc(sizeof(json_bucket_t) + count * size);
+    json_bucket_t* bucket = 
+    (json_bucket_t*)state->settings.malloc(state->settings.data,
+                                           sizeof(json_bucket_t) + count * size);
     if (bucket)
     {
         bucket->next     = next;
@@ -308,12 +345,12 @@ static json_bucket_t* make_bucket(json_bucket_t* next, int count, int size)
     return bucket;
 }
 
-static void free_bucket(json_bucket_t* bucket)
+static void free_bucket(json_state_t* state, json_bucket_t* bucket)
 {
     if (bucket)
     {
-        free_bucket(bucket->next);
-        free(bucket);
+        free_bucket(state, bucket->next);
+        state->settings.free(state->settings.data, bucket);
     }
 }
 
@@ -335,7 +372,7 @@ static void* bucket_extract(json_bucket_t* bucket, int count)
     }
 }
 
-static void* bucket_resize(json_bucket_t* bucket, int ptr, int old_count, int new_count)
+static void* bucket_resize(json_bucket_t* bucket, void* ptr, int old_count, int new_count)
 {
     if (!bucket || old_count <= 0 || new_count <= 0)
     {
@@ -359,7 +396,7 @@ static json_value_t* make_value(json_state_t* state, int type)
 {
     if (!state->value_pool || !state->value_pool->head)
     {
-		state->value_pool = make_pool(state->value_pool,
+		state->value_pool = make_pool(state, state->value_pool,
                                       64, sizeof(json_value_t));
 		if (!state->value_pool)
 		{
@@ -444,9 +481,9 @@ static void free_state(json_state_t* state)
     {
 		json_state_t* next = state->next;
 
-        free_bucket(state->values_bucket);
-        free_bucket(state->string_bucket);
-		free_pool(state->value_pool);
+        free_bucket(state, state->values_bucket);
+        free_bucket(state, state->string_bucket);
+		free_pool(state, state->value_pool);
 		free(state->errmsg);
 		free(state);
 
@@ -643,7 +680,7 @@ static json_value_t* parse_string(json_state_t* state)
 	    char* string = bucket_extract(state->string_bucket, length + 1);
         if (!string)
         {
-            state->string_bucket = make_bucket(state->string_bucket, 4096, sizeof(char)); /* 4096 equal default memory page size */
+            state->string_bucket = make_bucket(state, state->string_bucket, 4096, sizeof(char)); /* 4096 equal default memory page size */
             string = bucket_extract(state->string_bucket, length + 1);
             if (!string)
             {
@@ -704,7 +741,7 @@ static json_value_t* parse_object(json_state_t* state)
                                                 length, ++length);
             if (!root->object.values)
             {
-                state->values_bucket = make_bucket(state->values_bucket, 128, sizeof(json_value_t*));
+                state->values_bucket = make_bucket(state, state->values_bucket, 128, sizeof(json_value_t*));
                 void* new_values = bucket_extract(state->values_bucket, length);
                 if (!new_values)
                 {
@@ -714,7 +751,7 @@ static json_value_t* parse_object(json_state_t* state)
                 else
                 {
                     memcpy(new_values, root->object.values, (length - 1) * 2 * sizeof(json_value_t));
-                    root->object.values = (json_value_t*)new_values;
+                    *((void**)&root->object.values) = new_values;
                 }
             }
 	    
@@ -756,7 +793,7 @@ static json_value_t* parse_array(json_state_t* state)
             values = bucket_resize(state->values_bucket, values, length, ++length);
             if (!root->object.values)
             {
-                state->values_bucket = make_bucket(state->values_bucket, 128, sizeof(json_value_t*));
+                state->values_bucket = make_bucket(state, state->values_bucket, 128, sizeof(json_value_t*));
                 void* new_values = bucket_extract(state->values_bucket, length);
                 if (!new_values)
                 {
@@ -766,7 +803,7 @@ static json_value_t* parse_array(json_state_t* state)
                 else
                 {
                     memcpy(new_values, values, (length - 1) * sizeof(json_value_t));
-                    values = (json_value_t*)new_values;
+                    values = (json_value_t**)new_values;
                 }
             }
 	        values[length - 1] = value;
@@ -853,7 +890,18 @@ static json_value_t* parse_single(json_state_t* state)
 
 json_value_t* json_parse(const char* json, json_state_t** out_state)
 {
+    json_settings_t settings;
+    settings.data   = NULL;
+    settings.free   = def_free;
+    settings.malloc = def_malloc;
+
+    return json_parse_ex(json, &settings, out_state);
+}
+
+json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** out_state)
+{
     json_state_t* state = make_state(json);
+    state->settings = *settings;
 
     if (skip_space(state) == '{')
     {
