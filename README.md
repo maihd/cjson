@@ -1,8 +1,17 @@
-# Simple JSON parser for ANSI C
+# Introduction
+Simple JSON parser written in ANSI C
 
 ## API
 ```C
+typedef struct
+{
+    void* data;
+    void* (*malloc)(void* data, size_t size);
+    void  (*free)(void* data, void* pointer);
+} json_settings_t;
+
 json_value_t* json_parse(const char* json_code, json_state_t** out_state);
+json_value_t* json_parse_ex(const char* json_code, json_settings_t* settings, json_state_t** out_state);
 // 1. json_code: the JSON content from JSON's source (from memory, from file)
 // 2. out_state: the JSON state for parsing json code, contain usage memory (can be NULL, library will hold it)
 
@@ -33,9 +42,9 @@ void _sighandler(int sig)
 {
     if (sig == SIGINT)
     {
-	printf("\n");
-	printf("Type '.exit' to exit\n");
-	longjmp(jmpenv, 1);
+        printf("\n");
+        printf("Type '.exit' to exit\n");
+        longjmp(jmpenv, 1);
     }
 }
 
@@ -43,7 +52,7 @@ char* strtrim_fast(char* str)
 {
     while (isspace(*str))
     {
-	str++;
+	    str++;
     }
 
     char* ptr = str;
