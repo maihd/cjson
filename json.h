@@ -74,35 +74,41 @@ typedef struct json_value
 
 		struct
 		{
+			int                 length;
+			struct json_value** values;
+		} array;
+
+		struct
+		{
 			int length;
 			struct
 			{
 				struct json_value* name;
 				struct json_value* value;
-			}  *values;
+			}*  values;
 		} object;
-
-		struct
-		{
-			int                 length;
-			struct json_value** values;
-		} array;
     };
 
-    #ifdef __cplusplus
-public:
+#ifdef __cplusplus
+public: // @region: Constructors
     inline json_value()
-		: parent(0)
-		, type(JSON_NONE)
-		, boolean(JSON_FALSE)
+        : type(JSON_NONE)
+        , object({ 0, NULL })
 	{	
 	}
 
+    inline ~json_value()
+    {
+        // SHOULD BE EMPTY
+        // Memory are managed by json_state_t
+    }
+
+public: // @region: Indexor
 	inline const json_value& operator[] (int index) const
 	{
 		if (type != JSON_ARRAY || index < 0 || index > array.length)
 		{
-			return JSON_VALUE_NONE;
+			return json_value_t();
 		}
 		else
 		{
@@ -114,22 +120,23 @@ public:
 	{
 		if (type != JSON_OBJECT)
 		{
-			return JSON_VALUE_NONE;
+			return json_value_t();
 		}
 		else
 		{
 			for (int i = 0, n = object.length; i < n; i++)
 			{
-				if (strcmp(object.values[i].name, name) == 0)
+				if (strcmp(object.values[i].name->string.buffer, name) == 0)
 				{
 					return *object.values[i].value;
 				}
 			}
 
-			return JSON_VALUE_NONE;
+			return json_value_t();
 		}	
 	}
 
+public: // @region: Conversion
 	inline operator const char* () const
 	{
 		if (type == JSON_STRING)
@@ -155,7 +162,7 @@ public:
 		return !!boolean; // More precision, should use when debug
     #endif
 	}
-    #endif /* __cplusplus */
+#endif /* __cplusplus */
 } json_value_t;
     
 static const json_value_t JSON_VALUE_NONE; /* auto fill with zero */
@@ -191,7 +198,46 @@ JSON_API void          json_write(const json_value_t* value, FILE* out);
 #ifdef __cplusplus
 namespace json
 {
-    typedef json_
+    typedef ::json_type_t     type_t;
+    typedef ::json_error_t    error_t;
+    typedef ::json_value_t    value_t;
+    typedef ::json_state_t    state_t;
+    typedef ::json_settings_t settings_t;
+
+    inline value_t* parse(const char* code, state_t** state)
+    {
+        return ::json_parse(code, state);
+    }
+
+    inline value_t* parse(const char* code, const settings_t* settings, state_t** state)
+    {
+        return ::json_parse_ex(code, settings, state);
+    }
+
+    inline void release(state_t* state)
+    {
+        ::json_release(state);
+    }
+
+    inline error_t get_errno(const state_t* state)
+    {
+        return ::json_get_errno(state);
+    }
+
+    inline const char* get_error(const state_t* state)
+    {
+        return ::json_get_error(state);
+    }
+
+    inline void print(const value_t* value, FILE* out)
+    {
+        ::json_print(value, out);
+    }
+
+    inline void write(const value_t* value, FILE* out)
+    {
+        ::json_write(value, out);
+    }
 }
 #endif
 /* @endregion: C++ API...*/
@@ -274,7 +320,7 @@ static void set_error_valist(json_state_t* state, json_error_t code, const char*
     state->errnum = code;
     if (state->errmsg == NULL)
     {
-        state->errmsg = state->settings.malloc(state->settings.data, errmsg_size);
+        state->errmsg = (char*)state->settings.malloc(state->settings.data, errmsg_size);
     }
 
 #if defined(_MSC_VER) && _MSC_VER >= 1200
@@ -436,7 +482,7 @@ static void* bucket_resize(json_bucket_t* bucket, void* ptr, int old_count, int 
     }
 }
 
-static json_value_t* make_value(json_state_t* state, int type)
+static json_value_t* make_value(json_state_t* state, json_type_t type)
 {
     if (!state->value_pool || !state->value_pool->head)
     {
@@ -851,11 +897,11 @@ static json_value_t* parse_string(json_state_t* state)
 
         match_char(state, '"');
 
-        char* string = bucket_extract(state->string_bucket, length + 1);
+        char* string = (char*)bucket_extract(state->string_bucket, length + 1);
         if (!string)
         {
             state->string_bucket = make_bucket(state, state->string_bucket, 4096, sizeof(char)); /* 4096 equal default memory page size */
-            string = bucket_extract(state->string_bucket, length + 1);
+            string = (char*)bucket_extract(state->string_bucket, length + 1);
             if (!string)
             {
                 croak(state, JSON_ERROR_MEMORY, "Out of memory when create new string");

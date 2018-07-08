@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\json_test.c" />
+    <ClCompile Include="..\json_test_cpp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\json.h" />

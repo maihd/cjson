@@ -1,4 +1,4 @@
-#if 0
+#if 1
 
 #include <signal.h>
 #include <setjmp.h>
@@ -54,21 +54,21 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                json_state_t* state;
-                json_value_t* value = json_parse(json, &state);
+                json::state_t* state;
+                json::value_t* value = json::parse(json, &state);
 	    
-                if (json_get_errno(state) != JSON_ERROR_NONE)
+                if (json::get_errno(state) != JSON_ERROR_NONE)
                 {
                     value = NULL;
-                    printf("[ERROR]: %s\n", json_get_error(state));
+                    printf("[ERROR]: %s\n", json::get_error(state));
                 }
                 else
                 {
-                    json_print(value, stdout); printf("\n");
+                    json::print(value, stdout); printf("\n");
                 }
 
-                /* json_release(NULL) for release all memory if you don't catch the json_state_t */
-                json_release(state);
+                /* json::release(NULL) for release all memory if you don't catch the json_state_t */
+                json::release(state);
 	        }
 	    }
     }
@@ -76,4 +76,4 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-#endif
+#endif 0
