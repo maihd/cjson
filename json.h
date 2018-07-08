@@ -38,10 +38,18 @@ typedef enum
 typedef enum
 {
     JSON_ERROR_NONE,
-    JSON_ERROR_MEMORY,
+    
+    /* Parsing error */
+
+    JSON_ERROR_FORMAT,
     JSON_ERROR_UNMATCH,
     JSON_ERROR_UNKNOWN,
     JSON_ERROR_UNEXPECTED,
+
+    /* Runtime error */
+
+    JSON_ERROR_MEMORY,
+    JSON_ERROR_INTERNAL,
 } json_error_t;
 
 typedef enum
@@ -240,6 +248,29 @@ static void def_free(void* data, void* pointer)
     free(pointer);
 }
 
+/* @funcdef: set_error_valist */
+static void set_error_valist(json_state_t* state, json_error_t code, const char* fmt, va_list valist)
+{
+    const int errmsg_size = 1024;
+
+    state->errnum = code;
+    if (state->errmsg == NULL)
+    {
+        state->errmsg = state->settings.malloc(state->settings.data, errmsg_size);
+    }
+    sprintf(state->errmsg, fmt, valist);
+}
+
+/* @funcdef: set_error */
+static void set_error(json_state_t* state, json_error_t code, const char* fmt, ...)
+{
+    va_list varg;
+    va_start(varg, fmt);
+    set_error_valist(state, code, fmt, varg);
+    va_end(varg);
+}
+
+/* funcdef: croak */
 #if __GNUC__
 __attribute__((noreturn))
 #elif defined(_MSC_VER)
@@ -247,20 +278,10 @@ __declspec(noreturn)
 #endif
 static void croak(json_state_t* state, json_error_t code, const char* fmt, ...)
 {
-    const int errmsg_size = 1024;
-    
-    if (state->errmsg == NULL)
-    {
-		state->errmsg = state->settings.malloc(state->settings.data, errmsg_size);
-    }
-
-    state->errnum = code;
-
     va_list varg;
     va_start(varg, fmt);
-    sprintf(state->errmsg, fmt, varg);
+    set_error_valist(state, code, fmt, varg);
     va_end(varg);
-    
     longjmp(state->errjmp, code);
 }
 
@@ -561,7 +582,15 @@ static int match_char(json_state_t* state, int c)
     }
 }
 
+/* All parse functions declaration */
+
+static json_value_t* parse_array(json_state_t* state);
 static json_value_t* parse_single(json_state_t* state);
+static json_value_t* parse_object(json_state_t* state);
+static json_value_t* parse_number(json_state_t* state);
+static json_value_t* parse_string(json_state_t* state);
+
+/* @funcdef: parse_number */
 static json_value_t* parse_number(json_state_t* state)
 {
     if (skip_space(state) < 0)
@@ -661,115 +690,7 @@ static json_value_t* parse_number(json_state_t* state)
     }
 }
 
-static json_value_t* parse_string(json_state_t* state)
-{
-    if (skip_space(state) < 0)
-    {
-        return NULL;
-    }
-    else
-    {
-        match_char(state, '"');
-
-        int length = 0;
-	    while (!is_eof(state) && peek_char(state) != '"')
-	    {
-	        length++;
-	        next_char(state);
-	    }
-	
-	    match_char(state, '"');
-
-	    char* string = bucket_extract(state->string_bucket, length + 1);
-        if (!string)
-        {
-            state->string_bucket = make_bucket(state, state->string_bucket, 4096, sizeof(char)); /* 4096 equal default memory page size */
-            string = bucket_extract(state->string_bucket, length + 1);
-            if (!string)
-            {
-                croak(state, JSON_ERROR_MEMORY, "Out of memory when create new string");
-                return NULL;
-            }
-        }
-	    string[length] = 0;
-	    memcpy(string, state->buffer + state->cursor - length - 1, length);
-
-	    json_value_t* value  = make_value(state, JSON_STRING);
-	    value->string.length = length;
-	    value->string.buffer = string;
-	    return value;
-    }
-}
-
-static json_value_t* parse_object(json_state_t* state)
-{
-    if (skip_space(state) < 0)
-    {
-        return NULL;
-    }
-    else
-    {
-        match_char(state, '{');
-	
-	    json_value_t* root = make_value(state, JSON_OBJECT);
-
-	    int            length = 0;
-	    json_value_t** values = 0;
-	
-	    while (skip_space(state) > 0 && peek_char(state) != '}')
-	    {
-	        if (length > 0)
-	        {
-                match_char(state, ',');
-	        }
-	    
-	        json_value_t* name = NULL;
-            if (skip_space(state) == '"')
-	        {
-                name = parse_string(state);
-	        }
-	        else
-	        {
-                croak(state, JSON_ERROR_UNEXPECTED,
-		              "Expected string for name of field of object");
-	        }
-
-	        skip_space(state);
-	        match_char(state, ':');
-	    
-	        json_value_t* value = parse_single(state);
-
-            root->object.values = bucket_resize(state->values_bucket,
-                                                root->object.values,
-                                                length, ++length);
-            if (!root->object.values)
-            {
-                state->values_bucket = make_bucket(state, state->values_bucket, 128, sizeof(json_value_t*));
-                void* new_values = bucket_extract(state->values_bucket, length);
-                if (!new_values)
-                {
-                    croak(state, JSON_ERROR_MEMORY, "Out of memory when create object");
-                    return NULL;
-                }
-                else
-                {
-                    memcpy(new_values, root->object.values, (length - 1) * 2 * sizeof(json_value_t));
-                    *((void**)&root->object.values) = new_values;
-                }
-            }
-	    
-	        root->object.values[length - 1].name  = name;
-	        root->object.values[length - 1].value = value;
-	    }
-
-	    root->object.length = length;
-
-	    skip_space(state);
-	    match_char(state, '}');
-	    return root;
-    }
-}
-
+/* @funcdef: parse_array */
 static json_value_t* parse_array(json_state_t* state)
 {
     if (skip_space(state) < 0)
@@ -821,6 +742,7 @@ static json_value_t* parse_array(json_state_t* state)
     }
 }
 
+/* parse_single */
 static json_value_t* parse_single(json_state_t* state)
 {
     if (skip_space(state) < 0)
@@ -891,6 +813,118 @@ static json_value_t* parse_single(json_state_t* state)
     }
 }
 
+/* @funcdef: parse_string */
+static json_value_t* parse_string(json_state_t* state)
+{
+    if (skip_space(state) < 0)
+    {
+        return NULL;
+    }
+    else
+    {
+        match_char(state, '"');
+
+        int length = 0;
+        while (!is_eof(state) && peek_char(state) != '"')
+        {
+            length++;
+            next_char(state);
+        }
+
+        match_char(state, '"');
+
+        char* string = bucket_extract(state->string_bucket, length + 1);
+        if (!string)
+        {
+            state->string_bucket = make_bucket(state, state->string_bucket, 4096, sizeof(char)); /* 4096 equal default memory page size */
+            string = bucket_extract(state->string_bucket, length + 1);
+            if (!string)
+            {
+                croak(state, JSON_ERROR_MEMORY, "Out of memory when create new string");
+                return NULL;
+            }
+        }
+        string[length] = 0;
+        memcpy(string, state->buffer + state->cursor - length - 1, length);
+
+        json_value_t* value = make_value(state, JSON_STRING);
+        value->string.length = length;
+        value->string.buffer = string;
+        return value;
+    }
+}
+
+/* @funcdef: parse_object */
+static json_value_t* parse_object(json_state_t* state)
+{
+    if (skip_space(state) < 0)
+    {
+        return NULL;
+    }
+    else
+    {
+        match_char(state, '{');
+
+        json_value_t* root = make_value(state, JSON_OBJECT);
+
+        int            length = 0;
+        json_value_t** values = 0;
+
+        while (skip_space(state) > 0 && peek_char(state) != '}')
+        {
+            if (length > 0)
+            {
+                match_char(state, ',');
+            }
+
+            json_value_t* name = NULL;
+            if (skip_space(state) == '"')
+            {
+                name = parse_string(state);
+            }
+            else
+            {
+                croak(state, JSON_ERROR_UNEXPECTED,
+                      "Expected string for name of field of object");
+            }
+
+            skip_space(state);
+            match_char(state, ':');
+
+            json_value_t* value = parse_single(state);
+
+            root->object.values = bucket_resize(state->values_bucket,
+                                                root->object.values,
+                                                length, ++length);
+            if (!root->object.values)
+            {
+                state->values_bucket = make_bucket(state, state->values_bucket, 128, sizeof(json_value_t*));
+                void* new_values = bucket_extract(state->values_bucket, length);
+                if (!new_values)
+                {
+                    croak(state, JSON_ERROR_MEMORY, "Out of memory when create object");
+                    return NULL;
+                }
+                else
+                {
+                    memcpy(new_values, root->object.values, (length - 1) * 2 * sizeof(json_value_t));
+                    *((void**)&root->object.values) = new_values;
+                }
+            }
+
+            root->object.values[length - 1].name = name;
+            root->object.values[length - 1].value = value;
+        }
+
+        root->object.length = length;
+
+        skip_space(state);
+        match_char(state, '}');
+        return root;
+    }
+}
+         
+/* @region: json_parse_in */
 static json_value_t* json_parse_in(json_state_t* state)
 {
     if (!state)
@@ -906,8 +940,11 @@ static json_value_t* json_parse_in(json_state_t* state)
             return value;
         }
     }
-
-    return NULL;
+    else
+    {
+        set_error(state, JSON_ERROR_FORMAT, "Require starting with '{'");
+        return NULL;
+    }
 }
 
 /* @funcdef: json_parse */
