@@ -12,11 +12,21 @@ typedef struct
 
 json_value_t* json_parse(const char* json_code, json_state_t** out_state);
 json_value_t* json_parse_ex(const char* json_code, json_settings_t* settings, json_state_t** out_state);
-// 1. json_code: the JSON content from JSON's source (from memory, from file)
-// 2. out_state: the JSON state for parsing json code, contain usage memory (can be NULL, library will hold it)
+// 1. json_code : the JSON content from JSON's source (from memory, from file)
+// 2. out_state : the JSON state for parsing json code, contain usage memory (can be NULL, library will hold it)
+// 3. settings  : the parsing settings, and only custom memory management by now
 
 void json_release(json_state_t* state);
 // Release state, when state is null, library will implicit remove states that it hold
+
+json_error_t json_get_errno(const json_state_t* state);
+const char*  json_get_error(const json_state_t* state);
+
+void json_print(const json_value_t* value, FILE* out); 
+// Stringify output to file, more readable + size bigger  than json_write
+
+void json_write(const json_value_t* value, FILE* out); 
+// Stringify output to file, less readable + size smaller than json_print
 
 // Find more details, or helper functions in json.h
 ```
@@ -24,12 +34,6 @@ void json_release(json_state_t* state);
 ## Examples
 Belove code from json_test.c
 ```C
-#ifdef _MSC_VER
-#  ifndef _CRT_SECURE_NO_WARNINGS
-#  define _CRT_SECURE_NO_WARNINGS
-#  endif
-#endif
-
 #include <signal.h>
 #include <setjmp.h>
 
@@ -52,7 +56,7 @@ char* strtrim_fast(char* str)
 {
     while (isspace(*str))
     {
-	    str++;
+        str++;
     }
 
     char* ptr = str;
@@ -94,9 +98,9 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    json_display(value, stdout); printf("\n");
+                    json_print(value, stdout); printf("\n");
                 }
-	    
+
                 /* json_release(NULL) for release all memory if you don't catch the json_state_t */
                 json_release(state);
 	        }

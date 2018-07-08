@@ -149,7 +149,11 @@ public:
 
 	inline operator bool () const
 	{
-		return !!boolean;
+    #ifdef NDEBUG
+        return boolean;   // Faster, use when performance needed
+    #else
+		return !!boolean; // More precision, should use when debug
+    #endif
 	}
     #endif /* __cplusplus */
 } json_value_t;
@@ -171,14 +175,28 @@ JSON_API void          json_release(json_state_t* state);
 
 JSON_API json_error_t  json_get_errno(const json_state_t* state);
 JSON_API const char*   json_get_error(const json_state_t* state);
- 
+
 JSON_API void          json_print(const json_value_t* value, FILE* out);
 JSON_API void          json_write(const json_value_t* value, FILE* out);
 
+/* END OF EXTERN "C" */
 #ifdef __cplusplus
 }
 #endif
-    
+/* * */
+
+/*
+ * @region: C++ API wrapper
+ */
+#ifdef __cplusplus
+namespace json
+{
+    typedef json_
+}
+#endif
+/* @endregion: C++ API...*/
+
+/* END OF __JSON_H__ */
 #endif /* __JSON_H__ */
 
 #ifdef JSON_IMPL
@@ -258,7 +276,12 @@ static void set_error_valist(json_state_t* state, json_error_t code, const char*
     {
         state->errmsg = state->settings.malloc(state->settings.data, errmsg_size);
     }
+
+#if defined(_MSC_VER) && _MSC_VER >= 1200
+    sprintf_s(state->errmsg, errmsg_size, fmt, valist);
+#else
     sprintf(state->errmsg, fmt, valist);
+#endif
 }
 
 /* @funcdef: set_error */
@@ -937,6 +960,10 @@ static json_value_t* json_parse_in(json_state_t* state)
         {
             json_value_t* value = parse_object(state);
             return value;
+        }
+        else
+        {
+            return NULL;
         }
     }
     else

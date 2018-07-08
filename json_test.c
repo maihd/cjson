@@ -1,9 +1,3 @@
-#ifdef _MSC_VER
-#  ifndef _CRT_SECURE_NO_WARNINGS
-#  define _CRT_SECURE_NO_WARNINGS
-#  endif
-#endif
-
 #include <signal.h>
 #include <setjmp.h>
 
@@ -16,9 +10,9 @@ void _sighandler(int sig)
 {
     if (sig == SIGINT)
     {
-	printf("\n");
-	printf("Type '.exit' to exit\n");
-	longjmp(jmpenv, 1);
+        printf("\n");
+        printf("Type '.exit' to exit\n");
+        longjmp(jmpenv, 1);
     }
 }
 
@@ -26,7 +20,7 @@ char* strtrim_fast(char* str)
 {
     while (isspace(*str))
     {
-	str++;
+        str++;
     }
 
     char* ptr = str;
