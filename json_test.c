@@ -68,9 +68,9 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    json_display(value, stdout); printf("\n");
+                    json_print(value, stdout); printf("\n");
                 }
-	    
+
                 /* json_release(NULL) for release all memory if you don't catch the json_state_t */
                 json_release(state);
 	        }

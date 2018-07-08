@@ -165,7 +165,7 @@ JSON_API json_error_t  json_get_errno(const json_state_t* state);
 JSON_API const char*   json_get_error(const json_state_t* state);
  
 JSON_API void          json_print(const json_value_t* value, FILE* out);
-JSON_API void          json_display(const json_value_t* value, FILE* out);
+JSON_API void          json_write(const json_value_t* value, FILE* out);
 
 #ifdef __cplusplus
 }
@@ -891,6 +891,26 @@ static json_value_t* parse_single(json_state_t* state)
     }
 }
 
+static json_value_t* json_parse_in(json_state_t* state)
+{
+    if (!state)
+    {
+        return NULL;
+    }
+
+    if (skip_space(state) == '{')
+    {
+        if (setjmp(state->errjmp) == 0)
+        {
+            json_value_t* value = parse_object(state);
+            return value;
+        }
+    }
+
+    return NULL;
+}
+
+/* @funcdef: json_parse */
 json_value_t* json_parse(const char* json, json_state_t** out_state)
 {
     json_settings_t settings;
@@ -901,45 +921,43 @@ json_value_t* json_parse(const char* json, json_state_t** out_state)
     return json_parse_ex(json, &settings, out_state);
 }
 
+/* @funcdef: json_parse_ex */
 json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** out_state)
 {
     json_state_t* state = make_state(json, settings);
+    json_value_t* value = json_parse_in(state);
 
-    if (skip_space(state) == '{')
+    if (value)
     {
-        if (setjmp(state->errjmp) == 0)
+        if (out_state)
         {
-            json_value_t* value = parse_object(state);
-
-            if (out_state)
-            {
-                *out_state = state;
-            }
-            else
-            {
-                if (state)
-                {
-                    state->next = root_state;
-                    root_state = state;
-                }
-            }
-
-            return value;
+            *out_state = state;
         }
-    }
-        
-    if (out_state)
-    {
-        *out_state = state;
+        else
+        {
+            if (state)
+            {
+                state->next = root_state;
+                root_state = state;
+            }
+        }
     }
     else
     {
-        free_state(state);
+        if (out_state)
+        {
+            *out_state = state;
+        }
+        else
+        {
+            free_state(state);
+        }
     }
 
-    return NULL;
+    return value;
 }
 
+/* @funcdef: json_release */
 void json_release(json_state_t* state)
 {
     if (state)
@@ -953,6 +971,7 @@ void json_release(json_state_t* state)
     }
 }
 
+/* @funcdef: json_get_errno */
 json_error_t json_get_errno(const json_state_t* state)
 {
     if (state)
@@ -965,6 +984,7 @@ json_error_t json_get_errno(const json_state_t* state)
     }
 }
 
+/* @funcdef: json_get_error */
 const char* json_get_error(const json_state_t* state)
 {
     if (state)
@@ -977,7 +997,8 @@ const char* json_get_error(const json_state_t* state)
     }
 }
 
-void json_print(const json_value_t* value, FILE* out)
+/* @funcdef: json_write */
+void json_write(const json_value_t* value, FILE* out)
 {
     if (value)
     {
@@ -1036,7 +1057,8 @@ void json_print(const json_value_t* value, FILE* out)
     }
 }          
 
-void json_display(const json_value_t* value, FILE* out)
+/* @funcdef: json_print */
+void json_print(const json_value_t* value, FILE* out)
 {
     if (value)
     {
