@@ -764,18 +764,10 @@ static json_value_t* parse_single(json_state_t* state)
 	    case '"':
 	        return parse_string(state);
 
-	    case '+':
-	    case '-':
-	    case '0':
-	    case '1':
-	    case '2':
-	    case '3':
-	    case '4':
-	    case '5':
-	    case '6':
-	    case '7':
-	    case '8':
-	    case '9':
+	    case '+': case '-': case '0': 
+        case '1': case '2': case '3': 
+        case '4': case '5': case '6': 
+        case '7': case '8': case '9':
 	        return parse_number(state);
 	    
         default:
@@ -867,9 +859,7 @@ static json_value_t* parse_object(json_state_t* state)
 
         json_value_t* root = make_value(state, JSON_OBJECT);
 
-        int            length = 0;
-        json_value_t** values = 0;
-
+        int length = 0;
         while (skip_space(state) > 0 && peek_char(state) != '}')
         {
             if (length > 0)
@@ -893,13 +883,17 @@ static json_value_t* parse_object(json_state_t* state)
 
             json_value_t* value = parse_single(state);
 
-            root->object.values = bucket_resize(state->values_bucket,
-                                                root->object.values,
-                                                length, ++length);
-            if (!root->object.values)
+            /* Append new pair of value to container */
+            void* new_values = bucket_resize(state->values_bucket,
+                                             root->object.values,
+                                             length, ++length);
+            if (!new_values)
             {
+                /* Create new buffer */
                 state->values_bucket = make_bucket(state, state->values_bucket, 128, sizeof(json_value_t*));
-                void* new_values = bucket_extract(state->values_bucket, length);
+                
+                /* Continue get new buffer for values */
+                new_values = bucket_extract(state->values_bucket, length);
                 if (!new_values)
                 {
                     croak(state, JSON_ERROR_MEMORY, "Out of memory when create object");
@@ -912,7 +906,12 @@ static json_value_t* parse_object(json_state_t* state)
                 }
             }
 
-            root->object.values[length - 1].name = name;
+            /* When code reach here, new_values should not invalid */
+            assert(new_values != NULL && "An error occurred but is not handled");
+
+            /* Well done */
+            *((void**)&root->object.values) = new_values;
+            root->object.values[length - 1].name  = name;
             root->object.values[length - 1].value = value;
         }
 
@@ -942,7 +941,9 @@ static json_value_t* json_parse_in(json_state_t* state)
     }
     else
     {
-        set_error(state, JSON_ERROR_FORMAT, "Require starting with '{'");
+        set_error(state, JSON_ERROR_FORMAT, 
+                  "JSON must be starting with '{', first character is '%c'", 
+                  peek_char(state));
         return NULL;
     }
 }
@@ -975,7 +976,7 @@ json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, j
             if (state)
             {
                 state->next = root_state;
-                root_state = state;
+                root_state  = state;
             }
         }
     }
