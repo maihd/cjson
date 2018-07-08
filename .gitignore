@@ -1,5 +1,6 @@
+.vscode
 .DS_Store
-vctest/.vs
-vctest/obj
-vctest/Debug
-vctest/Release
+/vctest/.vs
+/vctest/obj
+/vctest/Debug
+/vctest/Release

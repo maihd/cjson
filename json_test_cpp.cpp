@@ -1,4 +1,4 @@
-#if 1
+﻿#if 1
 
 #include <signal.h>
 #include <setjmp.h>
