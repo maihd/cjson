@@ -737,11 +737,13 @@ static json_value_t* parse_array(json_state_t* state)
 	        }
 	    
 	        json_value_t* value = parse_single(state);
-            values = bucket_resize(state->values_bucket, values, length, ++length);
-            if (!root->object.values)
+            
+            void* new_values = bucket_resize(state->values_bucket, values, length, ++length);
+            if (!new_values)
             {
                 state->values_bucket = make_bucket(state, state->values_bucket, 128, sizeof(json_value_t*));
-                void* new_values = bucket_extract(state->values_bucket, length);
+                
+                new_values = bucket_extract(state->values_bucket, length);
                 if (!new_values)
                 {
                     croak(state, JSON_ERROR_MEMORY, "Out of memory when create array");
@@ -750,9 +752,10 @@ static json_value_t* parse_array(json_state_t* state)
                 else
                 {
                     memcpy(new_values, values, (length - 1) * sizeof(json_value_t));
-                    values = (json_value_t**)new_values;
                 }
             }
+
+            values = (json_value_t**)new_values;
 	        values[length - 1] = value;
 	    }
 
