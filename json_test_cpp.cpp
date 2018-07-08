@@ -8,7 +8,7 @@
 
 static jmp_buf jmpenv;
 
-void _sighandler(int sig)
+static void _sighandler(int sig)
 {
     if (sig == SIGINT)
     {
@@ -18,7 +18,7 @@ void _sighandler(int sig)
     }
 }
 
-char* strtrim_fast(char* str)
+static char* strtrim_fast(char* str)
 {
     while (isspace(*str))
     {
