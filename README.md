@@ -54,21 +54,21 @@ int main(int argc, char* argv[])
     char input[1024];
     while (1)
     {
-	    if (setjmp(jmpenv) == 0)
-	    {
-	        printf("> ");
-	        fgets(input, sizeof(input), stdin);
+        if (setjmp(jmpenv) == 0)
+        {
+            printf("> ");
+            fgets(input, sizeof(input), stdin);
 
-	        const char* json = strtrim_fast(input);
-	        if (strcmp(json, ".exit") == 0)
-	        {
+            const char* json = strtrim_fast(input);
+            if (strcmp(json, ".exit") == 0)
+            {
                 break;
-	        }
-	        else
+            }
+            else
             {
                 json_state_t* state;
                 json_value_t* value = json_parse(json, &state);
-	    
+
                 if (json_get_errno(state) != JSON_ERROR_NONE)
                 {
                     value = NULL;
@@ -81,8 +81,8 @@ int main(int argc, char* argv[])
 
                 /* json_release(NULL) for release all memory if you don't catch the json_state_t */
                 json_release(state);
-	        }
-	    }
+            }
+        }
     }
     
     return 0;
