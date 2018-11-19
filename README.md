@@ -28,7 +28,7 @@ struct json_settings_t
 json_value_t* json_parse(const char* json_code, json_state_t** out_state);
 json_value_t* json_parse_ex(const char* json_code, json_settings_t* settings, json_state_t** out_state);
 // 1. json_code : the JSON content from JSON's source (from memory, from file)
-// 2. out_state : the JSON state for parsing json code, contain usage memory (can be NULL, library will hold it)
+// 2. out_state : the JSON state for parsing json code, contain usage memory (can be NULL, library will hold it), can be reuse by give it an valid state
 // 3. settings  : the parsing settings, and only custom memory management by now
 
 void json_release(json_state_t* state);
