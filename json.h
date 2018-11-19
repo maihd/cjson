@@ -24,6 +24,9 @@ extern "C" {
 
 #include <stdio.h>
 
+/**
+ * JSON type of json value
+ */
 typedef enum json_type
 {
     JSON_NONE,
@@ -35,6 +38,9 @@ typedef enum json_type
     JSON_BOOLEAN,
 } json_type_t;
 
+/**
+ * JSON error code
+ */
 typedef enum json_error
 {
     JSON_ERROR_NONE,
@@ -52,12 +58,24 @@ typedef enum json_error
     JSON_ERROR_INTERNAL,
 } json_error_t;
 
+/**
+ * JSON boolean data type
+ */
+#ifdef __cplusplus
+typedef bool json_bool_t;
+#define JSON_TRUE  true
+#define JSON_FALSE false
+#else
 typedef enum json_bool
 {
 	JSON_TRUE  = 1,
 	JSON_FALSE = 0,
 } json_bool_t;
+#endif
 
+/**
+ * JSON value
+ */
 typedef struct json_value
 {
     json_type_t type;

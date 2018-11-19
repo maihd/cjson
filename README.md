@@ -3,12 +3,27 @@ Simple JSON parser written in ANSI C
 
 ## API
 ```C
-typedef struct
+struct json_state_t; // Implicit structure, manage parsing context
+
+struct json_value_t
 {
-    void* data;
-    void* (*malloc)(void* data, size_t size);
-    void  (*free)(void* data, void* pointer);
-} json_settings_t;
+    json_type_t type;
+    union 
+    {
+        double       number;
+        json_bool_t  boolean;   
+        struct {...} array;  
+        struct {...} object;
+        struct {...} string;
+    };
+};
+
+struct json_settings_t
+{
+    void* data;                                 // Your memory buffer
+    void* (*malloc)(void* data, size_t size);   // Your memory allocate function
+    void  (*free)(void* data, void* pointer);   // Your memory deallocate function
+};
 
 json_value_t* json_parse(const char* json_code, json_state_t** out_state);
 json_value_t* json_parse_ex(const char* json_code, json_settings_t* settings, json_state_t** out_state);
@@ -19,8 +34,8 @@ json_value_t* json_parse_ex(const char* json_code, json_settings_t* settings, js
 void json_release(json_state_t* state);
 // Release state, when state is null, library will implicit remove states that it hold
 
-json_error_t json_get_errno(const json_state_t* state);
-const char*  json_get_error(const json_state_t* state);
+json_error_t json_get_errno(const json_state_t* state); // Get error number of [given state] or [last state] (when state = NULL) 
+const char*  json_get_error(const json_state_t* state); // Get error string of [given state] or [last state] (when state = NULL)
 
 void json_print(const json_value_t* value, FILE* out); 
 // Stringify output to file, more readable + size bigger  than json_write
