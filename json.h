@@ -170,11 +170,27 @@ public: // @region: Conversion
 
 	inline operator bool () const
 	{
-    #ifdef NDEBUG
-        return boolean;   // Faster, use when performance needed
-    #else
-		return !!boolean; // More precision, should use when debug
-    #endif
+        switch (type)
+        {
+        case JSON_NUMBER:
+        case JSON_BOOLEAN:
+        #ifdef NDEBUG
+            return boolean;   // Faster, use when performance needed
+        #else
+            return !!boolean; // More precision, should use when debug
+        #endif
+
+        case JSON_ARRAY:
+        case JSON_OBJECT:
+        case JSON_STRING:
+            return true;
+
+        case JSON_NONE:
+        case JSON_NULL:
+        default: 
+            return false;
+        }
+
 	}
 #endif /* __cplusplus */
 } json_value_t;
