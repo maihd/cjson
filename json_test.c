@@ -40,6 +40,7 @@ int main(int argc, char* argv[])
     printf("Type '.exit' to exit\n");
     
     char input[1024];
+    json_state_t* state = NULL;
     while (1)
     {
 	    if (setjmp(jmpenv) == 0)
@@ -54,7 +55,6 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                json_state_t* state;
                 json_value_t* value = json_parse(json, &state);
 	    
                 if (json_get_errno(state) != JSON_ERROR_NONE)
@@ -66,12 +66,12 @@ int main(int argc, char* argv[])
                 {
                     json_print(value, stdout); printf("\n");
                 }
-
-                /* json_release(NULL) for release all memory if you don't catch the json_state_t */
-                json_release(state);
 	        }
 	    }
     }
+
+    /* json_release(NULL) for release all memory if you don't catch the json_state_t */
+    json_release(state);
     
     return 0;
 }
