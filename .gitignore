@@ -5,3 +5,6 @@
 /vctest/obj
 /vctest/Debug
 /vctest/Release
+/vctest/x64/obj
+/vctest/x64/Debug
+/vctest/x64/Release

@@ -259,6 +259,7 @@ namespace json
 
 typedef struct json_pool
 {
+    struct json_pool* prev;
     struct json_pool* next;
 
     void** head;
@@ -266,6 +267,7 @@ typedef struct json_pool
 
 typedef struct json_bucket
 {
+    struct json_bucket* prev;
     struct json_bucket* next;
 
     int size;
@@ -350,7 +352,7 @@ static void croak(json_state_t* state, json_error_t code, const char* fmt, ...)
     longjmp(state->errjmp, code);
 }
 
-static json_pool_t* make_pool(json_state_t* state, json_pool_t* next, int count, int size)
+static json_pool_t* make_pool(json_state_t* state, json_pool_t* prev, int count, int size)
 {
     if (count <= 0 || size <= 0)
     {
@@ -361,7 +363,13 @@ static json_pool_t* make_pool(json_state_t* state, json_pool_t* next, int count,
     json_pool_t* pool = (json_pool_t*)state->settings.malloc(state->settings.data, sizeof(json_pool_t) + pool_size);
     if (pool)
     {
-		pool->next = next;
+        if (prev)
+        {
+            prev->next = pool;
+        }
+
+		pool->prev = prev;
+		pool->next = NULL;
 		pool->head = (void**)((char*)pool + sizeof(json_pool_t));
 		
 		int i;
@@ -380,7 +388,7 @@ static void free_pool(json_state_t* state, json_pool_t* pool)
 {
     if (pool)
     {
-		free_pool(state, pool->next);
+		free_pool(state, pool->prev);
 		state->settings.free(state->settings.data, pool);
     }
 }
@@ -411,7 +419,7 @@ static void pool_collect(json_pool_t* pool, void* ptr)
     }
 }
 
-static json_bucket_t* make_bucket(json_state_t* state, json_bucket_t* next, int count, int size)
+static json_bucket_t* make_bucket(json_state_t* state, json_bucket_t* prev, int count, int size)
 {
     if (count <= 0 || size <= 0)
     {
@@ -423,7 +431,13 @@ static json_bucket_t* make_bucket(json_state_t* state, json_bucket_t* next, int 
                                            sizeof(json_bucket_t) + count * size);
     if (bucket)
     {
-        bucket->next     = next;
+        if (prev)
+        {
+            prev->next = bucket;
+        }
+
+        bucket->prev     = prev;
+        bucket->next     = NULL;
         bucket->size     = size;
         bucket->count    = 0;
         bucket->capacity = count;
@@ -504,41 +518,6 @@ static json_value_t* make_value(json_state_t* state, json_type_t type)
     return value;
 }
 
-static void free_value(json_state_t* state, json_value_t* value)
-{
-    if (value)
-    {
-    #if 0 /* Use with json_bucket_t value no need to be freed by hand */
-		int i, n;
-		switch (value->type)
-		{
-		case JSON_ARRAY:
-			for (i = 0, n = value->array.length; i < n; i++)
-			{
-				free_value(state, value->array.values[i]);
-			}
-			free(value->array.values);
-			break;
-
-		case JSON_OBJECT:
-			for (i = 0, n = value->object.length; i < n; i++)
-			{
-				free_value(state, value->object.values[i].name);
-				free_value(state, value->object.values[i].value);
-			}
-			free(value->object.values);
-			break;
-			
-		case JSON_STRING:
-			free(value->string.buffer);
-			break;
-		}
-
-		pool_collect(state->value_pool, value);
-    #endif
-    }
-}
-
 static json_state_t* make_state(const char* json, const json_settings_t* settings)
 {
     json_state_t* state = (json_state_t*)settings->malloc(settings->data, sizeof(json_state_t));
@@ -559,6 +538,72 @@ static json_state_t* make_state(const char* json, const json_settings_t* setting
         state->string_bucket = NULL;
 
         state->settings = *settings;
+    }
+    return state;
+}
+
+static json_state_t* reuse_state(json_state_t* state, const char* json, const json_settings_t* settings)
+{
+    if (state)
+    {
+        if (state == root_state)
+        {
+            root_state = state->next;
+        }
+        else
+        {
+            json_state_t* list = root_state;
+            while (list)
+            {
+                if (list->next == state)
+                {
+                    list->next = state->next;
+                }
+            }
+
+		    state->next = NULL;
+        }
+
+		state->line   = 1;
+		state->column = 1;
+		state->cursor = 0;
+		state->buffer = json;
+		state->errnum = JSON_ERROR_NONE;
+
+        if (state->settings.data != settings->data ||
+            state->settings.free != settings->free ||
+            state->settings.malloc != settings->malloc)
+        {
+            free_pool(state, state->value_pool);
+            free_bucket(state, state->values_bucket);
+            free_bucket(state, state->string_bucket);
+
+		    state->value_pool    = NULL;
+            state->values_bucket = NULL;
+            state->string_bucket = NULL;
+
+            state->settings.free(state->settings.data, state->errmsg); 
+            state->errmsg = NULL;
+        }
+        else
+        {
+            if (state->errmsg) state->errmsg[0] = 0;
+
+            while (state->value_pool && state->value_pool->prev)
+            {
+                state->value_pool = state->value_pool->prev;
+            }
+
+            while (state->values_bucket && state->values_bucket->prev)
+            {
+                state->values_bucket = state->values_bucket->prev;
+            }
+
+            while (state->string_bucket && state->string_bucket->prev)
+            {
+                state->string_bucket = state->string_bucket->prev;
+            }
+        }
     }
     return state;
 }
@@ -1034,7 +1079,7 @@ json_value_t* json_parse(const char* json, json_state_t** out_state)
 /* @funcdef: json_parse_ex */
 json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** out_state)
 {
-    json_state_t* state = make_state(json, settings);
+    json_state_t* state = out_state && *out_state ? reuse_state(*out_state, json, settings) : make_state(json, settings);
     json_value_t* value = json_parse_in(state);
 
     if (value)

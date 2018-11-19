@@ -40,6 +40,7 @@ int main(int argc, char* argv[])
     printf("Type '.exit' to exit\n");
     
     char input[1024];
+    json::state_t* state = NULL; // Must set null if not reuse state or first time
     while (1)
     {
 	    if (setjmp(jmpenv) == 0)
@@ -54,7 +55,6 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                json::state_t* state;
                 json::value_t* value = json::parse(json, &state);
 	    
                 if (json::get_errno(state) != JSON_ERROR_NONE)
@@ -67,11 +67,13 @@ int main(int argc, char* argv[])
                     json::print(value, stdout); printf("\n");
                 }
 
-                /* json::release(NULL) for release all memory if you don't catch the json_state_t */
-                json::release(state);
+                // No need release state here because we have reuse state
 	        }
 	    }
     }
+
+    /* json::release(NULL) for release all memory if you don't catch the json_state_t */
+    json::release(state);
     
     return 0;
 }
