@@ -24,7 +24,7 @@ extern "C" {
 
 #include <stdio.h>
 
-typedef enum
+typedef enum json_type
 {
     JSON_NONE,
     JSON_NULL,
@@ -35,7 +35,7 @@ typedef enum
     JSON_BOOLEAN,
 } json_type_t;
 
-typedef enum
+typedef enum json_error
 {
     JSON_ERROR_NONE,
     
@@ -52,7 +52,7 @@ typedef enum
     JSON_ERROR_INTERNAL,
 } json_error_t;
 
-typedef enum
+typedef enum json_bool
 {
 	JSON_TRUE  = 1,
 	JSON_FALSE = 0,
@@ -108,7 +108,7 @@ public: // @region: Indexor
 	{
 		if (type != JSON_ARRAY || index < 0 || index > array.length)
 		{
-			return json_value_t();
+			return json_value();
 		}
 		else
 		{
@@ -118,11 +118,7 @@ public: // @region: Indexor
 
 	inline const json_value& operator[] (const char* name) const
 	{
-		if (type != JSON_OBJECT)
-		{
-			return json_value_t();
-		}
-		else
+		if (type == JSON_OBJECT)
 		{
 			for (int i = 0, n = object.length; i < n; i++)
 			{
@@ -131,9 +127,9 @@ public: // @region: Indexor
 					return *object.values[i].value;
 				}
 			}
-
-			return json_value_t();
 		}	
+
+        return json_value();
 	}
 
 public: // @region: Conversion
@@ -204,17 +200,17 @@ namespace json
     typedef ::json_state_t    state_t;
     typedef ::json_settings_t settings_t;
 
-    inline value_t* parse(const char* code, state_t** state)
+    inline value_t* parse(const char* code, state_t** state = NULL)
     {
         return ::json_parse(code, state);
     }
 
-    inline value_t* parse(const char* code, const settings_t* settings, state_t** state)
+    inline value_t* parse(const char* code, const settings_t* settings, state_t** state = NULL)
     {
         return ::json_parse_ex(code, settings, state);
     }
 
-    inline void release(state_t* state)
+    inline void release(state_t* state = NULL)
     {
         ::json_release(state);
     }
@@ -229,12 +225,12 @@ namespace json
         return ::json_get_error(state);
     }
 
-    inline void print(const value_t* value, FILE* out)
+    inline void print(const value_t* value, FILE* out = stdout)
     {
         ::json_print(value, out);
     }
 
-    inline void write(const value_t* value, FILE* out)
+    inline void write(const value_t* value, FILE* out = stdout)
     {
         ::json_write(value, out);
     }
