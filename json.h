@@ -73,6 +73,8 @@ typedef enum json_bool
 } json_bool_t;
 #endif
 
+JSON_API extern const struct json_value JSON_VALUE_NONE;
+
 /**
  * JSON value
  */
@@ -126,7 +128,7 @@ public: // @region: Indexor
 	{
 		if (type != JSON_ARRAY || index < 0 || index > array.length)
 		{
-			return json_value();
+			return JSON_VALUE_NONE;
 		}
 		else
 		{
@@ -147,7 +149,7 @@ public: // @region: Indexor
 			}
 		}	
 
-        return json_value();
+        return JSON_VALUE_NONE;
 	}
 
 public: // @region: Conversion
@@ -194,8 +196,6 @@ public: // @region: Conversion
 	}
 #endif /* __cplusplus */
 } json_value_t;
-    
-static const json_value_t JSON_VALUE_NONE; /* auto fill with zero */
 
 typedef struct json_state json_state_t;
 typedef struct
@@ -331,6 +331,7 @@ struct json_state
 };
 
 static json_state_t* root_state = NULL;
+const struct json_value JSON_VALUE_NONE;
 
 static void* def_malloc(void* data, size_t size)
 {
