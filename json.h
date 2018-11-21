@@ -17,6 +17,18 @@
 #define JSON_API
 #endif
 
+#ifndef JSON_INLINE
+#  if defined(_MSC_VER)
+#     define JSON_INLINE __forceinline
+#  elif defined(__GNUC__)
+#     define JSON_INLINE __attribute__((always_inline))
+#  elif defined(__cplusplus)
+#     define JSON_INLINE inline
+#  else
+#     define JSON_INLINE 
+#  endif
+#endif
+
 #ifdef __cplusplus
 #include <string.h>
 extern "C" {
@@ -234,37 +246,37 @@ namespace json
     typedef ::json_state_t    state_t;
     typedef ::json_settings_t settings_t;
 
-    inline value_t* parse(const char* code, state_t** state = NULL)
+    JSON_INLINE value_t* parse(const char* code, state_t** state = NULL)
     {
         return ::json_parse(code, state);
     }
 
-    inline value_t* parse(const char* code, const settings_t* settings, state_t** state = NULL)
+    JSON_INLINE value_t* parse(const char* code, const settings_t* settings, state_t** state = NULL)
     {
         return ::json_parse_ex(code, settings, state);
     }
 
-    inline void release(state_t* state = NULL)
+    JSON_INLINE void release(state_t* state = NULL)
     {
         ::json_release(state);
     }
 
-    inline error_t get_errno(const state_t* state)
+    JSON_INLINE error_t get_errno(const state_t* state)
     {
         return ::json_get_errno(state);
     }
 
-    inline const char* get_error(const state_t* state)
+    JSON_INLINE const char* get_error(const state_t* state)
     {
         return ::json_get_error(state);
     }
 
-    inline void print(const value_t* value, FILE* out = stdout)
+    JSON_INLINE void print(const value_t* value, FILE* out = stdout)
     {
         ::json_print(value, out);
     }
 
-    inline void write(const value_t* value, FILE* out = stdout)
+    JSON_INLINE void write(const value_t* value, FILE* out = stdout)
     {
         ::json_write(value, out);
     }
