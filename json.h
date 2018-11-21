@@ -531,8 +531,15 @@ static json_value_t* make_value(json_state_t* state, json_type_t type)
 {
     if (!state->value_pool || !state->value_pool->head)
     {
-		state->value_pool = make_pool(state, state->value_pool,
-                                      64, sizeof(json_value_t));
+        if (state->value_pool && state->value_pool->prev)
+        {
+            state->value_pool = state->value_pool->prev;
+        }
+        else
+        {
+            state->value_pool = make_pool(state, state->value_pool, 64, sizeof(json_value_t));
+        }
+
 		if (!state->value_pool)
 		{
 			croak(state, JSON_ERROR_MEMORY, "Out of memory");
@@ -624,19 +631,43 @@ static json_state_t* reuse_state(json_state_t* state, const char* json, const js
         {
             if (state->errmsg) state->errmsg[0] = 0;
 
-            while (state->value_pool && state->value_pool->prev)
+            while (state->value_pool)
             {
-                state->value_pool = state->value_pool->prev;
+                state->value_pool->head = (void**)(state->value_pool + 1);
+                if (state->value_pool->prev)
+                {
+                    break;
+                }
+                else
+                {
+                    state->value_pool = state->value_pool->prev;
+                }
             }
 
-            while (state->values_bucket && state->values_bucket->prev)
+            while (state->values_bucket)
             {
-                state->values_bucket = state->values_bucket->prev;
+                state->values_bucket->count = 0;
+                if (state->values_bucket->prev)
+                {
+                    state->values_bucket = state->values_bucket->prev;
+                }
+                else
+                {
+                    break;
+                }
             }
 
-            while (state->string_bucket && state->string_bucket->prev)
+            while (state->string_bucket)
             {
-                state->string_bucket = state->string_bucket->prev;
+                state->string_bucket->count = 0;
+                if (state->string_bucket->prev)
+                {
+                    state->string_bucket = state->string_bucket->prev;
+                }
+                else
+                {
+                    break;
+                }
             }
         }
     }
@@ -861,8 +892,20 @@ static json_value_t* parse_array(json_state_t* state)
 	        json_value_t* value = parse_single(state);
             
             void* new_values = bucket_resize(state->values_bucket, values, length, ++length);
-            if (!new_values)
+            while (!new_values)
             {
+                /* Get from unused buckets */
+                while (state->values_bucket && state->values_bucket->prev)
+                {
+                    state->values_bucket = state->values_bucket->prev;
+                    new_values = bucket_extract(state->values_bucket, length);
+                    if (new_values)
+                    {
+                        break;
+                    }
+                }
+
+                /* Create new buckets */
                 state->values_bucket = make_bucket(state, state->values_bucket, 128, sizeof(json_value_t*));
                 
                 new_values = bucket_extract(state->values_bucket, length);
@@ -875,6 +918,7 @@ static json_value_t* parse_array(json_state_t* state)
                 {
                     memcpy(new_values, values, (length - 1) * sizeof(json_value_t));
                 }
+                break;
             }
 
             values = (json_value_t**)new_values;
@@ -976,6 +1020,18 @@ static json_value_t* parse_string(json_state_t* state)
         char* string = (char*)bucket_extract(state->string_bucket, length + 1);
         if (!string)
         {
+            /* Get from unused buckets */
+            while (state->string_bucket && state->string_bucket->prev)
+            {
+                state->string_bucket = state->string_bucket->prev;
+                string = (char*)bucket_extract(state->string_bucket, length);
+                if (string)
+                {
+                    break;
+                }
+            }
+
+            /* Create new bucket */
             state->string_bucket = make_bucket(state, state->string_bucket, 4096, sizeof(char)); /* 4096 equal default memory page size */
             string = (char*)bucket_extract(state->string_bucket, length + 1);
             if (!string)
@@ -1037,6 +1093,17 @@ static json_value_t* parse_object(json_state_t* state)
                                              length, ++length);
             if (!new_values)
             {
+                /* Get from unused buckets */
+                while (state->values_bucket && state->values_bucket->prev)
+                {
+                    state->values_bucket = state->values_bucket->prev;
+                    new_values = bucket_extract(state->values_bucket, length);
+                    if (new_values)
+                    {
+                        break;
+                    }
+                }
+
                 /* Create new buffer */
                 state->values_bucket = make_bucket(state, state->values_bucket, 128, sizeof(json_value_t*));
                 
