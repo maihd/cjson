@@ -20,8 +20,6 @@
 #ifndef JSON_INLINE
 #  if defined(_MSC_VER)
 #     define JSON_INLINE __forceinline
-#  elif defined(__GNUC__)
-#     define JSON_INLINE __attribute__((always_inline))
 #  elif defined(__cplusplus)
 #     define JSON_INLINE inline
 #  else
