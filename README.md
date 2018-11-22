@@ -139,11 +139,10 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                json::value_t* value = json::parse(json, &state);
+                const json::value_t& value = json::parse(json, &state);
 	    
-                if (json::get_errno(state) != JSON_ERROR_NONE)
+                if (value == JSON_VALUE_NONE || json::get_errno(state) != JSON_ERROR_NONE)
                 {
-                    value = NULL;
                     printf("[ERROR]: %s\n", json::get_error(state));
                 }
                 else
