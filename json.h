@@ -226,6 +226,8 @@ JSON_API const char*   json_get_error(const json_state_t* state);
 JSON_API void          json_print(const json_value_t* value, FILE* out);
 JSON_API void          json_write(const json_value_t* value, FILE* out);
 
+JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b);
+
 /* END OF EXTERN "C" */
 #ifdef __cplusplus
 }
@@ -1262,6 +1264,48 @@ const char* json_get_error(const json_state_t* state)
     {
         return NULL;
     }
+}
+
+json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
+{
+    if (a == b)
+    {
+        return true;
+    }
+
+    if (!a || !b)
+    {
+        return false;
+    }
+
+    if (a->type != b->type)
+    {
+        return false;
+    }
+
+    switch (a->type)
+    {
+    case JSON_NULL:
+    case JSON_NONE:
+        return true;
+
+    case JSON_NUMBER:
+        return a->number == b->number;
+
+    case JSON_BOOLEAN:
+        return a->boolean == b->boolean;
+
+    case JSON_ARRAY:
+        return a->array.values == b->array.values;
+
+    case JSON_OBJECT:
+        return a->object.values == b->object.values;
+
+    case JSON_STRING:
+        return a->string.buffer == b->string.buffer;
+    }
+
+    return false;
 }
 
 /* @funcdef: json_write */
