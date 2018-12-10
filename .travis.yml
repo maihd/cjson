@@ -1,0 +1,15 @@
+language: c
+
+os: 
+  - osx
+  - linux
+  - windows
+
+before_install: if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then choco install make; fi
+
+script: make
+
+branches:
+  only:
+    - master
+    - stable
