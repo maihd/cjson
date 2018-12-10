@@ -1,5 +1,5 @@
-# Introduction
-Simple JSON parser written in ANSI C
+# Introduction [![Build Status](https://travis-ci.org/maihd/json.svg?branch=master)](https://travis-ci.org/maihd/json)
+Simple JSON parser written in ANSI C/C++
 
 ## API
 ```C
@@ -164,4 +164,5 @@ int main(int argc, char* argv[])
 
 ## Metadata
 1. Author: MaiHD
-2. Tools : Emacs, VSCode, Visual Studio 2017 Community
+2. License: Public domain
+3. Tools : Emacs, VSCode, Visual Studio 2017 Community

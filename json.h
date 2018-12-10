@@ -2,7 +2,7 @@
  * Simple json parser written in ANSI C
  *
  * @author: MaiHD
- * @license: NULL
+ * @license: Public domain
  * @copyright: MaiHD @ ${HOME}, 2018
  ******************************************************/
 
@@ -27,12 +27,13 @@
 #  endif
 #endif
 
+#include <stdio.h>
+
 #ifdef __cplusplus
 #include <string.h>
 extern "C" {
 #endif
 
-#include <stdio.h>
 
 /**
  * JSON type of json value
@@ -122,9 +123,8 @@ typedef struct json_value
 #ifdef __cplusplus
 public: // @region: Constructors
     inline json_value()
-        : type(JSON_NONE)
-        , object({ 0, NULL })
 	{	
+        memset(this, 0, sizeof(this));
 	}
 
     inline ~json_value()
