@@ -1,15 +1,26 @@
-language: c
-
-os: 
-  - osx
-  - linux
-  - windows
-
-before_install: if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then choco install make; fi
-
 script: make
 
 branches:
   only:
     - master
     - stable
+
+matrix:
+  include:
+    - os: osx 
+      language: c
+      script: make
+    
+    - os: linux
+      language: c
+      script: make
+
+    - os: windows
+      language: c
+      before_install: choco install make
+      script: make
+
+    - os: windows
+      language: c
+      allow_failure: true
+      script: cl /EHsc json_test.c
