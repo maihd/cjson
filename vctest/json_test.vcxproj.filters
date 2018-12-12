@@ -18,9 +18,6 @@
     <ClCompile Include="..\json_test.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\json_test_cpp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\json.h">

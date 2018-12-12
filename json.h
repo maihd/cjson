@@ -34,7 +34,6 @@
 extern "C" {
 #endif
 
-
 /**
  * JSON type of json value
  */
@@ -77,7 +76,7 @@ typedef bool json_bool_t;
 #define JSON_TRUE  true
 #define JSON_FALSE false
 #else
-typedef enum json_bool
+typedef enum
 {
 	JSON_TRUE  = 1,
 	JSON_FALSE = 0,
@@ -233,73 +232,6 @@ JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b)
 }
 #endif
 /* * */
-
-/*
- * @region: C++ API wrapper
- */
-#ifdef __cplusplus
-namespace json
-{
-    typedef ::json_type_t     type_t;
-    typedef ::json_error_t    error_t;
-    typedef ::json_value_t    value_t;
-    typedef ::json_state_t    state_t;
-    typedef ::json_settings_t settings_t;
-
-    JSON_INLINE const value_t& parse(const char* code, state_t** state = NULL)
-    {
-        json_value_t* value = ::json_parse(code, state);
-        return value ? *value : JSON_VALUE_NONE;
-    }
-
-    JSON_INLINE const value_t& parse(const char* code, const settings_t* settings, state_t** state = NULL)
-    {
-        json_value_t* value = ::json_parse_ex(code, settings, state);
-        return value ? *value : JSON_VALUE_NONE;
-    }
-
-    JSON_INLINE void release(state_t* state = NULL)
-    {
-        ::json_release(state);
-    }
-
-    JSON_INLINE error_t get_errno(const state_t* state)
-    {
-        return ::json_get_errno(state);
-    }
-
-    JSON_INLINE const char* get_error(const state_t* state)
-    {
-        return ::json_get_error(state);
-    }
-
-    JSON_INLINE void print(const value_t& value, FILE* out = stdout)
-    {
-        ::json_print(&value, out);
-    }
-
-    JSON_INLINE void write(const value_t& value, FILE* out = stdout)
-    {
-        ::json_write(&value, out);
-    }
-
-    JSON_INLINE bool equals(const value_t& a, const value_t& b)
-    {
-        return ::json_equals(&a, &b);
-    }
-}
-
-JSON_INLINE bool operator==(const json::value_t& a, const json::value_t& b)
-{
-    return json::equals(a, b);
-}
-
-JSON_INLINE bool operator!=(const json::value_t& a, const json::value_t& b)
-{
-    return !json::equals(a, b);
-}
-#endif
-/* @endregion: C++ API...*/
 
 /* END OF __JSON_H__ */
 #endif /* __JSON_H__ */
@@ -1287,24 +1219,24 @@ json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
 {
     if (a == b)
     {
-        return true;
+        return JSON_TRUE;
     }
 
     if (!a || !b)
     {
-        return false;
+        return JSON_FALSE;
     }
 
     if (a->type != b->type)
     {
-        return false;
+        return JSON_FALSE;
     }
 
     switch (a->type)
     {
     case JSON_NULL:
     case JSON_NONE:
-        return true;
+        return JSON_TRUE;
 
     case JSON_NUMBER:
         return a->number == b->number;
@@ -1322,7 +1254,7 @@ json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
         return a->string.buffer == b->string.buffer;
     }
 
-    return false;
+    return JSON_FALSE;
 }
 
 /* @funcdef: json_write */

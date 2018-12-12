@@ -1,6 +1,4 @@
-﻿#if 0
-
-#include <signal.h>
+﻿#include <signal.h>
 #include <setjmp.h>
 
 #define JSON_IMPL
@@ -75,5 +73,3 @@ int main(int argc, char* argv[])
     
     return 0;
 }
-
-#endif

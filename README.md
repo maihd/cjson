@@ -104,64 +104,6 @@ int main(int argc, char* argv[])
 }
 ```
 
-Belove code from json_test_cpp.cpp:
-```C++
-#include <signal.h>
-#include <setjmp.h>
-
-#define JSON_IMPL
-#include "json.h"
-
-static jmp_buf jmpenv;
-static void _sighandler(int sig);
-static char* strtrim_fast(char* str);
-
-int main(int argc, char* argv[])
-{
-    signal(SIGINT, _sighandler);
-    
-    printf("JSON token testing prompt\n");
-    printf("Type '.exit' to exit\n");
-    
-    char input[1024];
-    json::state_t* state = NULL; // Must set null if not reuse state or first time
-    while (1)
-    {
-	    if (setjmp(jmpenv) == 0)
-	    {
-	        printf("> ");
-	        fgets(input, sizeof(input), stdin);
-
-	        const char* json = strtrim_fast(input);
-	        if (strcmp(json, ".exit") == 0)
-	        {
-                break;
-	        }
-	        else
-            {
-                const json::value_t& value = json::parse(json, &state);
-	    
-                if (value == JSON_VALUE_NONE || json::get_errno(state) != JSON_ERROR_NONE)
-                {
-                    printf("[ERROR]: %s\n", json::get_error(state));
-                }
-                else
-                {
-                    json::print(value, stdout); printf("\n");
-                }
-
-                // No need release state here because we have reuse state
-	        }
-	    }
-    }
-
-    /* json::release(NULL) for release all memory if you don't catch the json_state_t */
-    json::release(state);
-    
-    return 0;
-}
-```
-
 ## Metadata
 1. Author: MaiHD
 2. License: Public domain
