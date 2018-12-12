@@ -27,4 +27,5 @@ matrix:
       language: c
       env: VISUAL_STUDIO=1
       script:
+        - cmd /c "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\Common7\\Tools\\devenv.exe" vctest/json_test.sln /Upgrade
         - cmd /c "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\Common7\\Tools\\devenv.exe" vctest/json_test.sln /Build
