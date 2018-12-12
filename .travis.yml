@@ -23,4 +23,4 @@ matrix:
     - os: windows
       language: c
       script:
-        - cmd /c .travis/build_vs2017.bat
+        - echo .travis\\build_vs2017.bat | cmd
