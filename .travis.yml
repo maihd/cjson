@@ -6,6 +6,9 @@ branches:
     - stable
 
 matrix:
+  allow_failures:
+    - env: VISUAL_STUDIO=1
+
   include:
     - os: osx 
       language: c
@@ -22,5 +25,7 @@ matrix:
 
     - os: windows
       language: c
-      allow_failure: true
-      script: cl /EHsc json_test.c
+      env: VISUAL_STUDIO=1
+      script:
+        - "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\Tools\VsDevCmd.bat"
+        - cl /EHsc json_test.c
