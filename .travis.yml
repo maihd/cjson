@@ -6,9 +6,6 @@ branches:
     - stable
 
 matrix:
-  allow_failures:
-    - env: VISUAL_STUDIO=1
-
   include:
     - os: osx 
       language: c
@@ -25,6 +22,5 @@ matrix:
 
     - os: windows
       language: c
-      env: VISUAL_STUDIO=1
       script:
         - echo "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\Common7\\Tools\\devenv.exe" vctest/json_test.sln /Build | cmd
