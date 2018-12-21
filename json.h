@@ -852,7 +852,8 @@ static json_value_t* parse_array(json_state_t* state)
 	    
 	        json_value_t* value = parse_single(state);
             
-            void* new_values = bucket_resize(state->values_bucket, values, length, ++length);
+            int old_length = length;
+            void* new_values = bucket_resize(state->values_bucket, values, old_length, ++length);
             while (!new_values)
             {
                 /* Get from unused buckets */
@@ -970,12 +971,51 @@ static json_value_t* parse_string(json_state_t* state)
         match_char(state, '"');
 
         int length = 0;
-        while (!is_eof(state) && peek_char(state) != '"')
+        char temp_char;
+        char temp_string[1024];
+        while (!is_eof(state) && (temp_char = peek_char(state)) != '"')
         {
-            length++;
+            if (temp_char == '\\')
+            {
+                temp_char = next_char(state);
+                switch (temp_char)
+                {
+                case 'n':
+                    temp_string[length++] = '\n';
+                    break;
+
+                case 't':
+                    temp_string[length++] = '\t';
+                    break;
+
+                case 'r':
+                    temp_string[length++] = '\r';
+                    break;
+
+                case 'b':
+                    temp_string[length++] = '\b';
+                    break;
+
+                case '\\':
+                    temp_string[length++] = '\\';
+                    break;
+
+                case '"':
+                    temp_string[length++] = '\"';
+                    break;
+                        
+
+                default:
+                    croak(state, JSON_ERROR_UNKNOWN, "Unknown escape character");
+                }
+            }
+            else
+            {
+                temp_string[length++] = temp_char;
+            }
             next_char(state);
         }
-
+        temp_string[length] = 0;
         match_char(state, '"');
 
         char* string = (char*)bucket_extract(state->string_bucket, length + 1);
@@ -1002,7 +1042,7 @@ static json_value_t* parse_string(json_state_t* state)
             }
         }
         string[length] = 0;
-        memcpy(string, state->buffer + state->cursor - length - 1, length);
+        memcpy(string, temp_string, length);
 
         json_value_t* value = make_value(state, JSON_STRING);
         value->string.length = length;
@@ -1049,9 +1089,10 @@ static json_value_t* parse_object(json_state_t* state)
             json_value_t* value = parse_single(state);
 
             /* Append new pair of value to container */
+            int old_length = length;
             void* new_values = bucket_resize(state->values_bucket,
                                              root->object.values,
-                                             length, ++length);
+                                             old_length, ++length);
             if (!new_values)
             {
                 /* Get from unused buckets */
