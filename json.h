@@ -61,6 +61,7 @@ typedef enum json_error
     JSON_ERROR_UNMATCH,
     JSON_ERROR_UNKNOWN,
     JSON_ERROR_UNEXPECTED,
+    JSON_ERROR_UNSUPPORTED,
 
     /* Runtime error */
 
@@ -251,6 +252,11 @@ JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b)
 #include <string.h>
 #include <assert.h>
 #include <setjmp.h>
+
+#if __STDC_VERSION__ >= 201112L || defined(__cplusplus)
+#include <wchar.h>
+#include <uchar.h>
+#endif
 
 typedef struct json_pool
 {
@@ -970,15 +976,21 @@ static json_value_t* parse_string(json_state_t* state)
     {
         match_char(state, '"');
 
+        int i;
         int length = 0;
-        char temp_char;
+        int c0;
         char temp_string[1024];
-        while (!is_eof(state) && (temp_char = peek_char(state)) != '"')
+        #if __STDC_VERSION__ >= 201112L || defined(__cplusplus)
+        char c1, c32_cvt[MB_LEN_MAX + 1];
+        mbstate_t mbstate;
+        size_t ncvt;
+        #endif
+        while (!is_eof(state) && (c0 = peek_char(state)) != '"')
         {
-            if (temp_char == '\\')
+            if (c0 == '\\')
             {
-                temp_char = next_char(state);
-                switch (temp_char)
+                c0 = next_char(state);
+                switch (c0)
                 {
                 case 'n':
                     temp_string[length++] = '\n';
@@ -1004,6 +1016,28 @@ static json_value_t* parse_string(json_state_t* state)
                     temp_string[length++] = '\"';
                     break;
                         
+                case 'u':
+                #if __STDC_VERSION__ >= 201112L || defined(__cplusplus)
+                    c1 = 0;
+                    for (i = 0; i < 4; i++)
+                    {
+                        if (isxdigit((c0 = read_char(state))))
+                        {
+                            c1 = c1 * 10 + (isdigit(c0) ? c0 - '0' : c0 < 'a' ? c0 - 'A' : c0 - 'a'); 
+                        }   
+                        else
+                        {
+                            croak(state, JSON_ERROR_UNKNOWN, "Expected hexa character in unicode character");
+                        }
+                    }
+                    memset(&mbstate, 0, sizeof(mbstate));
+                    ncvt = c32rtomb(c32_cvt, c1, &mbstate);
+                    memcpy(temp_string + length, c32_cvt, ncvt);
+                    length += ncvt;
+                #else
+                    croak(state, JSON_ERROR_UNSUPPORTED, "Unicode character is not support in older C11 standard");
+                #endif
+                    break;
 
                 default:
                     croak(state, JSON_ERROR_UNKNOWN, "Unknown escape character");
@@ -1011,7 +1045,7 @@ static json_value_t* parse_string(json_state_t* state)
             }
             else
             {
-                temp_string[length++] = temp_char;
+                temp_string[length++] = c0;
             }
             next_char(state);
         }

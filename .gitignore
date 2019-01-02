@@ -9,6 +9,7 @@
 /vctest/x64/Debug
 /vctest/x64/Release
 
+*.o
 *.exe
 *.obj
 *.out
