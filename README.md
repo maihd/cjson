@@ -107,4 +107,5 @@ int main(int argc, char* argv[])
 ## Metadata
 1. Author: MaiHD
 2. License: Public domain
+3. Copyright: MaiHD 2018 - 2019
 3. Tools : Emacs, VSCode, Visual Studio 2017 Community

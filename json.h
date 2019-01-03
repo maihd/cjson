@@ -3,7 +3,7 @@
  *
  * @author: MaiHD
  * @license: Public domain
- * @copyright: MaiHD @ ${HOME}, 2018
+ * @copyright: MaiHD @ ${HOME}, 2018 - 2019
  ******************************************************/
 
 #ifndef __JSON_H__
