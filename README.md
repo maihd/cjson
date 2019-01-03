@@ -10,11 +10,11 @@ struct json_value_t
     json_type_t type;
     union 
     {
-        double       number;
-        json_bool_t  boolean;   
-        struct {...} array;  
-        struct {...} object;
-        struct {...} string;
+        double          number;
+        json_bool_t     boolean;   
+        const char*     string;
+        json_value_t**  array;  
+        struct {...}    object;
     };
 };
 
