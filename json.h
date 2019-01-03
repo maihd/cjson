@@ -159,14 +159,14 @@ public: // @region: Indexor
 		}
 		else
 		{
-			return *array.values[index];
+			return *array[index];
 		}	
 	}
 
 	JSON_INLINE const json_value& operator[] (const char* name) const
 	{
 		json_value_t* value = json_find(this, name);
-        return value ? &value : JSON_VALUE_NONE;
+        return value ? *value : JSON_VALUE_NONE;
 	}
 
 public: // @region: Conversion
