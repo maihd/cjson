@@ -43,6 +43,15 @@ void json_print(const json_value_t* value, FILE* out);
 void json_write(const json_value_t* value, FILE* out); 
 // Stringify output to file, less readable + size smaller than json_print
 
+json_bool_t json_equals(const json_value_t* a, const json_value_t* b);
+// Depth compare two JSON values
+
+json_value_t* json_find(const json_value_t* obj, const char* name);
+// Get value that is contained by `obj`
+
+int json_length(const json_value_t* value);
+// Get length of json value, value must be string, array or object
+
 // Find more details, or helper functions in json.h
 ```
 

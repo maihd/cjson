@@ -109,7 +109,7 @@ JSON_API void          json_write(const json_value_t* value, FILE* out);
 
 JSON_API int           json_length(const json_value_t* x);
 JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b);
-JSON_API json_value_t* json_get_value(const json_value_t* obj, const char* name);
+JSON_API json_value_t* json_find(const json_value_t* obj, const char* name);
 
 /**
  * JSON value
@@ -165,7 +165,7 @@ public: // @region: Indexor
 
 	JSON_INLINE const json_value& operator[] (const char* name) const
 	{
-		json_value_t* value = json_get_value(this, name);
+		json_value_t* value = json_find(this, name);
         return value ? &value : JSON_VALUE_NONE;
 	}
 
@@ -1404,8 +1404,8 @@ json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
     return JSON_FALSE;
 }
 
-/* @funcdef: json_get_value */
-json_value_t* json_get_value(const json_value_t* obj, const char* name)
+/* @funcdef: json_find */
+json_value_t* json_find(const json_value_t* obj, const char* name)
 {
     if (obj && obj->type == JSON_OBJECT)
     {
