@@ -735,6 +735,57 @@ static int json__match_char(json_state_t* state, int c)
     }
 }
 
+/* @funcdef: json__hash */
+static int json__hash(void* buf, size_t len)
+{
+    int h = 0xdeadbeaf;
+
+    const char* key = (const char*)buf;
+    if (len > 3)
+    {
+        const int* key_x4 = (const int*)key;
+        size_t i = len >> 2;
+        do 
+        {
+            int k = *key_x4++;
+
+            k *= 0xcc9e2d51;
+            k  = (k << 15) | (k >> 17);
+            k *= 0x1b873593;
+            h ^= k;
+            h  = (h << 13) | (h >> 19);
+            h  = (h * 5) + 0xe6546b64;
+        } while (--i);
+
+        key = (const char*)(key_x4);
+    }
+
+    if (len & 3)
+    {
+        size_t i = len & 3;
+        int k = 0;
+
+        key = &key[i - 1];
+        do {
+            k <<= 8;
+            k  |= *key--;
+        } while (--i);
+
+        k *= 0xcc9e2d51;
+        k  = (k << 15) | (k >> 17);
+        k *= 0x1b873593;
+        h ^= k;
+    }
+
+    h ^= len;
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+    return h;
+}
+
 /* All parse functions declaration */
 
 static json_value_t* json__parse_array(json_state_t* state);
@@ -1082,7 +1133,7 @@ static json_value_t* json__parse_string(json_state_t* state)
         temp_string[length] = 0;
         json__match_char(state, '"');
 
-        size_t size   = ((size_t)length + 1 + sizeof(int));
+        size_t size   = ((size_t)length + 1 + 2 * sizeof(int));
         char*  string = (char*)json__bucket_extract(state->string_bucket, size);
         if (!string)
         {
@@ -1107,10 +1158,13 @@ static json_value_t* json__parse_string(json_state_t* state)
             }
         }
 
-        ((int*)string)[0] = length;
-        string = string + 4;
-        string[length] = 0;
-        memcpy(string, temp_string, length);
+        /* String header */
+        ((int*)string)[0] = length;                  
+        ((int*)string)[1] = json__hash(temp_string, length);
+
+        /* String content */
+        string = string + 2 * sizeof(int);
+        memcpy(string, temp_string, length + 1);
 
         json_value_t* value = json__make_value(state, JSON_STRING);
         value->string = string;
@@ -1336,7 +1390,7 @@ int json_length(const json_value_t* x)
             return x->array ? *((int*)x->array - 1) : 0;
 
         case JSON_STRING:
-            return x->string ? *((int*)x->string - 1) : 0;
+            return x->string ? *((int*)x->string - 2) : 0;
 
         case JSON_OBJECT:
             return x->object.length;
@@ -1398,7 +1452,7 @@ json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
         return a->object.values == b->object.values;
 
     case JSON_STRING:
-        return strcmp(a->string, b->string) == 0;
+        return ((int*)a->string - 2)[1] == ((int*)b->string - 2)[1] && strcmp(a->string, b->string) == 0;
     }
 
     return JSON_FALSE;
@@ -1410,9 +1464,11 @@ json_value_t* json_find(const json_value_t* obj, const char* name)
     if (obj && obj->type == JSON_OBJECT)
     {
         int i, n;
+        int hash = json__hash(a, strlen(a));
         for (i = 0, n = json_length(obj); i < n; i++)
         {
-            if (strcmp(obj->object.values[i].name->string, name) == 0)
+            const char* str = obj->object.values[i].name->string;
+            if (hash == ((int*)str - 2)[1] && strcmp(str, name) == 0)
             {
                 return obj->object.values[i].value;
             }
