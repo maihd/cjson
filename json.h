@@ -253,11 +253,6 @@ JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b)
 #include <assert.h>
 #include <setjmp.h>
 
-#if __STDC_VERSION__ >= 201112L || defined(__cplusplus)
-#include <wchar.h>
-#include <uchar.h>
-#endif
-
 typedef struct json_pool
 {
     struct json_pool* prev;
@@ -978,13 +973,8 @@ static json_value_t* parse_string(json_state_t* state)
 
         int i;
         int length = 0;
-        int c0;
+        int c0, c1;
         char temp_string[1024];
-        #if __STDC_VERSION__ >= 201112L || defined(__cplusplus)
-        char c1, c32_cvt[MB_LEN_MAX + 1];
-        mbstate_t mbstate;
-        size_t ncvt;
-        #endif
         while (!is_eof(state) && (c0 = peek_char(state)) != '"')
         {
             if (c0 == '\\')
@@ -1017,11 +1007,10 @@ static json_value_t* parse_string(json_state_t* state)
                     break;
                         
                 case 'u':
-                #if __STDC_VERSION__ >= 201112L || defined(__cplusplus)
                     c1 = 0;
                     for (i = 0; i < 4; i++)
                     {
-                        if (isxdigit((c0 = read_char(state))))
+                        if (isxdigit((c0 = next_char(state))))
                         {
                             c1 = c1 * 10 + (isdigit(c0) ? c0 - '0' : c0 < 'a' ? c0 - 'A' : c0 - 'a'); 
                         }   
@@ -1030,13 +1019,30 @@ static json_value_t* parse_string(json_state_t* state)
                             croak(state, JSON_ERROR_UNKNOWN, "Expected hexa character in unicode character");
                         }
                     }
-                    memset(&mbstate, 0, sizeof(mbstate));
-                    ncvt = c32rtomb(c32_cvt, c1, &mbstate);
-                    memcpy(temp_string + length, c32_cvt, ncvt);
-                    length += ncvt;
-                #else
-                    croak(state, JSON_ERROR_UNSUPPORTED, "Unicode character is not support in older C11 standard");
-                #endif
+
+                    if (c1 <= 0x7F) 
+                    {
+                        temp_string[length++] = c1;
+                    }
+                    else if (c1 <= 0x7FF) 
+                    {
+                        temp_string[length++] = 0xC0 | (c1 >> 6);            /* 110xxxxx */
+                        temp_string[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
+                    }
+                    else if (c1 <= 0xFFFF) 
+                    {
+                        temp_string[length++] = 0xE0 | (c1 >> 12);           /* 1110xxxx */
+                        temp_string[length++] = 0x80 | ((c1 >> 6) & 0x3F);   /* 10xxxxxx */
+                        temp_string[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
+                    }
+                    else if (c1 <= 0x10FFFF) 
+                    {
+                        temp_string[length++] = 0xF0 | (c1 >> 18);           /* 11110xxx */
+                        temp_string[length++] = 0x80 | ((c1 >> 12) & 0x3F);  /* 10xxxxxx */
+                        temp_string[length++] = 0x80 | ((c1 >> 6) & 0x3F);   /* 10xxxxxx */
+                        temp_string[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
+                    }
+
                     break;
 
                 default:
