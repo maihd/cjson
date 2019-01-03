@@ -399,6 +399,7 @@ static void* json__pool_extract(json_pool_t* pool)
     }
 }
 
+#if 0 /* UNUSED */
 /* funcdef: json__pool_collect */
 static void json__pool_collect(json_pool_t* pool, void* ptr)
 {
@@ -409,6 +410,7 @@ static void json__pool_collect(json_pool_t* pool, void* ptr)
 		pool->head = node;
     }
 }
+#endif
 
 /* funcdef: json__make_bucket */
 static json_bucket_t* json__make_bucket(json_state_t* state, json_bucket_t* prev, size_t count, size_t size)
@@ -786,14 +788,14 @@ static int json__hash(void* buf, size_t len)
 
 /* All parse functions declaration */
 
-static json_value_t* json__parse_array(json_state_t* state);
-static json_value_t* json__parse_single(json_state_t* state);
-static json_value_t* json__parse_object(json_state_t* state);
-static json_value_t* json__parse_number(json_state_t* state);
-static json_value_t* json__parse_string(json_state_t* state);
+static json_value_t* json__parse_array(json_state_t* state, json_value_t* value);
+static json_value_t* json__parse_single(json_state_t* state, json_value_t* value);
+static json_value_t* json__parse_object(json_state_t* state, json_value_t* value);
+static json_value_t* json__parse_number(json_state_t* state, json_value_t* value);
+static json_value_t* json__parse_string(json_state_t* state, json_value_t* value);
 
 /* @funcdef: json__parse_number */
-static json_value_t* json__parse_number(json_state_t* state)
+static json_value_t* json__parse_number(json_state_t* state, json_value_t* value)
 {
     if (json__skip_space(state) < 0)
     {
@@ -885,7 +887,11 @@ static json_value_t* json__parse_number(json_state_t* state)
 		}
 		else
 		{
-			json_value_t* value = json__make_value(state, JSON_NUMBER);
+			if (!value)
+                value = json__make_value(state, JSON_NUMBER);
+            else
+                value->type = JSON_NUMBER;
+
 			value->number = sign * number;
 			return value;
 		}
@@ -893,7 +899,7 @@ static json_value_t* json__parse_number(json_state_t* state)
 }
 
 /* @funcdef: json__parse_array */
-static json_value_t* json__parse_array(json_state_t* state)
+static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
 {
     if (json__skip_space(state) < 0)
     {
@@ -903,7 +909,14 @@ static json_value_t* json__parse_array(json_state_t* state)
     {
 	    json__match_char(state, '[');
 	
-	    json_value_t* root = json__make_value(state, JSON_ARRAY);
+	    if (!root)
+        {
+            root = json__make_value(state, JSON_ARRAY);
+        }
+        else
+        {
+            root->type = JSON_ARRAY;
+        }
 
 	    int            length = 0;
 	    json_value_t** values = NULL;
@@ -915,7 +928,7 @@ static json_value_t* json__parse_array(json_state_t* state)
                 json__match_char(state, ',');
 	        }
 	    
-	        json_value_t* value = json__parse_single(state);
+	        json_value_t* value = json__parse_single(state, NULL);
             
             int   old_size   = sizeof(int) + length * sizeof(json_value_t*);
             int   new_size   = sizeof(int) + (length + 1) * sizeof(json_value_t*);
@@ -972,7 +985,7 @@ static json_value_t* json__parse_array(json_state_t* state)
 }
 
 /* json__parse_single */
-static json_value_t* json__parse_single(json_state_t* state)
+static json_value_t* json__parse_single(json_state_t* state, json_value_t* value)
 {
     if (json__skip_space(state) < 0)
     {
@@ -985,19 +998,19 @@ static json_value_t* json__parse_single(json_state_t* state)
 	    switch (c)
 	    {
 	    case '[':
-	        return json__parse_array(state);
+	        return json__parse_array(state, value);
 	    
 	    case '{':
-	        return json__parse_object(state);
+	        return json__parse_object(state, value);
 	    
 	    case '"':
-	        return json__parse_string(state);
+	        return json__parse_string(state, value);
 
 	    case '+': case '-': case '0': 
         case '1': case '2': case '3': 
         case '4': case '5': case '6': 
         case '7': case '8': case '9':
-	        return json__parse_number(state);
+	        return json__parse_number(state, value);
 	    
         default:
 	    {
@@ -1011,16 +1024,17 @@ static json_value_t* json__parse_single(json_state_t* state)
 	        const char* token = state->buffer + state->cursor - length;
 	        if (length == 4 && strncmp(token, "true", 4) == 0)
 	        {
-                json_value_t* value = json__make_value(state, JSON_BOOLEAN);
+                if (!value) value = json__make_value(state, JSON_BOOLEAN);
+                else        value->type = JSON_BOOLEAN;
                 value->boolean = JSON_TRUE;
 	        }
 	        else if (length == 4 && strncmp(token, "null", 4) == 0)
             {
-                return json__make_value(state, JSON_NULL);
+                return value ? (value->type = JSON_NULL, value) : json__make_value(state, JSON_NULL);
             }
 	        else if (length == 5 && strncmp(token, "false", 5) == 0)
 	        {
-                return json__make_value(state, JSON_BOOLEAN);
+                return value ? (value->type = JSON_BOOLEAN, value) : json__make_value(state, JSON_BOOLEAN);
 	        }
 	        else
 	        {
@@ -1035,7 +1049,7 @@ static json_value_t* json__parse_single(json_state_t* state)
 }
 
 /* @funcdef: json__parse_string */
-static json_value_t* json__parse_string(json_state_t* state)
+static json_value_t* json__parse_string(json_state_t* state, json_value_t* value)
 {
     if (json__skip_space(state) < 0)
     {
@@ -1164,14 +1178,18 @@ static json_value_t* json__parse_string(json_state_t* state)
         string = string + 2 * sizeof(int);
         memcpy(string, temp_string, length + 1);
 
-        json_value_t* value = json__make_value(state, JSON_STRING);
+        if (!value)
+            value = json__make_value(state, JSON_STRING);
+        else        
+            value->type = JSON_STRING;
+
         value->string = string;
         return value;
     }
 }
 
 /* @funcdef: json__parse_object */
-static json_value_t* json__parse_object(json_state_t* state)
+static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
 {
     if (json__skip_space(state) < 0)
     {
@@ -1181,7 +1199,15 @@ static json_value_t* json__parse_object(json_state_t* state)
     {
         json__match_char(state, '{');
 
-        json_value_t* root = json__make_value(state, JSON_OBJECT);
+        if (!root)
+        {
+            root = json__make_value(state, JSON_OBJECT);
+        }
+        else
+        {
+            root->type = JSON_OBJECT;
+        }
+
         root->object.length = 0;
         root->object.values = NULL;
 
@@ -1196,7 +1222,7 @@ static json_value_t* json__parse_object(json_state_t* state)
             json_value_t* name_token = NULL;
             if (json__skip_space(state) == '"')
             {
-                name_token = json__parse_string(state);
+                name_token = json__parse_string(state, NULL);
             }
             else
             {
@@ -1204,12 +1230,11 @@ static json_value_t* json__parse_object(json_state_t* state)
                       "Expected string for name of field of object");
             }
             const char* name = name_token->string;
-            json__pool_collect(state->value_pool, name_token);
 
             json__skip_space(state);
             json__match_char(state, ':');
 
-            json_value_t* value = json__parse_single(state);
+            json_value_t* value = json__parse_single(state, name_token);
 
             /* Append new pair of value to container */
             int old_length = length++;
@@ -1275,7 +1300,7 @@ static json_value_t* json_parse_in(json_state_t* state)
     {
         if (setjmp(state->errjmp) == 0)
         {
-            json_value_t* value = json__parse_object(state);
+            json_value_t* value = json__parse_object(state, NULL);
             return value;
         }
         else
