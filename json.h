@@ -131,7 +131,7 @@ struct json_value
 			int length;
 			struct
 			{
-				struct json_value* name;
+				const char*        name;
 				struct json_value* value;
 			}*  values;
 		} object;
@@ -399,7 +399,6 @@ static void* json__pool_extract(json_pool_t* pool)
     }
 }
 
-#if 0 /* UNUSED */
 /* funcdef: json__pool_collect */
 static void json__pool_collect(json_pool_t* pool, void* ptr)
 {
@@ -410,7 +409,6 @@ static void json__pool_collect(json_pool_t* pool, void* ptr)
 		pool->head = node;
     }
 }
-#endif
 
 /* funcdef: json__make_bucket */
 static json_bucket_t* json__make_bucket(json_state_t* state, json_bucket_t* prev, size_t count, size_t size)
@@ -1195,16 +1193,18 @@ static json_value_t* json__parse_object(json_state_t* state)
                 json__match_char(state, ',');
             }
 
-            json_value_t* name = NULL;
+            json_value_t* name_token = NULL;
             if (json__skip_space(state) == '"')
             {
-                name = json__parse_string(state);
+                name_token = json__parse_string(state);
             }
             else
             {
                 json__croak(state, JSON_ERROR_UNEXPECTED,
                       "Expected string for name of field of object");
             }
+            const char* name = name_token->string;
+            json__pool_collect(state->value_pool, name_token);
 
             json__skip_space(state);
             json__match_char(state, ':');
@@ -1464,10 +1464,10 @@ json_value_t* json_find(const json_value_t* obj, const char* name)
     if (obj && obj->type == JSON_OBJECT)
     {
         int i, n;
-        int hash = json__hash(a, strlen(a));
+        int hash = json__hash((void*)name, strlen(name));
         for (i = 0, n = json_length(obj); i < n; i++)
         {
-            const char* str = obj->object.values[i].name->string;
+            const char* str = obj->object.values[i].name;
             if (hash == ((int*)str - 2)[1] && strcmp(str, name) == 0)
             {
                 return obj->object.values[i].value;
@@ -1520,8 +1520,7 @@ void json_write(const json_value_t* value, FILE* out)
             fprintf(out, "{");
             for (i = 0, n = value->object.length; i < n; i++)
             {
-                json_write(value->object.values[i].name, out);
-                fprintf(out, " : ");
+                fprintf(out, "\"%s\" : ", value->object.values[i].name);
                 json_write(value->object.values[i].value, out);
                 if (i < n - 1)
                 {
@@ -1604,8 +1603,7 @@ void json_print(const json_value_t* value, FILE* out)
                     fputc(' ', out);
                 }
 
-                json_print(value->object.values[i].name, out);
-                fprintf(out, " : ");
+                fprintf(out, "\"%s\" : ", value->object.values[i].name);
                 json_print(value->object.values[i].value, out);
                 if (i < n - 1)
                 {
