@@ -220,6 +220,8 @@ JSON_API json_value_t* json_parse_ex(const char* json, const json_settings_t* se
 
 JSON_API void          json_release(json_state_t* state);
 
+JSON_API json_value_t* json_get_value(const json_value_t* obj, const char* name);
+
 JSON_API json_error_t  json_get_errno(const json_state_t* state);
 JSON_API const char*   json_get_error(const json_state_t* state);
 
@@ -1332,6 +1334,23 @@ json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
     }
 
     return JSON_FALSE;
+}
+
+json_value_t* json_get_value(const json_value_t* obj, const char* name)
+{
+    if (obj && obj->type == JSON_OBJECT)
+    {
+        int i, n;
+        for (i = 0, n = obj->object.length; i < n; i++)
+        {
+            if (strcmp(obj->object.values[i].name->string.buffer, name) == 0)
+            {
+                return obj->object.values[i].value;
+            }
+        }
+    }
+
+    return NULL;
 }
 
 /* @funcdef: json_write */
