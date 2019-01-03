@@ -69,6 +69,9 @@ typedef enum json_error
     JSON_ERROR_INTERNAL,
 } json_error_t;
 
+typedef struct json_state json_state_t;
+typedef struct json_value json_value_t;
+
 /**
  * JSON boolean data type
  */
@@ -84,12 +87,34 @@ typedef enum
 } json_bool_t;
 #endif
 
-JSON_API extern const struct json_value JSON_VALUE_NONE;
+typedef struct
+{
+    void* data;
+    void* (*malloc)(void* data, size_t size);
+    void  (*free)(void* data, void* pointer);
+} json_settings_t;
+
+JSON_API extern const json_value_t JSON_VALUE_NONE;
+
+JSON_API json_value_t* json_parse(const char* json, json_state_t** state);
+JSON_API json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** state);
+
+JSON_API void          json_release(json_state_t* state);
+
+JSON_API json_error_t  json_get_errno(const json_state_t* state);
+JSON_API const char*   json_get_error(const json_state_t* state);
+
+JSON_API void          json_print(const json_value_t* value, FILE* out);
+JSON_API void          json_write(const json_value_t* value, FILE* out);
+
+JSON_API int           json_length(const json_value_t* x);
+JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b);
+JSON_API json_value_t* json_get_value(const json_value_t* obj, const char* name);
 
 /**
  * JSON value
  */
-typedef struct json_value
+struct json_value
 {
     json_type_t type;
     union
@@ -97,18 +122,10 @@ typedef struct json_value
 		double      number;
 		json_bool_t boolean;
 
-		struct
-		{
-			int   length;
-			char* buffer;
-		} string;
+		const char* string;
 
-		struct
-		{
-			int                 length;
-			struct json_value** values;
-		} array;
-
+        struct json_value** array;
+        
 		struct
 		{
 			int length;
@@ -122,21 +139,21 @@ typedef struct json_value
 
 #ifdef __cplusplus
 public: // @region: Constructors
-    inline json_value()
+    JSON_INLINE json_value()
 	{	
         memset(this, 0, sizeof(*this));
 	}
 
-    inline ~json_value()
+    JSON_INLINE ~json_value()
     {
         // SHOULD BE EMPTY
         // Memory are managed by json_state_t
     }
 
 public: // @region: Indexor
-	inline const json_value& operator[] (int index) const
+	JSON_INLINE const json_value& operator[] (int index) const
 	{
-		if (type != JSON_ARRAY || index < 0 || index > array.length)
+		if (type != JSON_ARRAY || index < 0 || index > json_length(this))
 		{
 			return JSON_VALUE_NONE;
 		}
@@ -146,28 +163,18 @@ public: // @region: Indexor
 		}	
 	}
 
-	inline const json_value& operator[] (const char* name) const
+	JSON_INLINE const json_value& operator[] (const char* name) const
 	{
-		if (type == JSON_OBJECT)
-		{
-			for (int i = 0, n = object.length; i < n; i++)
-			{
-				if (strcmp(object.values[i].name->string.buffer, name) == 0)
-				{
-					return *object.values[i].value;
-				}
-			}
-		}	
-
-        return JSON_VALUE_NONE;
+		json_value_t* value = json_get_value(this, name);
+        return value ? &value : JSON_VALUE_NONE;
 	}
 
 public: // @region: Conversion
-	inline operator const char* () const
+	JSON_INLINE operator const char* () const
 	{
 		if (type == JSON_STRING)
 		{
-			return string.buffer;
+			return string;
 		}
 		else
 		{
@@ -175,12 +182,12 @@ public: // @region: Conversion
 		}
 	}
 
-	inline operator double () const
+	JSON_INLINE operator double () const
 	{
 		return number;
 	}
 
-	inline operator bool () const
+	JSON_INLINE operator bool () const
 	{
         switch (type)
         {
@@ -205,30 +212,7 @@ public: // @region: Conversion
 
 	}
 #endif /* __cplusplus */
-} json_value_t;
-
-typedef struct json_state json_state_t;
-typedef struct
-{
-    void* data;
-    void* (*malloc)(void* data, size_t size);
-    void  (*free)(void* data, void* pointer);
-} json_settings_t;
-
-JSON_API json_value_t* json_parse(const char* json, json_state_t** state);
-JSON_API json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** state);
-
-JSON_API void          json_release(json_state_t* state);
-
-JSON_API json_value_t* json_get_value(const json_value_t* obj, const char* name);
-
-JSON_API json_error_t  json_get_errno(const json_state_t* state);
-JSON_API const char*   json_get_error(const json_state_t* state);
-
-JSON_API void          json_print(const json_value_t* value, FILE* out);
-JSON_API void          json_write(const json_value_t* value, FILE* out);
-
-JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b);
+};
 
 /* END OF EXTERN "C" */
 #ifdef __cplusplus
@@ -241,12 +225,6 @@ JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b)
 
 #ifdef JSON_IMPL
 
-#ifdef _MSC_VER
-#  ifndef _CRT_SECURE_NO_WARNINGS
-#  define _CRT_SECURE_NO_WARNINGS
-#  endif
-#endif
-
 #include <ctype.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -254,6 +232,18 @@ JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b)
 #include <string.h>
 #include <assert.h>
 #include <setjmp.h>
+
+#ifndef JSON_VALUE_BUCKETS
+#define JSON_VALUE_BUCKETS 4096
+#endif
+
+#ifndef JSON_STRING_BUCKETS
+#define JSON_STRING_BUCKETS 4096
+#endif
+
+#ifndef JSON_VALUE_POOL_COUNT
+#define JSON_VALUE_POOL_COUNT 128
+#endif
 
 typedef struct json_pool
 {
@@ -268,9 +258,9 @@ typedef struct json_bucket
     struct json_bucket* prev;
     struct json_bucket* next;
 
-    int size;
-    int count;
-    int capacity;
+    size_t size;
+    size_t count;
+    size_t capacity;
 } json_bucket_t;
 
 struct json_state
@@ -297,13 +287,13 @@ struct json_state
 static json_state_t* root_state = NULL;
 const struct json_value JSON_VALUE_NONE;
 
-static void* def_malloc(void* data, size_t size)
+static void* json__malloc(void* data, size_t size)
 {
     (void)data;
     return malloc(size);
 }
 
-static void def_free(void* data, void* pointer)
+static void json__free(void* data, void* pointer)
 {
     (void)data;
     free(pointer);
@@ -414,16 +404,14 @@ static void pool_collect(json_pool_t* pool, void* ptr)
     }
 }
 
-static json_bucket_t* make_bucket(json_state_t* state, json_bucket_t* prev, int count, int size)
+static json_bucket_t* make_bucket(json_state_t* state, json_bucket_t* prev, size_t count, size_t size)
 {
     if (count <= 0 || size <= 0)
     {
-        return 0;
+        return NULL;
     }
 
-    json_bucket_t* bucket = 
-    (json_bucket_t*)state->settings.malloc(state->settings.data,
-                                           sizeof(json_bucket_t) + count * size);
+    json_bucket_t* bucket = (json_bucket_t*)state->settings.malloc(state->settings.data, sizeof(json_bucket_t) + count * size);
     if (bucket)
     {
         if (prev)
@@ -469,13 +457,18 @@ static void* bucket_extract(json_bucket_t* bucket, int count)
 
 static void* bucket_resize(json_bucket_t* bucket, void* ptr, int old_count, int new_count)
 {
-    if (!bucket || old_count <= 0 || new_count <= 0)
+    if (!bucket || new_count <= 0)
     {
         return NULL;
     }
 
+    if (!ptr)
+    {
+        return bucket_extract(bucket, new_count);
+    }
+
     char* begin = (char*)bucket + sizeof(json_bucket_t);
-    char* end   = begin + bucket->count * bucket->count;
+    char* end   = begin + bucket->size * bucket->count;
     if ((char*)ptr + bucket->size * old_count == end && bucket->count + (new_count - old_count) <= bucket->capacity)
     {
         bucket->count += (new_count - old_count);
@@ -487,6 +480,7 @@ static void* bucket_resize(json_bucket_t* bucket, void* ptr, int old_count, int 
     }
 }
 
+/* @funcdef: make_value */
 static json_value_t* make_value(json_state_t* state, json_type_t type)
 {
     if (!state->value_pool || !state->value_pool->head)
@@ -497,7 +491,7 @@ static json_value_t* make_value(json_state_t* state, json_type_t type)
         }
         else
         {
-            state->value_pool = make_pool(state, state->value_pool, 64, sizeof(json_value_t));
+            state->value_pool = make_pool(state, state->value_pool, JSON_VALUE_POOL_COUNT, sizeof(json_value_t));
         }
 
 		if (!state->value_pool)
@@ -840,7 +834,7 @@ static json_value_t* parse_array(json_state_t* state)
 	    json_value_t* root = make_value(state, JSON_ARRAY);
 
 	    int            length = 0;
-	    json_value_t** values = 0;
+	    json_value_t** values = NULL;
 	
 	    while (skip_space(state) > 0 && peek_char(state) != ']')
 	    {
@@ -851,46 +845,57 @@ static json_value_t* parse_array(json_state_t* state)
 	    
 	        json_value_t* value = parse_single(state);
             
-            int old_length = length;
-            void* new_values = bucket_resize(state->values_bucket, values, old_length, ++length);
-            while (!new_values)
+            int   old_size   = sizeof(int) + length * sizeof(json_value_t*);
+            int   new_size   = sizeof(int) + (length + 1) * sizeof(json_value_t*);
+            void* new_values = bucket_resize(state->values_bucket, 
+                                             values ? (int*)values - 1 : NULL, 
+                                             old_size, 
+                                             new_size);
+
+            if (!new_values)
             {
-                /* Get from unused buckets */
+                /* Get from unused buckets (a.k.a reuse json_state_t) */
                 while (state->values_bucket && state->values_bucket->prev)
                 {
                     state->values_bucket = state->values_bucket->prev;
-                    new_values = bucket_extract(state->values_bucket, length);
-                    if (new_values)
+                    new_values = bucket_extract(state->values_bucket, new_size);
+                    if (!new_values)
                     {
                         break;
                     }
                 }
 
-                /* Create new buckets */
-                state->values_bucket = make_bucket(state, state->values_bucket, 128, sizeof(json_value_t*));
-                
-                new_values = bucket_extract(state->values_bucket, length);
                 if (!new_values)
                 {
-                    croak(state, JSON_ERROR_MEMORY, "Out of memory when create array");
-                    return NULL;
+                    printf("Should reach here!\n");
+                    /* Create new buckets */
+                    state->values_bucket = make_bucket(state, state->values_bucket, JSON_VALUE_BUCKETS, 1);
+                    
+                    new_values = bucket_extract(state->values_bucket, new_size);
+                    if (!new_values)
+                    {
+                        croak(state, JSON_ERROR_MEMORY, "Out of memory when parsing array");
+                    }
+                    else if (values)
+                    {
+                        memcpy(new_values, (int*)values - 1, old_size);
+                    }
                 }
-                else
-                {
-                    memcpy(new_values, values, (length - 1) * sizeof(json_value_t));
-                }
-                break;
             }
 
-            values = (json_value_t**)new_values;
-	        values[length - 1] = value;
+            values = (json_value_t**)((int*)new_values + 1);
+	        values[length++] = value;
 	    }
 
 	    skip_space(state);
 	    match_char(state, ']');
 
-	    root->array.length = length;
-	    root->array.values = values;
+        if (values)
+        {
+            *((int*)values - 1) = length;
+        }
+
+	    root->array = values;
 	    return root;
     }
 }
@@ -1040,7 +1045,6 @@ static json_value_t* parse_string(json_state_t* state)
                         temp_string[length++] = 0x80 | ((c1 >> 6) & 0x3F);   /* 10xxxxxx */
                         temp_string[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
                     }
-
                     break;
 
                 default:
@@ -1056,7 +1060,8 @@ static json_value_t* parse_string(json_state_t* state)
         temp_string[length] = 0;
         match_char(state, '"');
 
-        char* string = (char*)bucket_extract(state->string_bucket, length + 1);
+        size_t size   = ((size_t)length + 1 + sizeof(int));
+        char*  string = (char*)bucket_extract(state->string_bucket, size);
         if (!string)
         {
             /* Get from unused buckets */
@@ -1071,20 +1076,22 @@ static json_value_t* parse_string(json_state_t* state)
             }
 
             /* Create new bucket */
-            state->string_bucket = make_bucket(state, state->string_bucket, 4096, sizeof(char)); /* 4096 equal default memory page size */
-            string = (char*)bucket_extract(state->string_bucket, length + 1);
+            state->string_bucket = make_bucket(state, state->string_bucket, JSON_STRING_BUCKETS, 1);
+            string = (char*)bucket_extract(state->string_bucket, size);
             if (!string)
             {
                 croak(state, JSON_ERROR_MEMORY, "Out of memory when create new string");
                 return NULL;
             }
         }
+
+        ((int*)string)[0] = length;
+        string = string + 4;
         string[length] = 0;
         memcpy(string, temp_string, length);
 
         json_value_t* value = make_value(state, JSON_STRING);
-        value->string.length = length;
-        value->string.buffer = string;
+        value->string = string;
         return value;
     }
 }
@@ -1101,6 +1108,8 @@ static json_value_t* parse_object(json_state_t* state)
         match_char(state, '{');
 
         json_value_t* root = make_value(state, JSON_OBJECT);
+        root->object.length = 0;
+        root->object.values = NULL;
 
         int length = 0;
         while (skip_space(state) > 0 && peek_char(state) != '}')
@@ -1127,10 +1136,11 @@ static json_value_t* parse_object(json_state_t* state)
             json_value_t* value = parse_single(state);
 
             /* Append new pair of value to container */
-            int old_length = length;
+            int old_length = length++;
             void* new_values = bucket_resize(state->values_bucket,
                                              root->object.values,
-                                             old_length, ++length);
+                                             old_length * sizeof(json_value_t*), 
+                                             length * sizeof(json_value_t*));
             if (!new_values)
             {
                 /* Get from unused buckets */
@@ -1145,14 +1155,13 @@ static json_value_t* parse_object(json_state_t* state)
                 }
 
                 /* Create new buffer */
-                state->values_bucket = make_bucket(state, state->values_bucket, 128, sizeof(json_value_t*));
+                state->values_bucket = make_bucket(state, state->values_bucket, 128, 1);
                 
                 /* Continue get new buffer for values */
                 new_values = bucket_extract(state->values_bucket, length);
                 if (!new_values)
                 {
                     croak(state, JSON_ERROR_MEMORY, "Out of memory when create object");
-                    return NULL;
                 }
                 else
                 {
@@ -1212,8 +1221,8 @@ json_value_t* json_parse(const char* json, json_state_t** out_state)
 {
     json_settings_t settings;
     settings.data   = NULL;
-    settings.free   = def_free;
-    settings.malloc = def_malloc;
+    settings.free   = json__free;
+    settings.malloc = json__malloc;
 
     return json_parse_ex(json, &settings, out_state);
 }
@@ -1294,8 +1303,35 @@ const char* json_get_error(const json_state_t* state)
     }
 }
 
+/* @funcdef: json_length */
+int json_length(const json_value_t* x)
+{
+    if (x)
+    {
+        switch (x->type)
+        {
+        case JSON_ARRAY:
+            return x->array ? *((int*)x->array - 1) : 0;
+
+        case JSON_STRING:
+            return x->string ? *((int*)x->string - 1) : 0;
+
+        case JSON_OBJECT:
+            return x->object.length;
+
+        default:
+            break;
+        }
+    }
+
+    return 0;
+}
+
+/* @funcdef: json_equals */
 json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
 {
+    int i, n;
+
     if (a == b)
     {
         return JSON_TRUE;
@@ -1324,26 +1360,37 @@ json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
         return a->boolean == b->boolean;
 
     case JSON_ARRAY:
-        return a->array.values == b->array.values;
+        if ((n = json_length(a)) == json_length(b))
+        {
+            for (i = 0; i < n; i++)
+            {
+                if (!json_equals(a->array[i], b->array[i]))
+                {
+                    return JSON_FALSE;
+                }
+            }
+        }
+        return JSON_TRUE;
 
     case JSON_OBJECT:
         return a->object.values == b->object.values;
 
     case JSON_STRING:
-        return a->string.buffer == b->string.buffer;
+        return strcmp(a->string, b->string) == 0;
     }
 
     return JSON_FALSE;
 }
 
+/* @funcdef: json_get_value */
 json_value_t* json_get_value(const json_value_t* obj, const char* name)
 {
     if (obj && obj->type == JSON_OBJECT)
     {
         int i, n;
-        for (i = 0, n = obj->object.length; i < n; i++)
+        for (i = 0, n = json_length(obj); i < n; i++)
         {
-            if (strcmp(obj->object.values[i].name->string.buffer, name) == 0)
+            if (strcmp(obj->object.values[i].name->string, name) == 0)
             {
                 return obj->object.values[i].value;
             }
@@ -1375,14 +1422,14 @@ void json_write(const json_value_t* value, FILE* out)
             break;
 
         case JSON_STRING:
-            fprintf(out, "\"%s\"", value->string.buffer);
+            fprintf(out, "\"%s\"", value->string);
             break;
 
         case JSON_ARRAY:
             fprintf(out, "[");
-            for (i = 0, n = value->array.length; i < n; i++)
+            for (i = 0, n = json_length(value); i < n; i++)
             {
-                json_print(value->array.values[i], out);
+                json_write(value->array[i], out);
                 if (i < n - 1)
                 {
                     fprintf(out, ",");
@@ -1395,9 +1442,9 @@ void json_write(const json_value_t* value, FILE* out)
             fprintf(out, "{");
             for (i = 0, n = value->object.length; i < n; i++)
             {
-                json_print(value->object.values[i].name, out);
+                json_write(value->object.values[i].name, out);
                 fprintf(out, " : ");
-                json_print(value->object.values[i].value, out);
+                json_write(value->object.values[i].value, out);
                 if (i < n - 1)
                 {
                     fprintf(out, ",");
@@ -1436,25 +1483,25 @@ void json_print(const json_value_t* value, FILE* out)
             break;
 
         case JSON_STRING:
-            fprintf(out, "\"%s\"", value->string.buffer);
+            fprintf(out, "\"%s\"", value->string);
             break;
 
         case JSON_ARRAY:
             fprintf(out, "[\n");
 
             indent++;
-            for (i = 0, n = value->array.length; i < n; i++)
+            for (i = 0, n = json_length(value); i < n; i++)
             {
                 int j, m;
                 for (j = 0, m = indent * 4; j < m; j++)
                 {
-                    fprintf(out, " ");
+                    fputc(' ', out);
                 }
 
-                json_print(value->array.values[i], out);
+                json_print(value->array[i], out);
                 if (i < n - 1)
                 {
-                    fprintf(out, ",");
+                    fputc(',', out);
                 }
                 fprintf(out, "\n");
             }
@@ -1463,20 +1510,20 @@ void json_print(const json_value_t* value, FILE* out)
             for (i = 0, n = indent * 4; i < n; i++)
             {
                 fprintf(out, " ");
-            }
-            fprintf(out, "]");
+            }  
+            fputc(']', out);
             break;
 
         case JSON_OBJECT:
             fprintf(out, "{\n");
 
             indent++;
-            for (i = 0, n = value->object.length; i < n; i++)
+            for (i = 0, n = json_length(value); i < n; i++)
             {
                 int j, m;
                 for (j = 0, m = indent * 4; j < m; j++)
                 {
-                    fprintf(out, " ");
+                    fputc(' ', out);
                 }
 
                 json_print(value->object.values[i].name, out);
@@ -1484,17 +1531,17 @@ void json_print(const json_value_t* value, FILE* out)
                 json_print(value->object.values[i].value, out);
                 if (i < n - 1)
                 {
-                    fprintf(out, ",");
+                    fputc(',', out);
                 }
-                fprintf(out, "\n");
+                fputc('\n', out);
             }
             indent--;
 
             for (i = 0, n = indent * 4; i < n; i++)
-            {
-                fprintf(out, " ");
-            }
-            fprintf(out, "}");
+            {                    
+                fputc(' ', out);
+            }                    
+            fputc('}', out);
             break;
 
         case JSON_NONE:

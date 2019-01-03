@@ -7,4 +7,4 @@ TARGET=json_test
 endif
 
 all:
-	$(CC) -o $(TARGET) json_test.c
+	$(CC) -o $(TARGET) json_test.c -Wall
