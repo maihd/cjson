@@ -124,7 +124,7 @@ typedef struct json_value
 public: // @region: Constructors
     inline json_value()
 	{	
-        memset(this, 0, sizeof(this));
+        memset(this, 0, sizeof(*this));
 	}
 
     inline ~json_value()
@@ -335,17 +335,13 @@ static void set_error(json_state_t* state, json_error_t code, const char* fmt, .
 }
 
 /* funcdef: croak */
-#if __GNUC__
-__attribute__((noreturn))
-#elif defined(_MSC_VER)
-__declspec(noreturn)
-#endif
 static void croak(json_state_t* state, json_error_t code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
     set_error_valist(state, code, fmt, varg);
     va_end(varg);
+
     longjmp(state->errjmp, code);
 }
 
