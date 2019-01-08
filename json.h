@@ -239,7 +239,7 @@ public: // @region: Conversion
 #endif
 
 #ifndef JSON_VALUE_POOL_COUNT
-#define JSON_VALUE_POOL_COUNT 128
+#define JSON_VALUE_POOL_COUNT (4096/sizeof(json_value_t))
 #endif
 
 typedef struct json_pool
@@ -309,10 +309,13 @@ static void json__set_error_valist(json_state_t* state, json_error_t code, const
         state->errmsg = (char*)state->settings.malloc(state->settings.data, errmsg_size);
     }
 
+    char final_format[1024];
+    sprintf(final_format, "%s\n\tAt line %d, column %d.", fmt, state->line, state->column);
+
 #if defined(_MSC_VER) && _MSC_VER >= 1200
-    sprintf_s(state->errmsg, errmsg_size, fmt, valist);
+    sprintf_s(state->errmsg, errmsg_size, final_format, valist);
 #else
-    sprintf(state->errmsg, fmt, valist);
+    sprintf(state->errmsg, final_format, valist);
 #endif
 }
 
@@ -1127,6 +1130,8 @@ static json_value_t* json__parse_single(json_state_t* state, json_value_t* value
 /* @funcdef: json__parse_string */
 static json_value_t* json__parse_string(json_state_t* state, json_value_t* value)
 {
+    const int HEADER_SIZE = 2 * sizeof(int);
+
     if (json__skip_space(state) < 0)
     {
         return NULL;
@@ -1135,12 +1140,45 @@ static json_value_t* json__parse_string(json_state_t* state, json_value_t* value
     {
         json__match_char(state, '"');
 
-        int i;
-        int length = 0;
-        int c0, c1;
-        char temp_string[1024];
+        int   i;
+        int   c0, c1;
+        int   length        = 0;
+        int   capacity      = 0;
+        char* temp_string   = NULL;
         while (!json__is_eof(state) && (c0 = json__peek_char(state)) != '"')
         {
+            if (length + 4 >= capacity - HEADER_SIZE)
+            {
+                capacity    = capacity > 0 ? capacity * 2 : 32;
+                temp_string = (char*)json__bucket_resize(state->string_bucket, 
+                                                         temp_string ? temp_string - HEADER_SIZE : temp_string, 
+                                                         capacity >> 1, capacity);
+                if (!temp_string)
+                {
+                    /* Get from unused buckets */
+                    while (state->string_bucket && state->string_bucket->prev)
+                    {
+                        state->string_bucket = state->string_bucket->prev;
+                        temp_string = (char*)json__bucket_extract(state->string_bucket, capacity);
+                        if (temp_string)
+                        {
+                            break;
+                        }
+                    }
+
+                    /* Create new bucket */
+                    state->string_bucket = json__make_bucket(state, state->string_bucket, JSON_STRING_BUCKETS, 1);
+                    temp_string = (char*)json__bucket_extract(state->string_bucket, capacity);
+                    if (!temp_string)
+                    {
+                        json__croak(state, JSON_ERROR_MEMORY, "Out of memory when create new string");
+                        return NULL;
+                    }
+                }
+
+                temp_string += HEADER_SIZE;
+            }
+
             if (c0 == '\\')
             {
                 c0 = json__next_char(state);
@@ -1216,50 +1254,34 @@ static json_value_t* json__parse_string(json_state_t* state, json_value_t* value
             {
                 temp_string[length++] = c0;
             }
+
             json__next_char(state);
         }
-        temp_string[length] = 0;
         json__match_char(state, '"');
 
-        size_t size   = ((size_t)length + 1 + 2 * sizeof(int));
-        char*  string = (char*)json__bucket_extract(state->string_bucket, size);
-        if (!string)
+        if (!value)
         {
-            /* Get from unused buckets */
-            while (state->string_bucket && state->string_bucket->prev)
-            {
-                state->string_bucket = state->string_bucket->prev;
-                string = (char*)json__bucket_extract(state->string_bucket, length);
-                if (string)
-                {
-                    break;
-                }
-            }
-
-            /* Create new bucket */
-            state->string_bucket = json__make_bucket(state, state->string_bucket, JSON_STRING_BUCKETS, 1);
-            string = (char*)json__bucket_extract(state->string_bucket, size);
-            if (!string)
-            {
-                json__croak(state, JSON_ERROR_MEMORY, "Out of memory when create new string");
-                return NULL;
-            }
+            value = json__make_value(state, JSON_STRING);
+        }
+        else        
+        {
+            value->type = JSON_STRING;
         }
 
-        /* String header */
-        ((int*)string)[0] = length;                  
-        ((int*)string)[1] = json__hash(temp_string, length);
+        if (temp_string)
+        {
+            temp_string[length] = 0;
 
-        /* String content */
-        string = string + 2 * sizeof(int);
-        memcpy(string, temp_string, length + 1);
+            size_t size   = ((size_t)length + 1);
+            char*  string = (char*)json__bucket_resize(state->string_bucket, temp_string - HEADER_SIZE, capacity, size);
 
-        if (!value)
-            value = json__make_value(state, JSON_STRING);
-        else        
-            value->type = JSON_STRING;
+            /* String header */
+            ((int*)string)[0] = length;                  
+            ((int*)string)[1] = json__hash(temp_string, length);
 
-        value->string = string;
+            value->string = string + HEADER_SIZE;
+        }
+
         return value;
     }
 }
@@ -1358,7 +1380,10 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
             root->object[old_length].value = value;
         }
 
-        *((int*)root->object - 1) = length;
+        if (root->object)
+        {
+            *((int*)root->object - 1) = length;
+        }
 
         json__skip_space(state);
         json__match_char(state, '}');
@@ -1393,7 +1418,7 @@ static json_value_t* json_parse_in(json_state_t* state)
             return NULL;
         }
     }
-    if (json__skip_space(state) == '[')
+    else if (json__skip_space(state) == '[')
     {
         if (setjmp(state->errjmp) == 0)
         {
