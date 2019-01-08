@@ -271,6 +271,7 @@ struct json_state
     int line;
     int column;
     int cursor;
+    json_type_t parsing_value_type;
     
     const char* buffer;
     
@@ -299,9 +300,41 @@ static void json__free(void* data, void* pointer)
 }
 
 /* @funcdef: json__set_error_valist */
-static void json__set_error_valist(json_state_t* state, json_error_t code, const char* fmt, va_list valist)
+static void json__set_error_valist(json_state_t* state, json_type_t type, json_error_t code, const char* fmt, va_list valist)
 {
     const int errmsg_size = 1024;
+
+    const char* type_name;
+    switch (type)
+    {
+    case JSON_NULL:
+        type_name = "null";
+        break;
+
+    case JSON_BOOLEAN:
+        type_name = "boolean";
+        break;
+
+    case JSON_NUMBER:
+        type_name = "number";
+        break;
+
+    case JSON_ARRAY:
+        type_name = "array";
+        break;
+
+    case JSON_STRING:
+        type_name = "string";
+        break;
+
+    case JSON_OBJECT:
+        type_name = "object";
+        break;
+
+    default:
+        type_name = "unknown";
+        break;
+    }
 
     state->errnum = code;
     if (state->errmsg == NULL)
@@ -310,30 +343,32 @@ static void json__set_error_valist(json_state_t* state, json_error_t code, const
     }
 
     char final_format[1024];
-    sprintf(final_format, "%s\n\tAt line %d, column %d.", fmt, state->line, state->column);
+    char templ_format[1024] = "%s\n\tAt line %d, column %d. Parsing token: <%s>.";
 
 #if defined(_MSC_VER) && _MSC_VER >= 1200
+    sprintf_s(final_format, sizeof(final_format), templ_format, fmt, state->line, state->column, type_name);
     sprintf_s(state->errmsg, errmsg_size, final_format, valist);
 #else
+    sprintf(final_format, templ_format, fmt, state->line, state->column, type_name);
     sprintf(state->errmsg, final_format, valist);
 #endif
 }
 
 /* @funcdef: json__set_error */
-static void json__set_error(json_state_t* state, json_error_t code, const char* fmt, ...)
+static void json__set_error(json_state_t* state, json_type_t type, json_error_t code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
-    json__set_error_valist(state, code, fmt, varg);
+    json__set_error_valist(state, type, code, fmt, varg);
     va_end(varg);
 }
 
-/* funcdef: json__croak */
-static void json__croak(json_state_t* state, json_error_t code, const char* fmt, ...)
+/* funcdef: json__panic */
+static void json__panic(json_state_t* state, json_type_t type, json_error_t code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
-    json__set_error_valist(state, code, fmt, varg);
+    json__set_error_valist(state, type, code, fmt, varg);
     va_end(varg);
 
     longjmp(state->errjmp, code);
@@ -508,7 +543,7 @@ static json_value_t* json__make_value(json_state_t* state, json_type_t type)
 
 		if (!state->value_pool)
 		{
-			json__croak(state, JSON_ERROR_MEMORY, "Out of memory");
+			json__panic(state, type, JSON_ERROR_MEMORY, "Out of memory");
 		}
     }
     
@@ -521,7 +556,7 @@ static json_value_t* json__make_value(json_state_t* state, json_type_t type)
     }
     else
     {
-		json__croak(state, JSON_ERROR_MEMORY, "Out of memory");
+		json__panic(state, type, JSON_ERROR_MEMORY, "Out of memory");
     }
     return value;
 }
@@ -722,7 +757,7 @@ static int json__skip_space(json_state_t* state)
 }
 
 /* @funcdef: json__match_char */
-static int json__match_char(json_state_t* state, int c)
+static int json__match_char(json_state_t* state, json_type_t type, int c)
 {
     if (json__peek_char(state) == c)
     {
@@ -730,7 +765,7 @@ static int json__match_char(json_state_t* state, int c)
     }
     else
     {
-		json__croak(state, JSON_ERROR_UNMATCH, "Expected '%c'", c);
+        json__panic(state, type, JSON_ERROR_UNMATCH, "Expected '%c'", c);
 		return -1;
     }
 }
@@ -810,8 +845,8 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
 		if (c == '+')
 		{
 			c = json__next_char(state);
-			json__croak(state, JSON_ERROR_UNEXPECTED,
-				  "JSON does not support number start with '+'");
+			json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
+				        "JSON does not support number start with '+'");
 		}
 		else if (c == '-')
 		{
@@ -823,14 +858,13 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
 			c = json__next_char(state);
 			if (!isspace(c) && !ispunct(c))
 			{
-				json__croak(state, JSON_ERROR_UNEXPECTED,
-					  "JSON does not support number start with '0'"
-					  " (only standalone '0' is accepted)");
+				json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
+                            "JSON does not support number start with '0' (only standalone '0' is accepted)");
 			}
 		}
 		else if (!isdigit(c))
 		{
-			json__croak(state, JSON_ERROR_UNEXPECTED, "Unexpected '%c'", c);
+			json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Unexpected '%c'", c);
 		}
 
 		int    dot    = 0;
@@ -847,13 +881,12 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
             {
                 if (exp)
                 {
-                    json__croak(state, JSON_ERROR_UNEXPECTED, "Too many 'e' are presented");
+                    json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many 'e' are presented in a <number>");
                 }
                 else if (dot && numpow == 1)
                 {
-                    json__croak(state, JSON_ERROR_UNEXPECTED,
-                                "'.' is presented in number token, "
-                                "but require a digit after '.' ('%c')", c);
+                    json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
+                                "'.' is presented in number token, but require a digit after '.' ('%c')", c);
                 }
                 else
                 {
@@ -865,11 +898,11 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
 			{
                 if (exp)
                 {
-                    json__croak(state, JSON_ERROR_UNEXPECTED, "Cannot has '.' after 'e' is presented");
+                    json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Cannot has '.' after 'e' is presented in a <number>");
                 }
 				else if (dot)
 				{
-					json__croak(state, JSON_ERROR_UNEXPECTED, "Too many '.' are presented");
+					json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many '.' are presented in a <number>");
 				}
 				else
 				{
@@ -880,11 +913,11 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
             {
                 if (expchk)
                 {
-                    json__croak(state, JSON_ERROR_UNEXPECTED, "'%c' is presented after digits are presented of exponent part", c);
+                    json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "'%c' is presented after digits are presented of exponent part", c);
                 }
                 else if (expsgn)
                 {
-                    json__croak(state, JSON_ERROR_UNEXPECTED, "Too many signed characters are presented after 'e'");
+                    json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many signed characters are presented after 'e'");
                 }
                 else
                 {
@@ -921,15 +954,13 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
 
         if (exp && !expchk)
         {
-            json__croak(state, JSON_ERROR_UNEXPECTED,
-                  "'e' is presented in number token, "
-			      "but require a digit after 'e' ('%c')", c);
+            json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
+                        "'e' is presented in number token, but require a digit after 'e' ('%c')", c);
         }
 		if (dot && numpow == 1)
 		{
-			json__croak(state, JSON_ERROR_UNEXPECTED,
-                  "'.' is presented in number token, "
-			      "but require a digit after '.' ('%c')", c);
+			json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
+                        "'.' is presented in number token, but require a digit after '.' ('%c')", c);
 			return NULL;
 		}
 		else
@@ -978,7 +1009,7 @@ static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
     }
     else
     {
-	    json__match_char(state, '[');
+	    json__match_char(state, JSON_ARRAY, '[');
 	
 	    if (!root)
         {
@@ -996,7 +1027,7 @@ static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
 	    {
 	        if (length > 0)
 	        {
-                json__match_char(state, ',');
+                json__match_char(state, JSON_ARRAY, ',');
 	        }
 	    
 	        json_value_t* value = json__parse_single(state, NULL);
@@ -1029,7 +1060,7 @@ static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
                     new_values = json__bucket_extract(state->values_bucket, new_size);
                     if (!new_values)
                     {
-                        json__croak(state, JSON_ERROR_MEMORY, "Out of memory when parsing array");
+                        json__panic(state, JSON_ARRAY, JSON_ERROR_MEMORY, "Out of memory when create <array>");
                     }
                     else if (values)
                     {
@@ -1043,7 +1074,7 @@ static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
 	    }
 
 	    json__skip_space(state);
-	    json__match_char(state, ']');
+	    json__match_char(state, JSON_ARRAY, ']');
 
         if (values)
         {
@@ -1117,7 +1148,7 @@ static json_value_t* json__parse_single(json_state_t* state, json_value_t* value
                     tmp[length] = token[length]; 
                 }
 
-                json__croak(state, JSON_ERROR_UNEXPECTED, "Unexpected token '%s'", tmp);
+                json__panic(state, JSON_NONE, JSON_ERROR_UNEXPECTED, "Unexpected token '%s'", tmp);
 	        }
 	    } break;
 	    /* END OF SWITCH STATEMENT */
@@ -1138,7 +1169,7 @@ static json_value_t* json__parse_string(json_state_t* state, json_value_t* value
     }
     else
     {
-        json__match_char(state, '"');
+        json__match_char(state, JSON_STRING, '"');
 
         int   i;
         int   c0, c1;
@@ -1171,7 +1202,7 @@ static json_value_t* json__parse_string(json_state_t* state, json_value_t* value
                     temp_string = (char*)json__bucket_extract(state->string_bucket, capacity);
                     if (!temp_string)
                     {
-                        json__croak(state, JSON_ERROR_MEMORY, "Out of memory when create new string");
+                        json__panic(state, JSON_STRING, JSON_ERROR_MEMORY, "Out of memory when create new <string>");
                         return NULL;
                     }
                 }
@@ -1218,7 +1249,7 @@ static json_value_t* json__parse_string(json_state_t* state, json_value_t* value
                         }   
                         else
                         {
-                            json__croak(state, JSON_ERROR_UNKNOWN, "Expected hexa character in unicode character");
+                            json__panic(state, JSON_STRING, JSON_ERROR_UNKNOWN, "Expected hexa character in unicode character");
                         }
                     }
 
@@ -1247,17 +1278,28 @@ static json_value_t* json__parse_string(json_state_t* state, json_value_t* value
                     break;
 
                 default:
-                    json__croak(state, JSON_ERROR_UNKNOWN, "Unknown escape character");
+                    json__panic(state, JSON_STRING, JSON_ERROR_UNKNOWN, "Unknown escape character");
+                    break;
                 }
             }
             else
             {
-                temp_string[length++] = c0;
+                switch (c0)
+                {
+                case '\r':
+                case '\n':
+                    json__panic(state, JSON_STRING, JSON_ERROR_UNEXPECTED, "Unexpected newline characters '%c'", c0);
+                    break;
+
+                default:
+                    temp_string[length++] = c0;
+                    break;
+                }
             }
 
             json__next_char(state);
         }
-        json__match_char(state, '"');
+        json__match_char(state, JSON_STRING, '"');
 
         if (!value)
         {
@@ -1295,7 +1337,7 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
     }
     else
     {
-        json__match_char(state, '{');
+        json__match_char(state, JSON_OBJECT, '{');
 
         if (!root)
         {
@@ -1312,7 +1354,7 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
         {
             if (length > 0)
             {
-                json__match_char(state, ',');
+                json__match_char(state, JSON_OBJECT, ',');
             }
 
             json_value_t* token = NULL;
@@ -1322,13 +1364,13 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
             }
             else
             {
-                json__croak(state, JSON_ERROR_UNEXPECTED,
-                      "Expected string for name of field of object");
+                json__panic(state, JSON_OBJECT, JSON_ERROR_UNEXPECTED,
+                      "Expected <string> for <member-name> of <object>");
             }
             const char* name = token->string;
 
             json__skip_space(state);
-            json__match_char(state, ':');
+            json__match_char(state, JSON_OBJECT, ':');
 
             json_value_t* value = json__parse_single(state, token);
 
@@ -1356,13 +1398,13 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
                 if (!new_values)
                 {
                     /* Create new buffer */
-                    state->values_bucket = json__make_bucket(state, state->values_bucket, 128, 1);
+                    state->values_bucket = json__make_bucket(state, state->values_bucket, JSON_VALUE_BUCKETS, 1);
                     
                     /* Continue get new buffer for values */
                     new_values = json__bucket_extract(state->values_bucket, length);
                     if (!new_values)
                     {
-                        json__croak(state, JSON_ERROR_MEMORY, "Out of memory when create object");
+                        json__panic(state, JSON_OBJECT, JSON_ERROR_MEMORY, "Out of memory when create <object>");
                     }
                     else if (root->object)
                     {
@@ -1386,7 +1428,7 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
         }
 
         json__skip_space(state);
-        json__match_char(state, '}');
+        json__match_char(state, JSON_OBJECT, '}');
         return root;
     }
 }
@@ -1408,7 +1450,7 @@ static json_value_t* json_parse_in(json_state_t* state)
             json__skip_space(state);
             if (!json__is_eof(state))
             {
-                json__croak(state, JSON_ERROR_FORMAT, "Multiple value in json");
+                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed");
             }
 
             return value;
@@ -1427,7 +1469,7 @@ static json_value_t* json_parse_in(json_state_t* state)
             json__skip_space(state);
             if (!json__is_eof(state))
             {
-                json__croak(state, JSON_ERROR_FORMAT, "Multiple value in json");
+                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed");
             }
 
             return value;
@@ -1439,7 +1481,7 @@ static json_value_t* json_parse_in(json_state_t* state)
     }
     else
     {
-        json__set_error(state, JSON_ERROR_FORMAT, 
+        json__set_error(state, JSON_NONE, JSON_ERROR_FORMAT, 
                         "JSON must be starting with '{' or '[', first character is '%c'", 
                         json__peek_char(state));
         return NULL;

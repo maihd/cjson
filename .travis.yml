@@ -9,16 +9,16 @@ matrix:
   include:
     - os: osx 
       language: c
-      script: make
+      script: make && make unit_test
     
     - os: linux
       language: c
-      script: make
+      script: make && make unit_test
 
     - os: windows
       language: c
       before_install: choco install make
-      script: make
+      script: make && make unit_test
 
     - os: windows
       language: c
