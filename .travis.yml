@@ -18,7 +18,7 @@ matrix:
     - os: windows
       language: c
       before_install: choco install make
-      script: make && make unit_test
+      script: make
 
     - os: windows
       language: c
