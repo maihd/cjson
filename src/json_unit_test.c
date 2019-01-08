@@ -20,7 +20,7 @@ static void* json_debug_malloc(void* data, size_t size)
 
 static void json_debug_free(void* data, void* ptr)
 {
-    (void*)data;
+    (void)data;
     free(ptr);
 }
 

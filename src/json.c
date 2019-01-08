@@ -1229,7 +1229,7 @@ static json_value_t* json_parse_in(json_state_t* state)
             json__skip_space(state);
             if (!json__is_eof(state))
             {
-                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed");
+                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed. JSON is start with <object>.");
             }
 
             return value;
@@ -1248,7 +1248,7 @@ static json_value_t* json_parse_in(json_state_t* state)
             json__skip_space(state);
             if (!json__is_eof(state))
             {
-                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed");
+                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed. JSON is start with <array>.");
             }
 
             return value;
