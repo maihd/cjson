@@ -832,6 +832,7 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
 
 		int    dot    = 0;
         int    exp    = 0;
+        int    expsgn = 0;
         int    exppow = 0;
         int    expchk = 0;
 		int    numpow = 1;
@@ -872,15 +873,19 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
 					dot = 1;
 				}
 			}
-            else if (exp && c == '-')
+            else if (exp && (c == '-' || c == '+'))
             {
-                if (exp < 0)
+                if (expchk)
                 {
-                    json__croak(state, JSON_ERROR_UNEXPECTED, "Too many '-' are presented after 'e'");
+                    json__croak(state, JSON_ERROR_UNEXPECTED, "'%c' is presented after digits are presented of exponent part", c);
+                }
+                else if (expsgn)
+                {
+                    json__croak(state, JSON_ERROR_UNEXPECTED, "Too many signed characters are presented after 'e'");
                 }
                 else
                 {
-                    exp = -1;
+                    expsgn = (c == '-' ? -1 : 1);
                 }
             }
 			else if (!isdigit(c))
@@ -935,7 +940,27 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
                 value->type = JSON_NUMBER;
             }
 
-			value->number = sign * number * (!exp ? 1 : pow(10, exp * exppow));
+			value->number = sign * number;
+
+            if (exp)
+            {
+                int i;
+                double tmp = 1;
+                for (i = 0; i < exppow; i++)
+                {
+                    tmp *= 10;
+                }
+                
+                if (expsgn < 0)
+                {
+                    value->number /= tmp;
+                }
+                else
+                {
+                    value->number *= tmp;
+                }
+            }
+
 			return value;
 		}
     }
