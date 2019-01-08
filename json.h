@@ -125,16 +125,12 @@ struct json_value
 		const char* string;
 
         struct json_value** array;
-        
-		struct
-		{
-			int length;
-			struct
-			{
-				const char*        name;
-				struct json_value* value;
-			}*  values;
-		} object;
+
+        struct
+        {
+            const char*        name;
+            struct json_value* value;
+        }* object;
     };
 
 #ifdef __cplusplus
@@ -1205,11 +1201,9 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
         }
         else
         {
-            root->type = JSON_OBJECT;
+            root->type   = JSON_OBJECT;
+            root->object = NULL;
         }
-
-        root->object.length = 0;
-        root->object.values = NULL;
 
         int length = 0;
         while (json__skip_space(state) > 0 && json__peek_char(state) != '}')
@@ -1219,29 +1213,31 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
                 json__match_char(state, ',');
             }
 
-            json_value_t* name_token = NULL;
+            json_value_t* token = NULL;
             if (json__skip_space(state) == '"')
             {
-                name_token = json__parse_string(state, NULL);
+                token = json__parse_string(state, NULL);
             }
             else
             {
                 json__croak(state, JSON_ERROR_UNEXPECTED,
                       "Expected string for name of field of object");
             }
-            const char* name = name_token->string;
+            const char* name = token->string;
 
             json__skip_space(state);
             json__match_char(state, ':');
 
-            json_value_t* value = json__parse_single(state, name_token);
+            json_value_t* value = json__parse_single(state, token);
 
             /* Append new pair of value to container */
-            int old_length = length++;
+            int   old_length = length++;
+            int   old_size   = sizeof(int) + old_length * sizeof(root->object[0]);
+            int   new_size   = sizeof(int) + length * sizeof(root->object[0]);
             void* new_values = json__bucket_resize(state->values_bucket,
-                                             root->object.values,
-                                             old_length * sizeof(json_value_t*), 
-                                             length * sizeof(json_value_t*));
+                                                   root->object ? (int*)root->object - 1 : NULL,
+                                                   old_size, 
+                                                   new_size);
             if (!new_values)
             {
                 /* Get from unused buckets */
@@ -1255,19 +1251,21 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
                     }
                 }
 
-                /* Create new buffer */
-                state->values_bucket = json__make_bucket(state, state->values_bucket, 128, 1);
-                
-                /* Continue get new buffer for values */
-                new_values = json__bucket_extract(state->values_bucket, length);
                 if (!new_values)
                 {
-                    json__croak(state, JSON_ERROR_MEMORY, "Out of memory when create object");
-                }
-                else
-                {
-                    memcpy(new_values, root->object.values, (length - 1) * 2 * sizeof(json_value_t));
-                    *((void**)&root->object.values) = new_values;
+                    /* Create new buffer */
+                    state->values_bucket = json__make_bucket(state, state->values_bucket, 128, 1);
+                    
+                    /* Continue get new buffer for values */
+                    new_values = json__bucket_extract(state->values_bucket, length);
+                    if (!new_values)
+                    {
+                        json__croak(state, JSON_ERROR_MEMORY, "Out of memory when create object");
+                    }
+                    else if (root->object)
+                    {
+                        memcpy(new_values, (int*)root->object - 1, old_size);
+                    }
                 }
             }
 
@@ -1275,12 +1273,12 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
             assert(new_values != NULL && "An error occurred but is not handled");
 
             /* Well done */
-            *((void**)&root->object.values) = new_values;
-            root->object.values[length - 1].name  = name;
-            root->object.values[length - 1].value = value;
+            *((void**)&root->object) = (int*)new_values + 1;
+            root->object[old_length].name  = name;
+            root->object[old_length].value = value;
         }
 
-        root->object.length = length;
+        *((int*)root->object - 1) = length;
 
         json__skip_space(state);
         json__match_char(state, '}');
@@ -1418,7 +1416,7 @@ int json_length(const json_value_t* x)
             return x->string ? *((int*)x->string - 2) : 0;
 
         case JSON_OBJECT:
-            return x->object.length;
+            return x->object ? *((int*)x->object - 1) : 0;
 
         default:
             break;
@@ -1474,7 +1472,24 @@ json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
         return JSON_TRUE;
 
     case JSON_OBJECT:
-        return a->object.values == b->object.values;
+        if ((n = json_length(a)) == json_length(b))
+        {
+            for (i = 0; i < n; i++)
+            {
+                const char* str0 = a->object[i].name;
+                const char* str1 = a->object[i].name;
+                if (((int*)str0 - 2)[1] != ((int*)str1 - 2)[1] || strcmp(str0, str1) == 0)
+                {
+                    return JSON_FALSE;
+                }
+
+                if (!json_equals(a->object[i].value, b->object[i].value))
+                {
+                    return JSON_FALSE;
+                }
+            }
+        }
+        return JSON_TRUE;
 
     case JSON_STRING:
         return ((int*)a->string - 2)[1] == ((int*)b->string - 2)[1] && strcmp(a->string, b->string) == 0;
@@ -1492,10 +1507,10 @@ json_value_t* json_find(const json_value_t* obj, const char* name)
         int hash = json__hash((void*)name, strlen(name));
         for (i = 0, n = json_length(obj); i < n; i++)
         {
-            const char* str = obj->object.values[i].name;
+            const char* str = obj->object[i].name;
             if (hash == ((int*)str - 2)[1] && strcmp(str, name) == 0)
             {
-                return obj->object.values[i].value;
+                return obj->object[i].value;
             }
         }
     }
@@ -1543,10 +1558,10 @@ void json_write(const json_value_t* value, FILE* out)
 
         case JSON_OBJECT:
             fprintf(out, "{");
-            for (i = 0, n = value->object.length; i < n; i++)
+            for (i = 0, n = json_length(value); i < n; i++)
             {
-                fprintf(out, "\"%s\" : ", value->object.values[i].name);
-                json_write(value->object.values[i].value, out);
+                fprintf(out, "\"%s\" : ", value->object[i].name);
+                json_write(value->object[i].value, out);
                 if (i < n - 1)
                 {
                     fprintf(out, ",");
@@ -1628,8 +1643,8 @@ void json_print(const json_value_t* value, FILE* out)
                     fputc(' ', out);
                 }
 
-                fprintf(out, "\"%s\" : ", value->object.values[i].name);
-                json_print(value->object.values[i].value, out);
+                fprintf(out, "\"%s\" : ", value->object[i].name);
+                json_print(value->object[i].value, out);
                 if (i < n - 1)
                 {
                     fputc(',', out);
