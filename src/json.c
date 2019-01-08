@@ -52,6 +52,7 @@ struct json_state
     int cursor;
     json_type_t parsing_value_type;
     
+    size_t      length;
     const char* buffer;
     
     json_error_t errnum;
@@ -352,6 +353,7 @@ static json_state_t* json__make_state(const char* json, const json_settings_t* s
 		state->column = 1;
 		state->cursor = 0;
 		state->buffer = json;
+		state->length = strlen(json);
 
 		state->errmsg = NULL;
 		state->errnum = JSON_ERROR_NONE;
@@ -477,7 +479,7 @@ static void json__free_state(json_state_t* state)
 /* @funcdef: json__is_eof */
 static int json__is_eof(json_state_t* state)
 {
-    return state->buffer[state->cursor] <= 0;
+    return state->cursor >= state->length || state->buffer[state->cursor] <= 0;
 }
 
 /* @funcdef: json__peek_char */
