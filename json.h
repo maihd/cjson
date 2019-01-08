@@ -1308,6 +1308,12 @@ static json_value_t* json_parse_in(json_state_t* state)
         if (setjmp(state->errjmp) == 0)
         {
             json_value_t* value = json__parse_object(state, NULL);
+
+            if (json__parse_single(state, NULL))
+            {
+                json__croak(state, JSON_ERROR_FORMAT, "Multiple value in json");
+            }
+
             return value;
         }
         else
@@ -1320,6 +1326,12 @@ static json_value_t* json_parse_in(json_state_t* state)
         if (setjmp(state->errjmp) == 0)
         {
             json_value_t* value = json__parse_array(state, NULL);
+
+            if (json__parse_single(state, NULL))
+            {
+                json__croak(state, JSON_ERROR_FORMAT, "Multiple value in json");
+            }
+            
             return value;
         }
         else
