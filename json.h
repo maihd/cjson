@@ -221,6 +221,7 @@ public: // @region: Conversion
 
 #ifdef JSON_IMPL
 
+#include <math.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -830,52 +831,93 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
 		}
 
 		int    dot    = 0;
-		int    dotchk = 1;
+        int    exp    = 0;
+        int    exppow = 0;
+        int    expchk = 0;
 		int    numpow = 1;
 		double number = 0;
 
 		while (c > 0)
 		{
-			if (c == '.')
+            if (c == 'e')
+            {
+                if (exp)
+                {
+                    json__croak(state, JSON_ERROR_UNEXPECTED, "Too many 'e' are presented");
+                }
+                else if (dot && numpow == 1)
+                {
+                    json__croak(state, JSON_ERROR_UNEXPECTED,
+                                "'.' is presented in number token, "
+                                "but require a digit after '.' ('%c')", c);
+                }
+                else
+                {
+                    exp    = 1;
+                    expchk = 0;
+                }
+            }
+			else if (c == '.')
 			{
-				if (dot)
+                if (exp)
+                {
+                    json__croak(state, JSON_ERROR_UNEXPECTED, "Cannot has '.' after 'e' is presented");
+                }
+				else if (dot)
 				{
-					json__croak(state, JSON_ERROR_UNEXPECTED,
-					      "Too many '.' are presented");
-				}
-				if (!dotchk)
-				{
-					json__croak(state, JSON_ERROR_UNEXPECTED, "Unexpected '%c'", c);
+					json__croak(state, JSON_ERROR_UNEXPECTED, "Too many '.' are presented");
 				}
 				else
 				{
-					dot    = 1;
-					dotchk = 0;
-					numpow = 1;
+					dot = 1;
 				}
 			}
+            else if (exp && c == '-')
+            {
+                if (exp < 0)
+                {
+                    json__croak(state, JSON_ERROR_UNEXPECTED, "Too many '-' are presented after 'e'");
+                }
+                else
+                {
+                    exp = -1;
+                }
+            }
 			else if (!isdigit(c))
 			{
 				break;
 			}
 			else
 			{
-				dotchk = 1;
-				if (dot)
-				{
-					numpow *= 10;
-					number += (c - '0') / (double)numpow;
-				}
-				else
-				{
-					number = number * 10 + (c - '0');
-				}
+                if (exp)
+                {
+                    expchk = 1;
+                    exppow = exppow * 10 + (c - '0');
+                }
+                else
+                {
+                    if (dot)
+                    {
+                        numpow *= 10;
+                        number += (c - '0') / (double)numpow;
+                    }
+                    else
+                    {
+                        number = number * 10 + (c - '0');
+                    }
+                }
 			}
 
 			c = json__next_char(state);
 		}
 
-		if (dot && !dotchk)
+        if (exp && !expchk)
+        {
+            json__croak(state, JSON_ERROR_UNEXPECTED,
+                  "'e' is presented in number token, "
+			      "but require a digit after 'e' ('%c')", c);
+        }
+		if (dot && numpow == 1)
 		{
 			json__croak(state, JSON_ERROR_UNEXPECTED,
                   "'.' is presented in number token, "
@@ -885,11 +927,15 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
 		else
 		{
 			if (!value)
+            {
                 value = json__make_value(state, JSON_NUMBER);
+            }
             else
+            {
                 value->type = JSON_NUMBER;
+            }
 
-			value->number = sign * number;
+			value->number = sign * number * (!exp ? 1 : pow(10, exp * exppow));
 			return value;
 		}
     }
@@ -1309,7 +1355,8 @@ static json_value_t* json_parse_in(json_state_t* state)
         {
             json_value_t* value = json__parse_object(state, NULL);
 
-            if (json__parse_single(state, NULL))
+            json__skip_space(state);
+            if (!json__is_eof(state))
             {
                 json__croak(state, JSON_ERROR_FORMAT, "Multiple value in json");
             }
@@ -1327,11 +1374,12 @@ static json_value_t* json_parse_in(json_state_t* state)
         {
             json_value_t* value = json__parse_array(state, NULL);
 
-            if (json__parse_single(state, NULL))
+            json__skip_space(state);
+            if (!json__is_eof(state))
             {
                 json__croak(state, JSON_ERROR_FORMAT, "Multiple value in json");
             }
-            
+
             return value;
         }
         else
