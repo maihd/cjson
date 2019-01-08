@@ -80,7 +80,7 @@ typedef bool json_bool_t;
 #define JSON_TRUE  true
 #define JSON_FALSE false
 #else
-typedef enum
+typedef enum json_bool_t
 {
 	JSON_TRUE  = 1,
 	JSON_FALSE = 0,
@@ -762,7 +762,8 @@ static int json__hash(void* buf, size_t len)
         int k = 0;
 
         key = &key[i - 1];
-        do {
+        do 
+        {
             k <<= 8;
             k  |= *key--;
         } while (--i);
@@ -1023,6 +1024,7 @@ static json_value_t* json__parse_single(json_state_t* state, json_value_t* value
                 if (!value) value = json__make_value(state, JSON_BOOLEAN);
                 else        value->type = JSON_BOOLEAN;
                 value->boolean = JSON_TRUE;
+                return value;
 	        }
 	        else if (length == 4 && strncmp(token, "null", 4) == 0)
             {
@@ -1030,11 +1032,18 @@ static json_value_t* json__parse_single(json_state_t* state, json_value_t* value
             }
 	        else if (length == 5 && strncmp(token, "false", 5) == 0)
 	        {
-                return value ? (value->type = JSON_BOOLEAN, value) : json__make_value(state, JSON_BOOLEAN);
+                return value ? (value->type = JSON_BOOLEAN, value->boolean = JSON_FALSE, value) : json__make_value(state, JSON_BOOLEAN);
 	        }
 	        else
 	        {
-                json__croak(state, JSON_ERROR_UNEXPECTED, "Unexpected token '%c'", c);
+                char tmp[256];
+                tmp[length] = 0;
+                while (length--)
+                {
+                    tmp[length] = token[length]; 
+                }
+
+                json__croak(state, JSON_ERROR_UNEXPECTED, "Unexpected token '%s'", tmp);
 	        }
 	    } break;
 	    /* END OF SWITCH STATEMENT */
@@ -1306,11 +1315,23 @@ static json_value_t* json_parse_in(json_state_t* state)
             return NULL;
         }
     }
+    if (json__skip_space(state) == '[')
+    {
+        if (setjmp(state->errjmp) == 0)
+        {
+            json_value_t* value = json__parse_array(state, NULL);
+            return value;
+        }
+        else
+        {
+            return NULL;
+        }
+    }
     else
     {
         json__set_error(state, JSON_ERROR_FORMAT, 
-                  "JSON must be starting with '{', first character is '%c'", 
-                  json__peek_char(state));
+                        "JSON must be starting with '{' or '[', first character is '%c'", 
+                        json__peek_char(state));
         return NULL;
     }
 }
