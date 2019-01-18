@@ -218,7 +218,6 @@ public: // @region: Conversion
 
 /* END OF __JSON_H__ */
 #endif /* __JSON_H__ */
-
 #ifdef JSON_IMPL
 
 #include <math.h>
@@ -268,11 +267,12 @@ struct json_state
     json_bucket_t* values_bucket;
     json_bucket_t* string_bucket;
     
-    int line;
-    int column;
-    int cursor;
-    json_type_t parsing_value_type;
+    size_t line;
+    size_t column;
+    size_t cursor;
+    //json_type_t parsing_value_type;
     
+    size_t      length;
     const char* buffer;
     
     json_error_t errnum;
@@ -573,6 +573,7 @@ static json_state_t* json__make_state(const char* json, const json_settings_t* s
 		state->column = 1;
 		state->cursor = 0;
 		state->buffer = json;
+		state->length = strlen(json);
 
 		state->errmsg = NULL;
 		state->errnum = JSON_ERROR_NONE;
@@ -698,7 +699,7 @@ static void json__free_state(json_state_t* state)
 /* @funcdef: json__is_eof */
 static int json__is_eof(json_state_t* state)
 {
-    return state->buffer[state->cursor] <= 0;
+    return state->cursor >= state->length || state->buffer[state->cursor] <= 0;
 }
 
 /* @funcdef: json__peek_char */
@@ -1450,7 +1451,7 @@ static json_value_t* json_parse_in(json_state_t* state)
             json__skip_space(state);
             if (!json__is_eof(state))
             {
-                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed");
+                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed. JSON is start with <object>.");
             }
 
             return value;
@@ -1469,7 +1470,7 @@ static json_value_t* json_parse_in(json_state_t* state)
             json__skip_space(state);
             if (!json__is_eof(state))
             {
-                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed");
+                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed. JSON is start with <array>.");
             }
 
             return value;
@@ -1840,5 +1841,5 @@ void json_print(const json_value_t* value, FILE* out)
     }
 }
 
-/* END OF JSON_IMPL */
 #endif /* JSON_IMPL */
+
