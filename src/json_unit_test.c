@@ -1,5 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,28 @@ static void json_debug_free(void* data, void* ptr)
     free(ptr);
 }
 
+#if defined(_MSC_VER) || defined(__MINGW32__)
+#include <Windows.h>
+
+double get_time(void)
+{
+    LARGE_INTEGER t, f;
+    QueryPerformanceCounter(&t);
+    QueryPerformanceFrequency(&f);
+    return (double)t.QuadPart / (double)f.QuadPart;
+}
+#elif defined(__unix__) || defined(__linux__)
+#include <unistd.h>
+#include <sys/time.h>
+
+double get_time(void)
+{
+    struct timespec t;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t);
+    return (double)t.tv_sec + (double)t.tv_nsec * 1e-9;
+}
+#endif
+
 int main(int argc, char* argv[])
 {
     if (argc < 2)
@@ -31,14 +54,6 @@ int main(int argc, char* argv[])
         fprintf(stderr, "usage: %s [files...]\n", argv[0]);
         return 1;
     }
-
-    json_debug_t debug;
-    memset(&debug, 0, sizeof(debug));
-
-    json_settings_t settings;
-    settings.data   = &debug;
-    settings.free   = json_debug_free;
-    settings.malloc = json_debug_malloc;
 
     int   i, n;
     char* buffer = NULL;
@@ -59,6 +74,15 @@ int main(int argc, char* argv[])
             buffer[filesize] = 0;
             fread(buffer, filesize, sizeof(char), file);
 
+            json_debug_t debug;
+            memset(&debug, 0, sizeof(debug));
+
+            json_settings_t settings;
+            settings.data   = &debug;
+            settings.free   = json_debug_free;
+            settings.malloc = json_debug_malloc;
+
+            double dt = get_time();
             json_state_t* state = NULL;
             json_value_t* value = json_parse_ex(buffer, &settings, &state);
             if (json_get_errno(state) != JSON_ERROR_NONE || !value)
@@ -66,9 +90,12 @@ int main(int argc, char* argv[])
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, json_get_error(state));
                 return 1;
             }
-            json_release(state);
+            dt = get_time() - dt;
 
+            json_release(state);
             fclose(file);
+
+            printf("Parsed file '%s'\n\t- file size:\t%zuB\n\t- memory usage:\t%zuB\n\t- times: %lfs\n\n", filename, filesize, debug.alloced, dt);
         }
     }
 

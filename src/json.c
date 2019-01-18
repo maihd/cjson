@@ -47,10 +47,10 @@ struct json_state
     json_bucket_t* values_bucket;
     json_bucket_t* string_bucket;
     
-    int line;
-    int column;
-    int cursor;
-    json_type_t parsing_value_type;
+    size_t line;
+    size_t column;
+    size_t cursor;
+    //json_type_t parsing_value_type;
     
     size_t      length;
     const char* buffer;
