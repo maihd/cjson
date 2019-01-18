@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
             json_release(state);
             fclose(file);
 
-            printf("Parsed file '%s'\n\t- file size:\t%zuB\n\t- memory usage:\t%zuB\n\t- times: %lfs\n\n", filename, filesize, debug.alloced, dt);
+            printf("Parsed file '%s'\n\t- file size:\t%zuB\n\t- memory usage:\t%zuB\n\t- times:\t%lfs\n\n", filename, filesize, debug.alloced, dt);
         }
     }
 
