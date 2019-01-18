@@ -36,7 +36,7 @@ double get_time(void)
     QueryPerformanceFrequency(&f);
     return (double)t.QuadPart / (double)f.QuadPart;
 }
-#elif defined(__unix__) || defined(__linux__)
+#elif defined(__unix__) || defined(__linux__) || defined(__APPLE__)
 #include <unistd.h>
 #include <sys/time.h>
 
