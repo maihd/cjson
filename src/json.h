@@ -87,6 +87,16 @@ namespace json
     JSON_API bool         equals(const Value& a, const Value& b);
     JSON_API const Value& find(const Value& obj, const char* name);
 
+    JSON_INLINE bool operator==(const Value& a, const Value& b)
+    {
+        return equals(a, b);
+    }
+
+    JSON_INLINE bool operator!=(const Value& a, const Value& b)
+    {
+        return !equals(a, b);
+    }
+
     /**
      * JSON value
      */

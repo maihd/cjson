@@ -1370,23 +1370,11 @@ namespace json
     /* @funcdef: equals */
     bool equals(const Value& a, const Value& b)
     {
+        // meta compare
+        if (&a == &b)                       return true;
+        if (!a || !b || a.type != b.type)   return false;
+
         int i, n;
-
-        if (&a == &b)
-        {
-            return true;
-        }
-
-        if (!a || !b)
-        {
-            return false;
-        }
-
-        if (a.type != b.type)
-        {
-            return false;
-        }
-
         switch (a.type)
         {
         case Type::Null:
@@ -1418,7 +1406,7 @@ namespace json
                 {
                     const char* str0 = a.object[i].name;
                     const char* str1 = a.object[i].name;
-                    if (((int*)str0 - 2)[1] != ((int *)str1 - 2)[1] || strcmp(str0, str1) == 0)
+                    if (((int*)str0 - 2)[1] != ((int*)str1 - 2)[1] || strcmp(str0, str1) == 0)
                     {
                         return false;
                     }
