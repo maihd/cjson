@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
             double dt = get_time();
             json::State* state = NULL;
             const json::Value& value = json::parse(buffer, &settings, &state);
-            if (json::get_errno(state) != json::Error::None || !value)
+            if (json::get_errno(state) != json::Error::None || value == json::Value::NONE)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, json::get_error(state));
                 return 1;
