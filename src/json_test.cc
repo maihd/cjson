@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
     printf("Type '.exit' to exit\n");
     
     char input[1024];
-    json_state_t* state = NULL;
+    json::State* state = NULL;
     while (1)
     {
 	    if (setjmp(jmpenv) == 0)
@@ -53,23 +53,21 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                json_value_t* value = json_parse(json, &state);
-	    
-                if (json_get_errno(state) != JSON_ERROR_NONE)
+                auto value = json::parse(json, &state);
+                if (json::get_errno(state) != json::Error::None)
                 {
-                    value = NULL;
-                    printf("[ERROR]: %s\n", json_get_error(state));
+                    printf("[ERROR]: %s\n", json::get_error(state));
                 }
                 else
                 {
-                    json_print(value, stdout); printf("\n");
+                    json::print(value, stdout); printf("\n");
                 }
 	        }
 	    }
     }
 
-    /* json_release(NULL) for release all memory if you don't catch the json_state_t */
-    json_release(state);
+    /* json::release(NULL) for release all memory if you don't catch the json::State */
+    json::release(state);
     
     return 0;
 }
