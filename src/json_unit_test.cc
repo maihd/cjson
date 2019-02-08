@@ -6,7 +6,7 @@
 #include <string.h>
 
 #include "./json.h"
-#include "./json.c"
+#include "./json.cc"
 
 typedef struct
 {
@@ -78,25 +78,25 @@ int main(int argc, char* argv[])
             json_debug_t debug;
             memset(&debug, 0, sizeof(debug));
 
-            json_settings_t settings;
+            json::Settings settings;
             settings.data   = &debug;
             settings.free   = json_debug_free;
             settings.malloc = json_debug_malloc;
 
             double dt = get_time();
-            json_state_t* state = NULL;
-            json_value_t* value = json_parse_ex(buffer, &settings, &state);
-            if (json_get_errno(state) != JSON_ERROR_NONE || !value)
+            json::State* state = NULL;
+            const json::Value& value = json::parse(buffer, &settings, &state);
+            if (json::get_errno(state) != json::Error::None || !value)
             {
-                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, json_get_error(state));
+                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, json::get_error(state));
                 return 1;
             }
             dt = get_time() - dt;
 
-            json_release(state);
+            json::release(state);
             fclose(file);
 
-            printf("Parsed file '%s'\n\t- file size:\t%zuB\n\t- memory usage:\t%zuB\n\t- times:\t%lfs\n\n", filename, filesize, debug.alloced, dt);
+            printf("Parsed file '%s'\n\t- file size:\t%uB\n\t- memory usage:\t%uB\n\t- times:\t%lfs\n\n", filename, filesize, debug.alloced, dt);
         }
     }
 

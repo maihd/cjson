@@ -29,192 +29,157 @@
 
 #include <stdio.h>
 
-#ifdef __cplusplus
-#include <string.h>
-extern "C" {
-#endif
-
-/**
- * JSON type of json value
- */
-typedef enum json_type
+namespace json 
 {
-    JSON_NONE,
-    JSON_NULL,
-    JSON_ARRAY,
-    JSON_OBJECT,
-    JSON_NUMBER,
-    JSON_STRING,
-    JSON_BOOLEAN,
-} json_type_t;
-
-/**
- * JSON error code
- */
-typedef enum json_error
-{
-    JSON_ERROR_NONE,
-    
-    /* Parsing error */
-
-    JSON_ERROR_FORMAT,
-    JSON_ERROR_UNMATCH,
-    JSON_ERROR_UNKNOWN,
-    JSON_ERROR_UNEXPECTED,
-    JSON_ERROR_UNSUPPORTED,
-
-    /* Runtime error */
-
-    JSON_ERROR_MEMORY,
-    JSON_ERROR_INTERNAL,
-} json_error_t;
-
-typedef struct json_state json_state_t;
-typedef struct json_value json_value_t;
-
-/**
- * JSON boolean data type
- */
-#ifdef __cplusplus
-typedef bool json_bool_t;
-#define JSON_TRUE  true
-#define JSON_FALSE false
-#else
-typedef enum json_bool_t
-{
-	JSON_TRUE  = 1,
-	JSON_FALSE = 0,
-} json_bool_t;
-#endif
-
-typedef struct
-{
-    void* data;
-    void* (*malloc)(void* data, size_t size);
-    void  (*free)(void* data, void* pointer);
-} json_settings_t;
-
-JSON_API extern const json_value_t JSON_VALUE_NONE;
-
-JSON_API json_value_t* json_parse(const char* json, json_state_t** state);
-JSON_API json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** state);
-
-JSON_API void          json_release(json_state_t* state);
-
-JSON_API json_error_t  json_get_errno(const json_state_t* state);
-JSON_API const char*   json_get_error(const json_state_t* state);
-
-JSON_API void          json_print(const json_value_t* value, FILE* out);
-JSON_API void          json_write(const json_value_t* value, FILE* out);
-
-JSON_API int           json_length(const json_value_t* x);
-JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b);
-JSON_API json_value_t* json_find(const json_value_t* obj, const char* name);
-
-/**
- * JSON value
- */
-struct json_value
-{
-    json_type_t type;
-    union
+    /**
+     * JSON type of json value
+     */
+    enum struct Type
     {
-		double      number;
-		json_bool_t boolean;
-
-		const char* string;
-
-        struct json_value** array;
-
-        struct
-        {
-            const char*        name;
-            struct json_value* value;
-        }* object;
+        Null,
+        Array,
+        Number,
+        Object,
+        String,
+        Boolean,                               
     };
 
-#ifdef __cplusplus
-public: // @region: Constructors
-    JSON_INLINE json_value()
-	{	
-        memset(this, 0, sizeof(*this));
-	}
-
-    JSON_INLINE ~json_value()
+    /**
+     * JSON error code
+     */
+    enum struct Error
     {
-        // SHOULD BE EMPTY
-        // Memory are managed by json_state_t
-    }
+        None,
+        
+        /* Parsing error */
 
-public: // @region: Indexor
-	JSON_INLINE const json_value& operator[] (int index) const
-	{
-		if (type != JSON_ARRAY || index < 0 || index > json_length(this))
-		{
-			return JSON_VALUE_NONE;
-		}
-		else
-		{
-			return *array[index];
-		}	
-	}
+        WrongFormat,
+        UnmatchToken,
+        UnknownToken,
+        UnexpectedToken,
+        UnsupportedToken,
 
-	JSON_INLINE const json_value& operator[] (const char* name) const
-	{
-		json_value_t* value = json_find(this, name);
-        return value ? *value : JSON_VALUE_NONE;
-	}
+        /* Runtime error */
 
-public: // @region: Conversion
-	JSON_INLINE operator const char* () const
-	{
-		if (type == JSON_STRING)
-		{
-			return string;
-		}
-		else
-		{
-			return "";
-		}
-	}
+        OutOfMemory,
+        InternalFailed,
+    };
 
-	JSON_INLINE operator double () const
-	{
-		return number;
-	}
+    struct State;
+    struct Value;
 
-	JSON_INLINE operator bool () const
-	{
-        switch (type)
+    struct Settings
+    {
+        void* data;
+        void* (*malloc)(void* data, size_t size);
+        void  (*free)(void* data, void* pointer);
+    };
+
+    JSON_API const Value& parse(const char* json, State** state);
+    JSON_API const Value& parse(const char* json, const Settings* settings, State** state);
+    JSON_API void         release(State* state);
+    JSON_API Error        get_errno(const State* state);
+    JSON_API const char*  get_error(const State* state);
+
+    JSON_API void         print(const Value& value, FILE* out);
+    JSON_API void         write(const Value& value, FILE* out);
+
+    JSON_API int          length(const Value& x);
+    JSON_API bool         equals(const Value& a, const Value& b);
+    JSON_API const Value& find(const Value& obj, const char* name);
+
+    /**
+     * JSON value
+     */
+    struct Value
+    {
+    public: // @region: Fields
+        Type type;
+        union
         {
-        case JSON_NUMBER:
-        case JSON_BOOLEAN:
-        #ifdef NDEBUG
-            return boolean;   // Faster, use when performance needed
-        #else
-            return !!boolean; // More precision, should use when debug
-        #endif
+            double      number;
+            bool        boolean;
 
-        case JSON_ARRAY:
-        case JSON_OBJECT:
-        case JSON_STRING:
-            return true;
+            const char* string;
 
-        case JSON_NONE:
-        case JSON_NULL:
-        default: 
-            return false;
+            Value** array;
+
+            struct
+            {
+                const char* name;
+                Value*      value;
+            }* object;
+        };
+
+    public: // @region: Constants
+        JSON_API static const Value NONE;
+
+    public: // @region: Constructors
+        JSON_INLINE Value()
+            : type(Type::Null)
+        {	
         }
 
-	}
-#endif /* __cplusplus */
-};
+        JSON_INLINE ~Value()
+        {
+            // SHOULD BE EMPTY
+            // Memory are managed by State
+        }
 
-/* END OF EXTERN "C" */
-#ifdef __cplusplus
+    public: // @region: Indexor
+        JSON_INLINE const Value& operator[] (int index) const
+        {
+            if (type != Type::Array || index < 0 || index > length(*this))
+            {
+                return NONE;
+            }
+            else
+            {
+                return *array[index];
+            }	
+        }
+
+        JSON_INLINE const Value& operator[] (const char* name) const
+        {
+            return find(*this, name);
+        }
+
+    public: // @region: Conversion
+        JSON_INLINE operator const char* () const
+        {
+            return (this->type == Type::String) ? this->string : "";
+        }
+
+        JSON_INLINE operator double () const
+        {
+            return this->number;
+        }
+
+        JSON_INLINE operator bool () const
+        {
+            switch (type)
+            {
+            case Type::Number:
+            case Type::Boolean:
+            #ifdef NDEBUG
+                return boolean;   // Faster, use when performance needed
+            #else
+                return !!boolean; // More precision, should use when debug
+            #endif
+
+            case Type::Array:
+            case Type::Object:
+                return true;
+
+            case Type::String:
+                return this->string && length(*this) > 0;
+
+            default: 
+                return false;
+            }
+        }
+    };
 }
-#endif
-/* * */
 
 /* END OF __JSON_H__ */
 #endif /* __JSON_H__ */

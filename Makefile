@@ -3,14 +3,14 @@ CC=gcc
 .PHONY: clean
 
 test:
-	$(CC) -o json_test.exe src/json_test.c -Wall -O0
+	$(CC) -o json_test.exe src/json_test.cc -Wall -O0
 
 unit_test:
-	$(CC) -o json_unit_test.exe src/json_unit_test.c -Wall -O0
+	$(CC) -o json_unit_test.exe src/json_unit_test.cc -Wall -O0
 	./json_unit_test.exe $(wildcard ./testdb/json/*.json)
 
 unit_test_dbg:
-	$(CC) -o json_unit_test.exe src/json_unit_test.c -Wall -O0 -g
+	$(CC) -o json_unit_test.exe src/json_unit_test.cc -Wall -O0 -g
 	gdb json_unit_test
 
 clean:
