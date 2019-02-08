@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -O0 -std=c++11
+CFLAGS=-Wall -O0 -std=c++11 -fno-exceptions
 
 .PHONY: clean
 
