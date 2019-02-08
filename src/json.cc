@@ -1367,30 +1367,6 @@ namespace json
         }
     }
 
-    /* @funcdef: length */
-    int length(const Value& x)
-    {
-        if (x)
-        {
-            switch (x.type)
-            {
-            case Type::Array:
-                return x.array ? *((int*)x.array - 1) : 0;
-
-            case Type::String:
-                return x.string ? *((int*)x.string - 2) : 0;
-
-            case Type::Object:
-                return x.object ? *((int*)x.object - 1) : 0;
-
-            default:
-                break;
-            }
-        }
-
-        return 0;
-    }
-
     /* @funcdef: equals */
     bool equals(const Value& a, const Value& b)
     {
@@ -1423,7 +1399,7 @@ namespace json
             return a.boolean == b.boolean;
 
         case Type::Array:
-            if ((n = length(a)) == length(b))
+            if ((n = a.length()) == b.length())
             {
                 for (i = 0; i < n; i++)
                 {
@@ -1436,7 +1412,7 @@ namespace json
             return true;
 
         case Type::Object:
-            if ((n = length(a)) == length(b))
+            if ((n = a.length()) == b.length())
             {
                 for (i = 0; i < n; i++)
                 {
@@ -1469,7 +1445,7 @@ namespace json
         {
             int i, n;
             int hash = json__hash((void*)name, strlen(name));
-            for (i = 0, n = length(obj); i < n; i++)
+            for (i = 0, n = obj.length(); i < n; i++)
             {
                 const char* str = obj.object[i].name;
                 if (hash == ((int*)str - 2)[1] && strcmp(str, name) == 0)
@@ -1509,7 +1485,7 @@ namespace json
 
             case Type::Array:
                 fprintf(out, "[");
-                for (i = 0, n = length(value); i < n; i++)
+                for (i = 0, n = value.length(); i < n; i++)
                 {
                     write(value[i], out);
                     if (i < n - 1)
@@ -1522,7 +1498,7 @@ namespace json
 
             case Type::Object:
                 fprintf(out, "{");
-                for (i = 0, n = length(value); i < n; i++)
+                for (i = 0, n = value.length(); i < n; i++)
                 {
                     fprintf(out, "\"%s\" : ", value.object[i].name);
                     write(*value.object[i].value, out);
@@ -1570,7 +1546,7 @@ namespace json
                 fprintf(out, "[\n");
 
                 indent++;
-                for (i = 0, n = length(value); i < n; i++)
+                for (i = 0, n = value.length(); i < n; i++)
                 {
                     int j, m;
                     for (j = 0, m = indent * 4; j < m; j++)
@@ -1598,7 +1574,7 @@ namespace json
                 fprintf(out, "{\n");
 
                 indent++;
-                for (i = 0, n = length(value); i < n; i++)
+                for (i = 0, n = value.length(); i < n; i++)
                 {
                     int j, m;
                     for (j = 0, m = indent * 4; j < m; j++)

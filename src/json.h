@@ -84,7 +84,6 @@ namespace json
     JSON_API void         print(const Value& value, FILE* out);
     JSON_API void         write(const Value& value, FILE* out);
 
-    JSON_API int          length(const Value& x);
     JSON_API bool         equals(const Value& a, const Value& b);
     JSON_API const Value& find(const Value& obj, const char* name);
 
@@ -126,10 +125,29 @@ namespace json
             // Memory are managed by State
         }
 
+    public: // @region: Properties
+        JSON_INLINE int length() const
+        {
+            switch (type)
+            {
+            case Type::Array:
+                return array ? *((int*)array - 1) : 0;
+
+            case Type::String:
+                return string ? *((int*)string - 2) : 0;
+
+            case Type::Object:
+                return object ? *((int*)object - 1) : 0;
+
+            default:
+                return 0;
+            }
+        }
+
     public: // @region: Indexor
         JSON_INLINE const Value& operator[] (int index) const
         {
-            if (type != Type::Array || index < 0 || index > length(*this))
+            if (type != Type::Array || index < 0 || index > this->length())
             {
                 return NONE;
             }
@@ -172,7 +190,7 @@ namespace json
                 return true;
 
             case Type::String:
-                return this->string && length(*this) > 0;
+                return this->string && this->length() > 0;
 
             default: 
                 return false;
