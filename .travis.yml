@@ -25,18 +25,18 @@ matrix:
       script: make CC=clang && make unit_test CC=clang
 
     - os: windows
-      language: c++
+      language: c
       compiler: gcc
       before_install: choco install make
       script: make
 
     - os: windows
-      language: c++
+      language: c
       compiler: clang
       before_install: choco install make
       script: make CC=clang
 
     - os: windows
-      language: c++
+      language: c
       script:
         - echo .travis\\build_vs2017.bat | cmd
