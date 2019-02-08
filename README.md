@@ -2,62 +2,64 @@
 Simple JSON parser written in ANSI C/C++
 
 ## API
-```C
-struct json_state_t; // Implicit structure, manage parsing context
+```C++
+struct json::State; // Implicit structure, manage parsing context
 
-struct json_value_t
+struct json::Value
 {
-    json_type_t type;
+    json::Type type;
     union 
     {
         double          number;
         json_bool_t     boolean;   
         const char*     string;
-        json_value_t**  array;  
+        json::Value**   array;  
         struct {...}    object;
     };
+
+    int length() const;
 };
 
-struct json_settings_t
+bool operator==(const json::Value& a, const json::Value& b);
+bool operator!=(const json::Value& a, const json::Value& b);
+
+struct json::Settings
 {
     void* data;                                 // Your memory buffer
     void* (*malloc)(void* data, size_t size);   // Your memory allocate function
     void  (*free)(void* data, void* pointer);   // Your memory deallocate function
 };
 
-json_value_t* json_parse(const char* json_code, json_state_t** out_state);
-json_value_t* json_parse_ex(const char* json_code, json_settings_t* settings, json_state_t** out_state);
+json::Value* json::parse(const char* json_code, json::State** out_state);
+json::Value* json::parse(const char* json_code, json::Settings* settings, json::State** out_state);
 // 1. json_code : the JSON content from JSON's source (from memory, from file)
 // 2. out_state : the JSON state for parsing json code, contain usage memory (can be NULL, library will hold it), can be reuse by give it an valid state
 // 3. settings  : the parsing settings, and only custom memory management by now
 
-void json_release(json_state_t* state);
+void json::release(json::State* state);
 // Release state, when state is null, library will implicit remove states that it hold
 
-json_error_t json_get_errno(const json_state_t* state); // Get error number of [given state] or [last state] (when state = NULL) 
-const char*  json_get_error(const json_state_t* state); // Get error string of [given state] or [last state] (when state = NULL)
+json::Error json::get_errno(const json::State* state); // Get error number of [given state] or [last state] (when state = NULL) 
+const char* json::get_error(const json::State* state); // Get error string of [given state] or [last state] (when state = NULL)
 
-void json_print(const json_value_t* value, FILE* out); 
+void json::print(const json::Value* value, FILE* out); 
 // Stringify output to file, more readable + size bigger  than json_write
 
-void json_write(const json_value_t* value, FILE* out); 
+void json::write(const json::Value* value, FILE* out); 
 // Stringify output to file, less readable + size smaller than json_print
 
-json_bool_t json_equals(const json_value_t* a, const json_value_t* b);
+bool json::equals(const json::Value* a, const json::Value* b);
 // Depth compare two JSON values
 
-json_value_t* json_find(const json_value_t* obj, const char* name);
+json::Value* json::find(const json::Value* obj, const char* name);
 // Get value that is contained by `obj`
-
-int json_length(const json_value_t* value);
-// Get length of json value, value must be string, array or object
 
 // Find more details, or helper functions in json.h
 ```
 
 ## Examples
-Belove code from json_test.c:
-```C
+Belove code from json_test.cc:
+```C++
 #include <signal.h>
 #include <setjmp.h>
 
@@ -76,7 +78,7 @@ int main(int argc, char* argv[])
     printf("Type '.exit' to exit\n");
     
     char input[1024];
-    json_state_t* state = NULL;
+    json::State* state = NULL;
     while (1)
     {
 	    if (setjmp(jmpenv) == 0)
@@ -91,23 +93,21 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                json_value_t* value = json_parse(json, &state);
-	    
-                if (json_get_errno(state) != JSON_ERROR_NONE)
+                auto value = json::parse(json, &state);
+                if (json::get_errno(state) != json::Error::None)
                 {
-                    value = NULL;
-                    printf("[ERROR]: %s\n", json_get_error(state));
+                    printf("[ERROR]: %s\n", json::get_error(state));
                 }
                 else
                 {
-                    json_print(value, stdout); printf("\n");
+                    json::print(value, stdout); printf("\n");
                 }
 	        }
 	    }
     }
 
-    /* json_release(NULL) for release all memory if you don't catch the json_state_t */
-    json_release(state);
+    /* json::release(NULL) for release all memory if you don't catch the json::State */
+    json::release(state);
     
     return 0;
 }
