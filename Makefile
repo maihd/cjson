@@ -1,16 +1,17 @@
-CC=gcc
+CC=g++
+CFLAGS=-Wall -O0 -std=c++11
 
 .PHONY: clean
 
 test:
-	$(CC) -o json_test.exe src/json_test.cc -Wall -O0
+	$(CC) -o json_test.exe src/json_test.cc $(CFLAGS)
 
 unit_test:
-	$(CC) -o json_unit_test.exe src/json_unit_test.cc -Wall -O0
+	$(CC) -o json_unit_test.exe src/json_unit_test.cc $(CFLAGS)
 	./json_unit_test.exe $(wildcard ./testdb/json/*.json)
 
 unit_test_dbg:
-	$(CC) -o json_unit_test.exe src/json_unit_test.cc -Wall -O0 -g
+	$(CC) -o json_unit_test.exe src/json_unit_test.cc $(CFLAGS) -g
 	gdb json_unit_test
 
 clean:
