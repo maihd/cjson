@@ -24,7 +24,7 @@ lib:
 	echo ""                         >> json.h
 	echo "#ifdef JSON_IMPL"         >> json.h
 	echo ""                         >> json.h	
-	cat ./src/json.c                >> json.h
+	cat ./src/json.cc               >> json.h
 	echo ""                         >> json.h
 	echo ""                         >> json.h
 	echo "#endif /* JSON_IMPL */"   >> json.h

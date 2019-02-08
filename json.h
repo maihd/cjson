@@ -29,192 +29,185 @@
 
 #include <stdio.h>
 
-#ifdef __cplusplus
-#include <string.h>
-extern "C" {
-#endif
-
-/**
- * JSON type of json value
- */
-typedef enum json_type
+namespace json 
 {
-    JSON_NONE,
-    JSON_NULL,
-    JSON_ARRAY,
-    JSON_OBJECT,
-    JSON_NUMBER,
-    JSON_STRING,
-    JSON_BOOLEAN,
-} json_type_t;
-
-/**
- * JSON error code
- */
-typedef enum json_error
-{
-    JSON_ERROR_NONE,
-    
-    /* Parsing error */
-
-    JSON_ERROR_FORMAT,
-    JSON_ERROR_UNMATCH,
-    JSON_ERROR_UNKNOWN,
-    JSON_ERROR_UNEXPECTED,
-    JSON_ERROR_UNSUPPORTED,
-
-    /* Runtime error */
-
-    JSON_ERROR_MEMORY,
-    JSON_ERROR_INTERNAL,
-} json_error_t;
-
-typedef struct json_state json_state_t;
-typedef struct json_value json_value_t;
-
-/**
- * JSON boolean data type
- */
-#ifdef __cplusplus
-typedef bool json_bool_t;
-#define JSON_TRUE  true
-#define JSON_FALSE false
-#else
-typedef enum json_bool_t
-{
-	JSON_TRUE  = 1,
-	JSON_FALSE = 0,
-} json_bool_t;
-#endif
-
-typedef struct
-{
-    void* data;
-    void* (*malloc)(void* data, size_t size);
-    void  (*free)(void* data, void* pointer);
-} json_settings_t;
-
-JSON_API extern const json_value_t JSON_VALUE_NONE;
-
-JSON_API json_value_t* json_parse(const char* json, json_state_t** state);
-JSON_API json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** state);
-
-JSON_API void          json_release(json_state_t* state);
-
-JSON_API json_error_t  json_get_errno(const json_state_t* state);
-JSON_API const char*   json_get_error(const json_state_t* state);
-
-JSON_API void          json_print(const json_value_t* value, FILE* out);
-JSON_API void          json_write(const json_value_t* value, FILE* out);
-
-JSON_API int           json_length(const json_value_t* x);
-JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b);
-JSON_API json_value_t* json_find(const json_value_t* obj, const char* name);
-
-/**
- * JSON value
- */
-struct json_value
-{
-    json_type_t type;
-    union
+    /**
+     * JSON type of json value
+     */
+    enum struct Type
     {
-		double      number;
-		json_bool_t boolean;
-
-		const char* string;
-
-        struct json_value** array;
-
-        struct
-        {
-            const char*        name;
-            struct json_value* value;
-        }* object;
+        Null,
+        Array,
+        Number,
+        Object,
+        String,
+        Boolean,                               
     };
 
-#ifdef __cplusplus
-public: // @region: Constructors
-    JSON_INLINE json_value()
-	{	
-        memset(this, 0, sizeof(*this));
-	}
-
-    JSON_INLINE ~json_value()
+    /**
+     * JSON error code
+     */
+    enum struct Error
     {
-        // SHOULD BE EMPTY
-        // Memory are managed by json_state_t
+        None,
+        
+        /* Parsing error */
+
+        WrongFormat,
+        UnmatchToken,
+        UnknownToken,
+        UnexpectedToken,
+        UnsupportedToken,
+
+        /* Runtime error */
+
+        OutOfMemory,
+        InternalFailed,
+    };
+
+    struct State;
+    struct Value;
+
+    struct Settings
+    {
+        void* data;
+        void* (*malloc)(void* data, size_t size);
+        void  (*free)(void* data, void* pointer);
+    };
+
+    JSON_API const Value& parse(const char* json, State** state);
+    JSON_API const Value& parse(const char* json, const Settings* settings, State** state);
+    JSON_API void         release(State* state);
+    JSON_API Error        get_errno(const State* state);
+    JSON_API const char*  get_error(const State* state);
+
+    JSON_API void         print(const Value& value, FILE* out);
+    JSON_API void         write(const Value& value, FILE* out);
+
+    JSON_API bool         equals(const Value& a, const Value& b);
+    JSON_API const Value& find(const Value& obj, const char* name);
+
+    JSON_INLINE bool operator==(const Value& a, const Value& b)
+    {
+        return equals(a, b);
     }
 
-public: // @region: Indexor
-	JSON_INLINE const json_value& operator[] (int index) const
-	{
-		if (type != JSON_ARRAY || index < 0 || index > json_length(this))
-		{
-			return JSON_VALUE_NONE;
-		}
-		else
-		{
-			return *array[index];
-		}	
-	}
+    JSON_INLINE bool operator!=(const Value& a, const Value& b)
+    {
+        return !equals(a, b);
+    }
 
-	JSON_INLINE const json_value& operator[] (const char* name) const
-	{
-		json_value_t* value = json_find(this, name);
-        return value ? *value : JSON_VALUE_NONE;
-	}
-
-public: // @region: Conversion
-	JSON_INLINE operator const char* () const
-	{
-		if (type == JSON_STRING)
-		{
-			return string;
-		}
-		else
-		{
-			return "";
-		}
-	}
-
-	JSON_INLINE operator double () const
-	{
-		return number;
-	}
-
-	JSON_INLINE operator bool () const
-	{
-        switch (type)
+    /**
+     * JSON value
+     */
+    struct Value
+    {
+    public: // @region: Fields
+        Type type;
+        union
         {
-        case JSON_NUMBER:
-        case JSON_BOOLEAN:
-        #ifdef NDEBUG
-            return boolean;   // Faster, use when performance needed
-        #else
-            return !!boolean; // More precision, should use when debug
-        #endif
+            double      number;
+            bool        boolean;
 
-        case JSON_ARRAY:
-        case JSON_OBJECT:
-        case JSON_STRING:
-            return true;
+            const char* string;
 
-        case JSON_NONE:
-        case JSON_NULL:
-        default: 
-            return false;
+            Value** array;
+
+            struct
+            {
+                const char* name;
+                Value*      value;
+            }* object;
+        };
+
+    public: // @region: Constants
+        JSON_API static const Value NONE;
+
+    public: // @region: Constructors
+        JSON_INLINE Value()
+            : type(Type::Null)
+        {	
         }
 
-	}
-#endif /* __cplusplus */
-};
+        JSON_INLINE ~Value()
+        {
+            // SHOULD BE EMPTY
+            // Memory are managed by State
+        }
 
-/* END OF EXTERN "C" */
-#ifdef __cplusplus
+    public: // @region: Properties
+        JSON_INLINE int length() const
+        {
+            switch (type)
+            {
+            case Type::Array:
+                return array ? *((int*)array - 1) : 0;
+
+            case Type::String:
+                return string ? *((int*)string - 2) : 0;
+
+            case Type::Object:
+                return object ? *((int*)object - 1) : 0;
+
+            default:
+                return 0;
+            }
+        }
+
+    public: // @region: Indexor
+        JSON_INLINE const Value& operator[] (int index) const
+        {
+            if (type != Type::Array || index < 0 || index > this->length())
+            {
+                return NONE;
+            }
+            else
+            {
+                return *array[index];
+            }	
+        }
+
+        JSON_INLINE const Value& operator[] (const char* name) const
+        {
+            return find(*this, name);
+        }
+
+    public: // @region: Conversion
+        JSON_INLINE operator const char* () const
+        {
+            return (this->type == Type::String) ? this->string : "";
+        }
+
+        JSON_INLINE operator double () const
+        {
+            return this->number;
+        }
+
+        JSON_INLINE operator bool () const
+        {
+            switch (type)
+            {
+            case Type::Number:
+            case Type::Boolean:
+            #ifdef NDEBUG
+                return boolean;   // Faster, use when performance needed
+            #else
+                return !!boolean; // More precision, should use when debug
+            #endif
+
+            case Type::Array:
+            case Type::Object:
+                return true;
+
+            case Type::String:
+                return this->string && this->length() > 0;
+
+            default: 
+                return false;
+            }
+        }
+    };
 }
-#endif
-/* * */
 
 /* END OF __JSON_H__ */
 #endif /* __JSON_H__ */
@@ -238,1608 +231,1583 @@ public: // @region: Conversion
 #endif
 
 #ifndef JSON_VALUE_POOL_COUNT
-#define JSON_VALUE_POOL_COUNT (4096/sizeof(json_value_t))
+#define JSON_VALUE_POOL_COUNT (4096 / sizeof(::json::Value))
 #endif
 
-typedef struct json_pool
+namespace json
 {
-    struct json_pool* prev;
-    struct json_pool* next;
-
-    void** head;
-} json_pool_t;
-
-typedef struct json_bucket
-{
-    struct json_bucket* prev;
-    struct json_bucket* next;
-
-    size_t size;
-    size_t count;
-    size_t capacity;
-} json_bucket_t;
-
-struct json_state
-{
-    struct json_state* next;
-    json_pool_t* value_pool;
-
-    json_bucket_t* values_bucket;
-    json_bucket_t* string_bucket;
-    
-    size_t line;
-    size_t column;
-    size_t cursor;
-    //json_type_t parsing_value_type;
-    
-    size_t      length;
-    const char* buffer;
-    
-    json_error_t errnum;
-    char*        errmsg;
-    jmp_buf      errjmp;
-
-    json_settings_t settings; /* Runtime settings */
-};
-
-static json_state_t* root_state = NULL;
-const struct json_value JSON_VALUE_NONE;
-
-/* @funcdef: json__malloc */
-static void* json__malloc(void* data, size_t size)
-{
-    (void)data;
-    return malloc(size);
-}
-
-/* @funcdef: json__free */
-static void json__free(void* data, void* pointer)
-{
-    (void)data;
-    free(pointer);
-}
-
-/* @funcdef: json__set_error_valist */
-static void json__set_error_valist(json_state_t* state, json_type_t type, json_error_t code, const char* fmt, va_list valist)
-{
-    const int errmsg_size = 1024;
-
-    const char* type_name;
-    switch (type)
+    struct Pool
     {
-    case JSON_NULL:
-        type_name = "null";
-        break;
+        Pool*  prev;
+        Pool*  next;
+        void** head;
+    };
 
-    case JSON_BOOLEAN:
-        type_name = "boolean";
-        break;
+    struct Bucket
+    {
+        Bucket* prev;
+        Bucket* next;
 
-    case JSON_NUMBER:
-        type_name = "number";
-        break;
+        size_t  size;
+        size_t  count;
+        size_t  capacity;
+    };
 
-    case JSON_ARRAY:
-        type_name = "array";
-        break;
+    struct State
+    {
+        State* next;
 
-    case JSON_STRING:
-        type_name = "string";
-        break;
+        Pool*   value_pool;
+        Bucket* values_bucket;
+        Bucket* string_bucket;
 
-    case JSON_OBJECT:
-        type_name = "object";
-        break;
+        size_t line;
+        size_t column;
+        size_t cursor;
+        //Type parsing_value_type;
 
-    default:
-        type_name = "unknown";
-        break;
+        size_t      length;
+        const char* buffer;
+
+        Error errnum;
+        char *errmsg;
+        jmp_buf errjmp;
+
+        Settings settings; /* Runtime settings */
+    };
+
+    const  Value  Value::NONE;
+    static State* root_state = NULL;
+
+    /* @funcdef: json__malloc */
+    static void *json__malloc(void *data, size_t size)
+    {
+        (void)data;
+        return malloc(size);
     }
 
-    state->errnum = code;
-    if (state->errmsg == NULL)
+    /* @funcdef: json__free */
+    static void json__free(void* data, void* pointer)
     {
-        state->errmsg = (char*)state->settings.malloc(state->settings.data, errmsg_size);
+        (void)data;
+        free(pointer);
     }
 
-    char final_format[1024];
-    char templ_format[1024] = "%s\n\tAt line %d, column %d. Parsing token: <%s>.";
-
-#if defined(_MSC_VER) && _MSC_VER >= 1200
-    sprintf_s(final_format, sizeof(final_format), templ_format, fmt, state->line, state->column, type_name);
-    sprintf_s(state->errmsg, errmsg_size, final_format, valist);
-#else
-    sprintf(final_format, templ_format, fmt, state->line, state->column, type_name);
-    sprintf(state->errmsg, final_format, valist);
-#endif
-}
-
-/* @funcdef: json__set_error */
-static void json__set_error(json_state_t* state, json_type_t type, json_error_t code, const char* fmt, ...)
-{
-    va_list varg;
-    va_start(varg, fmt);
-    json__set_error_valist(state, type, code, fmt, varg);
-    va_end(varg);
-}
-
-/* funcdef: json__panic */
-static void json__panic(json_state_t* state, json_type_t type, json_error_t code, const char* fmt, ...)
-{
-    va_list varg;
-    va_start(varg, fmt);
-    json__set_error_valist(state, type, code, fmt, varg);
-    va_end(varg);
-
-    longjmp(state->errjmp, code);
-}
-
-/* funcdef: json__make_pool */
-static json_pool_t* json__make_pool(json_state_t* state, json_pool_t* prev, int count, int size)
-{
-    if (count <= 0 || size <= 0)
+    /* @funcdef: json__set_error_valist */
+    static void json__set_error_valist(State* state, Type type, Error code, const char* fmt, va_list valist)
     {
-		return NULL;
-    }
+        const int errmsg_size = 1024;
 
-    int pool_size = count * (sizeof(void*) + size);
-    json_pool_t* pool = (json_pool_t*)state->settings.malloc(state->settings.data, sizeof(json_pool_t) + pool_size);
-    if (pool)
-    {
-        if (prev)
+        const char *type_name;
+        switch (type)
         {
-            prev->next = pool;
+        case Type::Null:
+            type_name = "null";
+            break;
+
+        case Type::Boolean:
+            type_name = "boolean";
+            break;
+
+        case Type::Number:
+            type_name = "number";
+            break;
+
+        case Type::Array:
+            type_name = "array";
+            break;
+
+        case Type::String:
+            type_name = "string";
+            break;
+
+        case Type::Object:
+            type_name = "object";
+            break;
+
+        default:
+            type_name = "unknown";
+            break;
         }
 
-		pool->prev = prev;
-		pool->next = NULL;
-		pool->head = (void**)((char*)pool + sizeof(json_pool_t));
-		
-		int i;
-		void** node = pool->head;
-		for (i = 0; i < count - 1; i++)
-		{
-			node = (void**)(*node = (char*)node + sizeof(void*) + size);
-		}
-		*node = NULL;
-    }
-    
-    return pool;
-}
-
-/* funcdef: json__free_pool */
-static void json__free_pool(json_state_t* state, json_pool_t* pool)
-{
-    if (pool)
-    {
-		json__free_pool(state, pool->prev);
-		state->settings.free(state->settings.data, pool);
-    }
-}
-
-/* funcdef: json__pool_extract */
-static void* json__pool_extract(json_pool_t* pool)
-{
-    if (pool->head)
-    {
-		void** head = pool->head;
-		void** next = (void**)(*head);
-		
-		pool->head = next;
-		return (void*)((char*)head + sizeof(void*));
-    }
-    else
-    {
-		return NULL;
-    }
-}
-
-#if 0 /* UNUSED */
-/* funcdef: json__pool_collect */
-static void json__pool_collect(json_pool_t* pool, void* ptr)
-{
-    if (ptr)
-    {
-		void** node = (void**)((char*)ptr - sizeof(void*));
-		*node = pool->head;
-		pool->head = node;
-    }
-}
-#endif
-
-/* funcdef: json__make_bucket */
-static json_bucket_t* json__make_bucket(json_state_t* state, json_bucket_t* prev, size_t count, size_t size)
-{
-    if (count <= 0 || size <= 0)
-    {
-        return NULL;
-    }
-
-    json_bucket_t* bucket = (json_bucket_t*)state->settings.malloc(state->settings.data, sizeof(json_bucket_t) + count * size);
-    if (bucket)
-    {
-        if (prev)
+        state->errnum = code;
+        if (state->errmsg == NULL)
         {
-            prev->next = bucket;
+            state->errmsg = (char *)state->settings.malloc(state->settings.data, errmsg_size);
         }
 
-        bucket->prev     = prev;
-        bucket->next     = NULL;
-        bucket->size     = size;
-        bucket->count    = 0;
-        bucket->capacity = count;
-    }
-    return bucket;
-}
+        char final_format[1024];
+        char templ_format[1024] = "%s\n\tAt line %d, column %d. Parsing token: <%s>.";
 
-/* funcdef: json__free_bucket */
-static void json__free_bucket(json_state_t* state, json_bucket_t* bucket)
-{
-    if (bucket)
-    {
-        json__free_bucket(state, bucket->next);
-        state->settings.free(state->settings.data, bucket);
-    }
-}
-
-/* funcdef: json__bucket_extract */
-static void* json__bucket_extract(json_bucket_t* bucket, int count)
-{
-    if (!bucket || count <= 0)
-    {
-        return NULL;
-    }
-    else if (bucket->count + count <= bucket->capacity)
-    {
-        void* res = (char*)bucket + sizeof(json_bucket_t) + bucket->size * bucket->count;
-        bucket->count += count;
-        return res;
-    }
-    else
-    {
-        return NULL;
-    }
-}
-
-/* funcdef: json__bucket_resize */
-static void* json__bucket_resize(json_bucket_t* bucket, void* ptr, int old_count, int new_count)
-{
-    if (!bucket || new_count <= 0)
-    {
-        return NULL;
+    #if defined(_MSC_VER) && _MSC_VER >= 1200
+        sprintf_s(final_format, sizeof(final_format), templ_format, fmt, state->line, state->column, type_name);
+        sprintf_s(state->errmsg, errmsg_size, final_format, valist);
+    #else
+        sprintf(final_format, templ_format, fmt, state->line, state->column, type_name);
+        sprintf(state->errmsg, final_format, valist);
+    #endif
     }
 
-    if (!ptr)
+    /* @funcdef: json__set_error */
+    static void json__set_error(State* state, Type type, Error code, const char* fmt, ...)
     {
-        return json__bucket_extract(bucket, new_count);
+        va_list varg;
+        va_start(varg, fmt);
+        json__set_error_valist(state, type, code, fmt, varg);
+        va_end(varg);
     }
 
-    char* begin = (char*)bucket + sizeof(json_bucket_t);
-    char* end   = begin + bucket->size * bucket->count;
-    if ((char*)ptr + bucket->size * old_count == end && bucket->count + (new_count - old_count) <= bucket->capacity)
+    /* funcdef: json__panic */
+    static void json__panic(State* state, Type type, Error code, const char* fmt, ...)
     {
-        bucket->count += (new_count - old_count);
-        return ptr;
-    }
-    else
-    {
-        return NULL;
-    }
-}
+        va_list varg;
+        va_start(varg, fmt);
+        json__set_error_valist(state, type, code, fmt, varg);
+        va_end(varg);
 
-/* @funcdef: json__make_value */
-static json_value_t* json__make_value(json_state_t* state, json_type_t type)
-{
-    if (!state->value_pool || !state->value_pool->head)
+        longjmp(state->errjmp, (int)code);
+    }
+
+    /* funcdef: json__make_pool */
+    static Pool* json__make_pool(State* state, Pool* prev, int count, int size)
     {
-        if (state->value_pool && state->value_pool->prev)
+        if (count <= 0 || size <= 0)
         {
-            state->value_pool = state->value_pool->prev;
+            return NULL;
+        }
+
+        int   pool_size = count * (sizeof(void*) + size);
+        Pool* pool      = (Pool*)state->settings.malloc(state->settings.data, sizeof(Pool) + pool_size);
+        if (pool)
+        {
+            if (prev)
+            {
+                prev->next = pool;
+            }
+
+            pool->prev = prev;
+            pool->next = NULL;
+            pool->head = (void**)((char*)pool + sizeof(Pool));
+
+            int i;
+            void **node = pool->head;
+            for (i = 0; i < count - 1; i++)
+            {
+                node = (void**)(*node = (char*)node + sizeof(void*) + size);
+            }
+            *node = NULL;
+        }
+
+        return pool;
+    }
+
+    /* funcdef: json__free_pool */
+    static void json__free_pool(State* state, Pool* pool)
+    {
+        if (pool)
+        {
+            json__free_pool(state, pool->prev);
+            state->settings.free(state->settings.data, pool);
+        }
+    }
+
+    /* funcdef: json__pool_extract */
+    static void *json__pool_extract(Pool *pool)
+    {
+        if (pool->head)
+        {
+            void **head = pool->head;
+            void **next = (void **)(*head);
+
+            pool->head = next;
+            return (void *)((char *)head + sizeof(void *));
         }
         else
         {
-            state->value_pool = json__make_pool(state, state->value_pool, JSON_VALUE_POOL_COUNT, sizeof(json_value_t));
+            return NULL;
+        }
+    }
+
+    #if 0 /* UNUSED */
+    /* funcdef: json__pool_collect */
+    static void json__pool_collect(Pool* pool, void* ptr)
+    {
+        if (ptr)
+        {
+            void** node = (void**)((char*)ptr - sizeof(void*));
+            *node = pool->head;
+            pool->head = node;
+        }
+    }
+    #endif
+
+    /* funcdef: json__make_bucket */
+    static Bucket *json__make_bucket(State *state, Bucket *prev, size_t count, size_t size)
+    {
+        if (count <= 0 || size <= 0)
+        {
+            return NULL;
         }
 
-		if (!state->value_pool)
-		{
-			json__panic(state, type, JSON_ERROR_MEMORY, "Out of memory");
-		}
-    }
-    
-    json_value_t* value = (json_value_t*)json__pool_extract(state->value_pool);
-    if (value)
-    {
-		memset(value, 0, sizeof(json_value_t));
-		value->type    = type;
-		value->boolean = JSON_FALSE;
-    }
-    else
-    {
-		json__panic(state, type, JSON_ERROR_MEMORY, "Out of memory");
-    }
-    return value;
-}
-
-/* @funcdef: json__make_state */
-static json_state_t* json__make_state(const char* json, const json_settings_t* settings)
-{
-    json_state_t* state = (json_state_t*)settings->malloc(settings->data, sizeof(json_state_t));
-    if (state)
-    {
-		state->next   = NULL;
-		
-		state->line   = 1;
-		state->column = 1;
-		state->cursor = 0;
-		state->buffer = json;
-		state->length = strlen(json);
-
-		state->errmsg = NULL;
-		state->errnum = JSON_ERROR_NONE;
-
-		state->value_pool    = NULL;
-        state->values_bucket = NULL;
-        state->string_bucket = NULL;
-
-        state->settings = *settings;
-    }
-    return state;
-}
-
-/* @funcdef: json__reuse_state */
-static json_state_t* json__reuse_state(json_state_t* state, const char* json, const json_settings_t* settings)
-{
-    if (state)
-    {
-        if (state == root_state)
+        Bucket *bucket = (Bucket *)state->settings.malloc(state->settings.data, sizeof(Bucket) + count * size);
+        if (bucket)
         {
-            root_state = state->next;
-        }
-        else
-        {
-            json_state_t* list = root_state;
-            while (list)
+            if (prev)
             {
-                if (list->next == state)
-                {
-                    list->next = state->next;
-                }
+                prev->next = bucket;
             }
 
-		    state->next = NULL;
+            bucket->prev     = prev;
+            bucket->next     = NULL;
+            bucket->size     = size;
+            bucket->count    = 0;
+            bucket->capacity = count;
         }
+        return bucket;
+    }
 
-		state->line   = 1;
-		state->column = 1;
-		state->cursor = 0;
-		state->buffer = json;
-		state->errnum = JSON_ERROR_NONE;
-
-        if (state->settings.data != settings->data ||
-            state->settings.free != settings->free ||
-            state->settings.malloc != settings->malloc)
+    /* funcdef: json__free_bucket */
+    static void json__free_bucket(State* state, Bucket* bucket)
+    {
+        if (bucket)
         {
-            json__free_pool(state, state->value_pool);
-            json__free_bucket(state, state->values_bucket);
-            json__free_bucket(state, state->string_bucket);
+            json__free_bucket(state, bucket->next);
+            state->settings.free(state->settings.data, bucket);
+        }
+    }
 
-		    state->value_pool    = NULL;
-            state->values_bucket = NULL;
-            state->string_bucket = NULL;
-
-            state->settings.free(state->settings.data, state->errmsg); 
-            state->errmsg = NULL;
+    /* funcdef: json__bucket_extract */
+    static void *json__bucket_extract(Bucket* bucket, int count)
+    {
+        if (!bucket || count <= 0)
+        {
+            return NULL;
+        }
+        else if (bucket->count + count <= bucket->capacity)
+        {
+            void *res = (char *)bucket + sizeof(Bucket) + bucket->size * bucket->count;
+            bucket->count += count;
+            return res;
         }
         else
         {
-            if (state->errmsg) state->errmsg[0] = 0;
-
-            while (state->value_pool)
-            {
-                state->value_pool->head = (void**)(state->value_pool + 1);
-                if (state->value_pool->prev)
-                {
-                    break;
-                }
-                else
-                {
-                    state->value_pool = state->value_pool->prev;
-                }
-            }
-
-            while (state->values_bucket)
-            {
-                state->values_bucket->count = 0;
-                if (state->values_bucket->prev)
-                {
-                    state->values_bucket = state->values_bucket->prev;
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            while (state->string_bucket)
-            {
-                state->string_bucket->count = 0;
-                if (state->string_bucket->prev)
-                {
-                    state->string_bucket = state->string_bucket->prev;
-                }
-                else
-                {
-                    break;
-                }
-            }
+            return NULL;
         }
     }
-    return state;
-}
 
-/* @funcdef: json__free_state */
-static void json__free_state(json_state_t* state)
-{
-    if (state)
+    /* funcdef: json__bucket_resize */
+    static void *json__bucket_resize(Bucket *bucket, void *ptr, int old_count, int new_count)
     {
-		json_state_t* next = state->next;
-
-        json__free_bucket(state, state->values_bucket);
-        json__free_bucket(state, state->string_bucket);
-		json__free_pool(state, state->value_pool);
-
-		state->settings.free(state->settings.data, state->errmsg);
-		state->settings.free(state->settings.data, state);
-
-		json__free_state(next);
-    }
-}
-
-/* @funcdef: json__is_eof */
-static int json__is_eof(json_state_t* state)
-{
-    return state->cursor >= state->length || state->buffer[state->cursor] <= 0;
-}
-
-/* @funcdef: json__peek_char */
-static int json__peek_char(json_state_t* state)
-{
-    return state->buffer[state->cursor];
-}
-
-/* @funcdef: json__next_char */
-static int json__next_char(json_state_t* state)
-{
-    if (json__is_eof(state))
-    {
-		return -1;
-    }
-    else
-    {
-		int c = state->buffer[++state->cursor];
-
-		if (c == '\n')
-		{
-			state->line++;
-			state->column = 1;
-		}
-		else
-		{
-			state->column = state->column + 1;
-		}
-		
-		return c;
-    }
-}
-
-#if 0 /* UNUSED */
-/* @funcdef: json__make_value */
-static int next_line(json_state_t* state)
-{
-    int c = json__peek_char(state);
-    while (c > 0 && c != '\n')
-    {
-		c = json__next_char(state);
-    }
-    return json__next_char(state);
-}
-#endif
-
-/* @funcdef: json__skip_space */
-static int json__skip_space(json_state_t* state)
-{
-    int c = json__peek_char(state);
-    while (c > 0 && isspace(c))
-    {
-		c = json__next_char(state);
-    }
-    return c;
-}
-
-/* @funcdef: json__match_char */
-static int json__match_char(json_state_t* state, json_type_t type, int c)
-{
-    if (json__peek_char(state) == c)
-    {
-		return json__next_char(state);
-    }
-    else
-    {
-        json__panic(state, type, JSON_ERROR_UNMATCH, "Expected '%c'", c);
-		return -1;
-    }
-}
-
-/* @funcdef: json__hash */
-static int json__hash(void* buf, size_t len)
-{
-    int h = 0xdeadbeaf;
-
-    const char* key = (const char*)buf;
-    if (len > 3)
-    {
-        const int* key_x4 = (const int*)key;
-        size_t i = len >> 2;
-        do 
+        if (!bucket || new_count <= 0)
         {
-            int k = *key_x4++;
-
-            k *= 0xcc9e2d51;
-            k  = (k << 15) | (k >> 17);
-            k *= 0x1b873593;
-            h ^= k;
-            h  = (h << 13) | (h >> 19);
-            h  = (h * 5) + 0xe6546b64;
-        } while (--i);
-
-        key = (const char*)(key_x4);
-    }
-
-    if (len & 3)
-    {
-        size_t i = len & 3;
-        int k = 0;
-
-        key = &key[i - 1];
-        do 
-        {
-            k <<= 8;
-            k  |= *key--;
-        } while (--i);
-
-        k *= 0xcc9e2d51;
-        k  = (k << 15) | (k >> 17);
-        k *= 0x1b873593;
-        h ^= k;
-    }
-
-    h ^= len;
-    h ^= h >> 16;
-    h *= 0x85ebca6b;
-    h ^= h >> 13;
-    h *= 0xc2b2ae35;
-    h ^= h >> 16;
-    return h;
-}
-
-/* All parse functions declaration */
-
-static json_value_t* json__parse_array(json_state_t* state, json_value_t* value);
-static json_value_t* json__parse_single(json_state_t* state, json_value_t* value);
-static json_value_t* json__parse_object(json_state_t* state, json_value_t* value);
-static json_value_t* json__parse_number(json_state_t* state, json_value_t* value);
-static json_value_t* json__parse_string(json_state_t* state, json_value_t* value);
-
-/* @funcdef: json__parse_number */
-static json_value_t* json__parse_number(json_state_t* state, json_value_t* value)
-{
-    if (json__skip_space(state) < 0)
-    {
-		return NULL;
-    }
-    else
-    {
-		int c = json__peek_char(state);
-		int sign = 1;
-		
-		if (c == '+')
-		{
-			c = json__next_char(state);
-			json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
-				        "JSON does not support number start with '+'");
-		}
-		else if (c == '-')
-		{
-			sign = -1;
-			c = json__next_char(state);
-		}
-		else if (c == '0')
-		{
-			c = json__next_char(state);
-			if (!isspace(c) && !ispunct(c))
-			{
-				json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
-                            "JSON does not support number start with '0' (only standalone '0' is accepted)");
-			}
-		}
-		else if (!isdigit(c))
-		{
-			json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Unexpected '%c'", c);
-		}
-
-		int    dot    = 0;
-        int    exp    = 0;
-        int    expsgn = 0;
-        int    exppow = 0;
-        int    expchk = 0;
-		int    numpow = 1;
-		double number = 0;
-
-		while (c > 0)
-		{
-            if (c == 'e')
-            {
-                if (exp)
-                {
-                    json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many 'e' are presented in a <number>");
-                }
-                else if (dot && numpow == 1)
-                {
-                    json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
-                                "'.' is presented in number token, but require a digit after '.' ('%c')", c);
-                }
-                else
-                {
-                    exp    = 1;
-                    expchk = 0;
-                }
-            }
-			else if (c == '.')
-			{
-                if (exp)
-                {
-                    json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Cannot has '.' after 'e' is presented in a <number>");
-                }
-				else if (dot)
-				{
-					json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many '.' are presented in a <number>");
-				}
-				else
-				{
-					dot = 1;
-				}
-			}
-            else if (exp && (c == '-' || c == '+'))
-            {
-                if (expchk)
-                {
-                    json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "'%c' is presented after digits are presented of exponent part", c);
-                }
-                else if (expsgn)
-                {
-                    json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many signed characters are presented after 'e'");
-                }
-                else
-                {
-                    expsgn = (c == '-' ? -1 : 1);
-                }
-            }
-			else if (!isdigit(c))
-			{
-				break;
-			}
-			else
-			{
-                if (exp)
-                {
-                    expchk = 1;
-                    exppow = exppow * 10 + (c - '0');
-                }
-                else
-                {
-                    if (dot)
-                    {
-                        numpow *= 10;
-                        number += (c - '0') / (double)numpow;
-                    }
-                    else
-                    {
-                        number = number * 10 + (c - '0');
-                    }
-                }
-			}
-
-			c = json__next_char(state);
-		}
-
-        if (exp && !expchk)
-        {
-            json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
-                        "'e' is presented in number token, but require a digit after 'e' ('%c')", c);
+            return NULL;
         }
-		if (dot && numpow == 1)
-		{
-			json__panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
-                        "'.' is presented in number token, but require a digit after '.' ('%c')", c);
-			return NULL;
-		}
-		else
-		{
-			if (!value)
+
+        if (!ptr)
+        {
+            return json__bucket_extract(bucket, new_count);
+        }
+
+        char *begin = (char *)bucket + sizeof(Bucket);
+        char *end = begin + bucket->size * bucket->count;
+        if ((char *)ptr + bucket->size * old_count == end && bucket->count + (new_count - old_count) <= bucket->capacity)
+        {
+            bucket->count += (new_count - old_count);
+            return ptr;
+        }
+        else
+        {
+            return NULL;
+        }
+    }
+
+    /* @funcdef: json__make_value */
+    static Value* json__make_value(State* state, Type type)
+    {
+        if (!state->value_pool || !state->value_pool->head)
+        {
+            if (state->value_pool && state->value_pool->prev)
             {
-                value = json__make_value(state, JSON_NUMBER);
+                state->value_pool = state->value_pool->prev;
             }
             else
             {
-                value->type = JSON_NUMBER;
+                state->value_pool = json__make_pool(state, state->value_pool, JSON_VALUE_POOL_COUNT, sizeof(Value));
             }
 
-			value->number = sign * number;
-
-            if (exp)
+            if (!state->value_pool)
             {
-                int i;
-                double tmp = 1;
-                for (i = 0; i < exppow; i++)
-                {
-                    tmp *= 10;
-                }
-                
-                if (expsgn < 0)
-                {
-                    value->number /= tmp;
-                }
-                else
-                {
-                    value->number *= tmp;
-                }
+                json__panic(state, type, Error::OutOfMemory, "Out of memory");
             }
+        }
 
-			return value;
-		}
-    }
-}
-
-/* @funcdef: json__parse_array */
-static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
-{
-    if (json__skip_space(state) < 0)
-    {
-        return NULL;
-    }
-    else
-    {
-	    json__match_char(state, JSON_ARRAY, '[');
-	
-	    if (!root)
+        Value *value = (Value *)json__pool_extract(state->value_pool);
+        if (value)
         {
-            root = json__make_value(state, JSON_ARRAY);
+            memset(value, 0, sizeof(Value));
+            value->type = type;
+            value->boolean = false;
         }
         else
         {
-            root->type = JSON_ARRAY;
+            json__panic(state, type, Error::OutOfMemory, "Out of memory");
         }
+        return value;
+    }
 
-	    int            length = 0;
-	    json_value_t** values = NULL;
-	
-	    while (json__skip_space(state) > 0 && json__peek_char(state) != ']')
-	    {
-	        if (length > 0)
-	        {
-                json__match_char(state, JSON_ARRAY, ',');
-	        }
-	    
-	        json_value_t* value = json__parse_single(state, NULL);
-            
-            int   old_size   = sizeof(int) + length * sizeof(json_value_t*);
-            int   new_size   = sizeof(int) + (length + 1) * sizeof(json_value_t*);
-            void* new_values = json__bucket_resize(state->values_bucket, 
-                                             values ? (int*)values - 1 : NULL, 
-                                             old_size, 
-                                             new_size);
+    /* @funcdef: json__make_state */
+    static State *json__make_state(const char *json, const Settings *settings)
+    {
+        State *state = (State *)settings->malloc(settings->data, sizeof(State));
+        if (state)
+        {
+            state->next = NULL;
 
-            if (!new_values)
+            state->line = 1;
+            state->column = 1;
+            state->cursor = 0;
+            state->buffer = json;
+            state->length = strlen(json);
+
+            state->errmsg = NULL;
+            state->errnum = Error::None;
+
+            state->value_pool = NULL;
+            state->values_bucket = NULL;
+            state->string_bucket = NULL;
+
+            state->settings = *settings;
+        }
+        return state;
+    }
+
+    /* @funcdef: json__reuse_state */
+    static State *json__reuse_state(State *state, const char *json, const Settings *settings)
+    {
+        if (state)
+        {
+            if (state == root_state)
             {
-                /* Get from unused buckets (a.k.a reuse json_state_t) */
-                while (state->values_bucket && state->values_bucket->prev)
+                root_state = state->next;
+            }
+            else
+            {
+                State *list = root_state;
+                while (list)
                 {
-                    state->values_bucket = state->values_bucket->prev;
-                    new_values = json__bucket_extract(state->values_bucket, new_size);
-                    if (!new_values)
+                    if (list->next == state)
+                    {
+                        list->next = state->next;
+                    }
+                }
+
+                state->next = NULL;
+            }
+
+            state->line = 1;
+            state->column = 1;
+            state->cursor = 0;
+            state->buffer = json;
+            state->errnum = Error::None;
+
+            if (state->settings.data != settings->data ||
+                state->settings.free != settings->free ||
+                state->settings.malloc != settings->malloc)
+            {
+                json__free_pool(state, state->value_pool);
+                json__free_bucket(state, state->values_bucket);
+                json__free_bucket(state, state->string_bucket);
+
+                state->value_pool = NULL;
+                state->values_bucket = NULL;
+                state->string_bucket = NULL;
+
+                state->settings.free(state->settings.data, state->errmsg);
+                state->errmsg = NULL;
+            }
+            else
+            {
+                if (state->errmsg)
+                    state->errmsg[0] = 0;
+
+                while (state->value_pool)
+                {
+                    state->value_pool->head = (void **)(state->value_pool + 1);
+                    if (state->value_pool->prev)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        state->value_pool = state->value_pool->prev;
+                    }
+                }
+
+                while (state->values_bucket)
+                {
+                    state->values_bucket->count = 0;
+                    if (state->values_bucket->prev)
+                    {
+                        state->values_bucket = state->values_bucket->prev;
+                    }
+                    else
                     {
                         break;
                     }
                 }
 
-                if (!new_values)
+                while (state->string_bucket)
                 {
-                    /* Create new buckets */
-                    state->values_bucket = json__make_bucket(state, state->values_bucket, JSON_VALUE_BUCKETS, 1);
-                    
-                    new_values = json__bucket_extract(state->values_bucket, new_size);
-                    if (!new_values)
-                    {
-                        json__panic(state, JSON_ARRAY, JSON_ERROR_MEMORY, "Out of memory when create <array>");
-                    }
-                    else if (values)
-                    {
-                        memcpy(new_values, (int*)values - 1, old_size);
-                    }
-                }
-            }
-
-            values = (json_value_t**)((int*)new_values + 1);
-	        values[length++] = value;
-	    }
-
-	    json__skip_space(state);
-	    json__match_char(state, JSON_ARRAY, ']');
-
-        if (values)
-        {
-            *((int*)values - 1) = length;
-        }
-
-	    root->array = values;
-	    return root;
-    }
-}
-
-/* json__parse_single */
-static json_value_t* json__parse_single(json_state_t* state, json_value_t* value)
-{
-    if (json__skip_space(state) < 0)
-    {
-        return NULL;
-    }
-    else
-    {
-	    int c = json__peek_char(state);
-	
-	    switch (c)
-	    {
-	    case '[':
-	        return json__parse_array(state, value);
-	    
-	    case '{':
-	        return json__parse_object(state, value);
-	    
-	    case '"':
-	        return json__parse_string(state, value);
-
-	    case '+': case '-': case '0': 
-        case '1': case '2': case '3': 
-        case '4': case '5': case '6': 
-        case '7': case '8': case '9':
-	        return json__parse_number(state, value);
-	    
-        default:
-	    {
-	        int length = 0;
-	        while (c > 0 && isalpha(c))
-	        {
-                length++;
-                c = json__next_char(state);
-	        }
-
-	        const char* token = state->buffer + state->cursor - length;
-	        if (length == 4 && strncmp(token, "true", 4) == 0)
-	        {
-                if (!value) value = json__make_value(state, JSON_BOOLEAN);
-                else        value->type = JSON_BOOLEAN;
-                value->boolean = JSON_TRUE;
-                return value;
-	        }
-	        else if (length == 4 && strncmp(token, "null", 4) == 0)
-            {
-                return value ? (value->type = JSON_NULL, value) : json__make_value(state, JSON_NULL);
-            }
-	        else if (length == 5 && strncmp(token, "false", 5) == 0)
-	        {
-                return value ? (value->type = JSON_BOOLEAN, value->boolean = JSON_FALSE, value) : json__make_value(state, JSON_BOOLEAN);
-	        }
-	        else
-	        {
-                char tmp[256];
-                tmp[length] = 0;
-                while (length--)
-                {
-                    tmp[length] = token[length]; 
-                }
-
-                json__panic(state, JSON_NONE, JSON_ERROR_UNEXPECTED, "Unexpected token '%s'", tmp);
-	        }
-	    } break;
-	    /* END OF SWITCH STATEMENT */
-        }
-
-        return NULL;
-    }
-}
-
-/* @funcdef: json__parse_string */
-static json_value_t* json__parse_string(json_state_t* state, json_value_t* value)
-{
-    const int HEADER_SIZE = 2 * sizeof(int);
-
-    if (json__skip_space(state) < 0)
-    {
-        return NULL;
-    }
-    else
-    {
-        json__match_char(state, JSON_STRING, '"');
-
-        int   i;
-        int   c0, c1;
-        int   length        = 0;
-        int   capacity      = 0;
-        char* temp_string   = NULL;
-        while (!json__is_eof(state) && (c0 = json__peek_char(state)) != '"')
-        {
-            if (length + 4 >= capacity - HEADER_SIZE)
-            {
-                capacity    = capacity > 0 ? capacity * 2 : 32;
-                temp_string = (char*)json__bucket_resize(state->string_bucket, 
-                                                         temp_string ? temp_string - HEADER_SIZE : temp_string, 
-                                                         capacity >> 1, capacity);
-                if (!temp_string)
-                {
-                    /* Get from unused buckets */
-                    while (state->string_bucket && state->string_bucket->prev)
+                    state->string_bucket->count = 0;
+                    if (state->string_bucket->prev)
                     {
                         state->string_bucket = state->string_bucket->prev;
-                        temp_string = (char*)json__bucket_extract(state->string_bucket, capacity);
-                        if (temp_string)
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        return state;
+    }
+
+    /* @funcdef: json__free_state */
+    static void json__free_state(State *state)
+    {
+        if (state)
+        {
+            State *next = state->next;
+
+            json__free_bucket(state, state->values_bucket);
+            json__free_bucket(state, state->string_bucket);
+            json__free_pool(state, state->value_pool);
+
+            state->settings.free(state->settings.data, state->errmsg);
+            state->settings.free(state->settings.data, state);
+
+            json__free_state(next);
+        }
+    }
+
+    /* @funcdef: json__is_eof */
+    static int json__is_eof(State *state)
+    {
+        return state->cursor >= state->length || state->buffer[state->cursor] <= 0;
+    }
+
+    /* @funcdef: json__peek_char */
+    static int json__peek_char(State *state)
+    {
+        return state->buffer[state->cursor];
+    }
+
+    /* @funcdef: json__next_char */
+    static int json__next_char(State *state)
+    {
+        if (json__is_eof(state))
+        {
+            return -1;
+        }
+        else
+        {
+            int c = state->buffer[++state->cursor];
+
+            if (c == '\n')
+            {
+                state->line++;
+                state->column = 1;
+            }
+            else
+            {
+                state->column = state->column + 1;
+            }
+
+            return c;
+        }
+    }
+
+    #if 0 /* UNUSED */
+    /* @funcdef: json__make_value */
+    static int next_line(State* state)
+    {
+        int c = json__peek_char(state);
+        while (c > 0 && c != '\n')
+        {
+            c = json__next_char(state);
+        }
+        return json__next_char(state);
+    }
+    #endif
+
+    /* @funcdef: json__skip_space */
+    static int json__skip_space(State *state)
+    {
+        int c = json__peek_char(state);
+        while (c > 0 && isspace(c))
+        {
+            c = json__next_char(state);
+        }
+        return c;
+    }
+
+    /* @funcdef: json__match_char */
+    static int json__match_char(State *state, Type type, int c)
+    {
+        if (json__peek_char(state) == c)
+        {
+            return json__next_char(state);
+        }
+        else
+        {
+            json__panic(state, type, Error::UnmatchToken, "Expected '%c'", c);
+            return -1;
+        }
+    }
+
+    /* @funcdef: json__hash */
+    static int json__hash(void *buf, size_t len)
+    {
+        int h = 0xdeadbeaf;
+
+        const char *key = (const char *)buf;
+        if (len > 3)
+        {
+            const int *key_x4 = (const int *)key;
+            size_t i = len >> 2;
+            do
+            {
+                int k = *key_x4++;
+
+                k *= 0xcc9e2d51;
+                k = (k << 15) | (k >> 17);
+                k *= 0x1b873593;
+                h ^= k;
+                h = (h << 13) | (h >> 19);
+                h = (h * 5) + 0xe6546b64;
+            } while (--i);
+
+            key = (const char *)(key_x4);
+        }
+
+        if (len & 3)
+        {
+            size_t i = len & 3;
+            int k = 0;
+
+            key = &key[i - 1];
+            do
+            {
+                k <<= 8;
+                k |= *key--;
+            } while (--i);
+
+            k *= 0xcc9e2d51;
+            k = (k << 15) | (k >> 17);
+            k *= 0x1b873593;
+            h ^= k;
+        }
+
+        h ^= len;
+        h ^= h >> 16;
+        h *= 0x85ebca6b;
+        h ^= h >> 13;
+        h *= 0xc2b2ae35;
+        h ^= h >> 16;
+        return h;
+    }
+
+    /* All parse functions declaration */
+
+    static Value *json__parse_array(State *state, Value *value);
+    static Value *json__parse_single(State *state, Value *value);
+    static Value *json__parse_object(State *state, Value *value);
+    static Value *json__parse_number(State *state, Value *value);
+    static Value *json__parse_string(State *state, Value *value);
+
+    /* @funcdef: json__parse_number */
+    static Value *json__parse_number(State *state, Value *value)
+    {
+        if (json__skip_space(state) < 0)
+        {
+            return NULL;
+        }
+        else
+        {
+            int c = json__peek_char(state);
+            int sign = 1;
+
+            if (c == '+')
+            {
+                c = json__next_char(state);
+                json__panic(state, Type::Number, Error::UnexpectedToken,
+                            "JSON does not support number start with '+'");
+            }
+            else if (c == '-')
+            {
+                sign = -1;
+                c = json__next_char(state);
+            }
+            else if (c == '0')
+            {
+                c = json__next_char(state);
+                if (!isspace(c) && !ispunct(c))
+                {
+                    json__panic(state, Type::Number, Error::UnexpectedToken,
+                                "JSON does not support number start with '0' (only standalone '0' is accepted)");
+                }
+            }
+            else if (!isdigit(c))
+            {
+                json__panic(state, Type::Number, Error::UnexpectedToken, "Unexpected '%c'", c);
+            }
+
+            int dot = 0;
+            int exp = 0;
+            int expsgn = 0;
+            int exppow = 0;
+            int expchk = 0;
+            int numpow = 1;
+            double number = 0;
+
+            while (c > 0)
+            {
+                if (c == 'e')
+                {
+                    if (exp)
+                    {
+                        json__panic(state, Type::Number, Error::UnexpectedToken, "Too many 'e' are presented in a <number>");
+                    }
+                    else if (dot && numpow == 1)
+                    {
+                        json__panic(state, Type::Number, Error::UnexpectedToken,
+                                    "'.' is presented in number token, but require a digit after '.' ('%c')", c);
+                    }
+                    else
+                    {
+                        exp = 1;
+                        expchk = 0;
+                    }
+                }
+                else if (c == '.')
+                {
+                    if (exp)
+                    {
+                        json__panic(state, Type::Number, Error::UnexpectedToken, "Cannot has '.' after 'e' is presented in a <number>");
+                    }
+                    else if (dot)
+                    {
+                        json__panic(state, Type::Number, Error::UnexpectedToken, "Too many '.' are presented in a <number>");
+                    }
+                    else
+                    {
+                        dot = 1;
+                    }
+                }
+                else if (exp && (c == '-' || c == '+'))
+                {
+                    if (expchk)
+                    {
+                        json__panic(state, Type::Number, Error::UnexpectedToken, "'%c' is presented after digits are presented of exponent part", c);
+                    }
+                    else if (expsgn)
+                    {
+                        json__panic(state, Type::Number, Error::UnexpectedToken, "Too many signed characters are presented after 'e'");
+                    }
+                    else
+                    {
+                        expsgn = (c == '-' ? -1 : 1);
+                    }
+                }
+                else if (!isdigit(c))
+                {
+                    break;
+                }
+                else
+                {
+                    if (exp)
+                    {
+                        expchk = 1;
+                        exppow = exppow * 10 + (c - '0');
+                    }
+                    else
+                    {
+                        if (dot)
+                        {
+                            numpow *= 10;
+                            number += (c - '0') / (double)numpow;
+                        }
+                        else
+                        {
+                            number = number * 10 + (c - '0');
+                        }
+                    }
+                }
+
+                c = json__next_char(state);
+            }
+
+            if (exp && !expchk)
+            {
+                json__panic(state, Type::Number, Error::UnexpectedToken,
+                            "'e' is presented in number token, but require a digit after 'e' ('%c')", c);
+            }
+            if (dot && numpow == 1)
+            {
+                json__panic(state, Type::Number, Error::UnexpectedToken,
+                            "'.' is presented in number token, but require a digit after '.' ('%c')", c);
+                return NULL;
+            }
+            else
+            {
+                if (!value)
+                {
+                    value = json__make_value(state, Type::Number);
+                }
+                else
+                {
+                    value->type = Type::Number;
+                }
+
+                value->number = sign * number;
+
+                if (exp)
+                {
+                    int i;
+                    double tmp = 1;
+                    for (i = 0; i < exppow; i++)
+                    {
+                        tmp *= 10;
+                    }
+
+                    if (expsgn < 0)
+                    {
+                        value->number /= tmp;
+                    }
+                    else
+                    {
+                        value->number *= tmp;
+                    }
+                }
+
+                return value;
+            }
+        }
+    }
+
+    /* @funcdef: json__parse_array */
+    static Value *json__parse_array(State *state, Value *root)
+    {
+        if (json__skip_space(state) < 0)
+        {
+            return NULL;
+        }
+        else
+        {
+            json__match_char(state, Type::Array, '[');
+
+            if (!root)
+            {
+                root = json__make_value(state, Type::Array);
+            }
+            else
+            {
+                root->type = Type::Array;
+            }
+
+            int length = 0;
+            Value **values = NULL;
+
+            while (json__skip_space(state) > 0 && json__peek_char(state) != ']')
+            {
+                if (length > 0)
+                {
+                    json__match_char(state, Type::Array, ',');
+                }
+
+                Value *value = json__parse_single(state, NULL);
+
+                int old_size = sizeof(int) + length * sizeof(Value *);
+                int new_size = sizeof(int) + (length + 1) * sizeof(Value *);
+                void *new_values = json__bucket_resize(state->values_bucket,
+                                                    values ? (int *)values - 1 : NULL,
+                                                    old_size,
+                                                    new_size);
+
+                if (!new_values)
+                {
+                    /* Get from unused buckets (a.k.a reuse State) */
+                    while (state->values_bucket && state->values_bucket->prev)
+                    {
+                        state->values_bucket = state->values_bucket->prev;
+                        new_values = json__bucket_extract(state->values_bucket, new_size);
+                        if (!new_values)
                         {
                             break;
                         }
                     }
 
-                    /* Create new bucket */
-                    state->string_bucket = json__make_bucket(state, state->string_bucket, JSON_STRING_BUCKETS, 1);
-                    temp_string = (char*)json__bucket_extract(state->string_bucket, capacity);
-                    if (!temp_string)
+                    if (!new_values)
                     {
-                        json__panic(state, JSON_STRING, JSON_ERROR_MEMORY, "Out of memory when create new <string>");
-                        return NULL;
-                    }
-                }
+                        /* Create new buckets */
+                        state->values_bucket = json__make_bucket(state, state->values_bucket, JSON_VALUE_BUCKETS, 1);
 
-                temp_string += HEADER_SIZE;
-            }
-
-            if (c0 == '\\')
-            {
-                c0 = json__next_char(state);
-                switch (c0)
-                {
-                case 'n':
-                    temp_string[length++] = '\n';
-                    break;
-
-                case 't':
-                    temp_string[length++] = '\t';
-                    break;
-
-                case 'r':
-                    temp_string[length++] = '\r';
-                    break;
-
-                case 'b':
-                    temp_string[length++] = '\b';
-                    break;
-
-                case '\\':
-                    temp_string[length++] = '\\';
-                    break;
-
-                case '"':
-                    temp_string[length++] = '\"';
-                    break;
-                        
-                case 'u':
-                    c1 = 0;
-                    for (i = 0; i < 4; i++)
-                    {
-                        if (isxdigit((c0 = json__next_char(state))))
+                        new_values = json__bucket_extract(state->values_bucket, new_size);
+                        if (!new_values)
                         {
-                            c1 = c1 * 10 + (isdigit(c0) ? c0 - '0' : c0 < 'a' ? c0 - 'A' : c0 - 'a'); 
-                        }   
-                        else
+                            json__panic(state, Type::Array, Error::OutOfMemory, "Out of memory when create <array>");
+                        }
+                        else if (values)
                         {
-                            json__panic(state, JSON_STRING, JSON_ERROR_UNKNOWN, "Expected hexa character in unicode character");
+                            memcpy(new_values, (int *)values - 1, old_size);
                         }
                     }
-
-                    if (c1 <= 0x7F) 
-                    {
-                        temp_string[length++] = c1;
-                    }
-                    else if (c1 <= 0x7FF) 
-                    {
-                        temp_string[length++] = 0xC0 | (c1 >> 6);            /* 110xxxxx */
-                        temp_string[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
-                    }
-                    else if (c1 <= 0xFFFF) 
-                    {
-                        temp_string[length++] = 0xE0 | (c1 >> 12);           /* 1110xxxx */
-                        temp_string[length++] = 0x80 | ((c1 >> 6) & 0x3F);   /* 10xxxxxx */
-                        temp_string[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
-                    }
-                    else if (c1 <= 0x10FFFF) 
-                    {
-                        temp_string[length++] = 0xF0 | (c1 >> 18);           /* 11110xxx */
-                        temp_string[length++] = 0x80 | ((c1 >> 12) & 0x3F);  /* 10xxxxxx */
-                        temp_string[length++] = 0x80 | ((c1 >> 6) & 0x3F);   /* 10xxxxxx */
-                        temp_string[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
-                    }
-                    break;
-
-                default:
-                    json__panic(state, JSON_STRING, JSON_ERROR_UNKNOWN, "Unknown escape character");
-                    break;
                 }
+
+                values = (Value **)((int *)new_values + 1);
+                values[length++] = value;
             }
-            else
+
+            json__skip_space(state);
+            json__match_char(state, Type::Array, ']');
+
+            if (values)
             {
-                switch (c0)
-                {
-                case '\r':
-                case '\n':
-                    json__panic(state, JSON_STRING, JSON_ERROR_UNEXPECTED, "Unexpected newline characters '%c'", c0);
-                    break;
-
-                default:
-                    temp_string[length++] = c0;
-                    break;
-                }
+                *((int *)values - 1) = length;
             }
 
-            json__next_char(state);
+            root->array = values;
+            return root;
         }
-        json__match_char(state, JSON_STRING, '"');
-
-        if (!value)
-        {
-            value = json__make_value(state, JSON_STRING);
-        }
-        else        
-        {
-            value->type = JSON_STRING;
-        }
-
-        if (temp_string)
-        {
-            temp_string[length] = 0;
-
-            size_t size   = ((size_t)length + 1);
-            char*  string = (char*)json__bucket_resize(state->string_bucket, temp_string - HEADER_SIZE, capacity, size);
-
-            /* String header */
-            ((int*)string)[0] = length;                  
-            ((int*)string)[1] = json__hash(temp_string, length);
-
-            value->string = string + HEADER_SIZE;
-        }
-
-        return value;
     }
-}
 
-/* @funcdef: json__parse_object */
-static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
-{
-    if (json__skip_space(state) < 0)
+    /* json__parse_single */
+    static Value *json__parse_single(State *state, Value *value)
     {
-        return NULL;
-    }
-    else
-    {
-        json__match_char(state, JSON_OBJECT, '{');
-
-        if (!root)
+        if (json__skip_space(state) < 0)
         {
-            root = json__make_value(state, JSON_OBJECT);
+            return NULL;
         }
         else
         {
-            root->type   = JSON_OBJECT;
-            root->object = NULL;
-        }
+            int c = json__peek_char(state);
 
-        int length = 0;
-        while (json__skip_space(state) > 0 && json__peek_char(state) != '}')
-        {
-            if (length > 0)
+            switch (c)
             {
-                json__match_char(state, JSON_OBJECT, ',');
-            }
+            case '[':
+                return json__parse_array(state, value);
 
-            json_value_t* token = NULL;
-            if (json__skip_space(state) == '"')
+            case '{':
+                return json__parse_object(state, value);
+
+            case '"':
+                return json__parse_string(state, value);
+
+            case '+':
+            case '-':
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                return json__parse_number(state, value);
+
+            default:
             {
-                token = json__parse_string(state, NULL);
-            }
-            else
-            {
-                json__panic(state, JSON_OBJECT, JSON_ERROR_UNEXPECTED,
-                      "Expected <string> for <member-name> of <object>");
-            }
-            const char* name = token->string;
-
-            json__skip_space(state);
-            json__match_char(state, JSON_OBJECT, ':');
-
-            json_value_t* value = json__parse_single(state, token);
-
-            /* Append new pair of value to container */
-            int   old_length = length++;
-            int   old_size   = sizeof(int) + old_length * sizeof(root->object[0]);
-            int   new_size   = sizeof(int) + length * sizeof(root->object[0]);
-            void* new_values = json__bucket_resize(state->values_bucket,
-                                                   root->object ? (int*)root->object - 1 : NULL,
-                                                   old_size, 
-                                                   new_size);
-            if (!new_values)
-            {
-                /* Get from unused buckets */
-                while (state->values_bucket && state->values_bucket->prev)
+                int length = 0;
+                while (c > 0 && isalpha(c))
                 {
-                    state->values_bucket = state->values_bucket->prev;
-                    new_values = json__bucket_extract(state->values_bucket, length);
-                    if (new_values)
+                    length++;
+                    c = json__next_char(state);
+                }
+
+                const char *token = state->buffer + state->cursor - length;
+                if (length == 4 && strncmp(token, "true", 4) == 0)
+                {
+                    if (!value)
+                        value = json__make_value(state, Type::Boolean);
+                    else
+                        value->type = Type::Boolean;
+                    value->boolean = true;
+                    return value;
+                }
+                else if (length == 4 && strncmp(token, "null", 4) == 0)
+                {
+                    return value ? (value->type = Type::Null, value) : json__make_value(state, Type::Null);
+                }
+                else if (length == 5 && strncmp(token, "false", 5) == 0)
+                {
+                    return value ? (value->type = Type::Boolean, value->boolean = false, value) : json__make_value(state, Type::Boolean);
+                }
+                else
+                {
+                    char tmp[256];
+                    tmp[length] = 0;
+                    while (length--)
                     {
+                        tmp[length] = token[length];
+                    }
+
+                    json__panic(state, Type::Null, Error::UnexpectedToken, "Unexpected token '%s'", tmp);
+                }
+            }
+            break;
+                /* END OF SWITCH STATEMENT */
+            }
+
+            return NULL;
+        }
+    }
+
+    /* @funcdef: json__parse_string */
+    static Value* json__parse_string(State* state, Value* value)
+    {
+        const int HEADER_SIZE = 2 * sizeof(int);
+
+        if (json__skip_space(state) < 0)
+        {
+            return NULL;
+        }
+        else
+        {
+            json__match_char(state, Type::String, '"');
+
+            int i;
+            int c0, c1;
+            int length = 0;
+            int capacity = 0;
+            char *temp_string = NULL;
+            while (!json__is_eof(state) && (c0 = json__peek_char(state)) != '"')
+            {
+                if (length + 4 >= capacity - HEADER_SIZE)
+                {
+                    capacity = capacity > 0 ? capacity * 2 : 32;
+                    temp_string = (char *)json__bucket_resize(state->string_bucket,
+                                                            temp_string ? temp_string - HEADER_SIZE : temp_string,
+                                                            capacity >> 1, capacity);
+                    if (!temp_string)
+                    {
+                        /* Get from unused buckets */
+                        while (state->string_bucket && state->string_bucket->prev)
+                        {
+                            state->string_bucket = state->string_bucket->prev;
+                            temp_string = (char *)json__bucket_extract(state->string_bucket, capacity);
+                            if (temp_string)
+                            {
+                                break;
+                            }
+                        }
+
+                        /* Create new bucket */
+                        state->string_bucket = json__make_bucket(state, state->string_bucket, JSON_STRING_BUCKETS, 1);
+                        temp_string = (char*)json__bucket_extract(state->string_bucket, capacity);
+                        if (!temp_string)
+                        {
+                            json__panic(state, Type::String, Error::OutOfMemory, "Out of memory when create new <string>");
+                            return NULL;
+                        }
+                    }
+
+                    temp_string += HEADER_SIZE;
+                }
+
+                if (c0 == '\\')
+                {
+                    c0 = json__next_char(state);
+                    switch (c0)
+                    {
+                    case 'n':
+                        temp_string[length++] = '\n';
+                        break;
+
+                    case 't':
+                        temp_string[length++] = '\t';
+                        break;
+
+                    case 'r':
+                        temp_string[length++] = '\r';
+                        break;
+
+                    case 'b':
+                        temp_string[length++] = '\b';
+                        break;
+
+                    case '\\':
+                        temp_string[length++] = '\\';
+                        break;
+
+                    case '"':
+                        temp_string[length++] = '\"';
+                        break;
+
+                    case 'u':
+                        c1 = 0;
+                        for (i = 0; i < 4; i++)
+                        {
+                            if (isxdigit((c0 = json__next_char(state))))
+                            {
+                                c1 = c1 * 10 + (isdigit(c0) ? c0 - '0' : c0 < 'a' ? c0 - 'A' : c0 - 'a');
+                            }
+                            else
+                            {
+                                json__panic(state, Type::String, Error::UnknownToken, "Expected hexa character in unicode character");
+                            }
+                        }
+
+                        if (c1 <= 0x7F)
+                        {
+                            temp_string[length++] = c1;
+                        }
+                        else if (c1 <= 0x7FF)
+                        {
+                            temp_string[length++] = 0xC0 | (c1 >> 6);   /* 110xxxxx */
+                            temp_string[length++] = 0x80 | (c1 & 0x3F); /* 10xxxxxx */
+                        }
+                        else if (c1 <= 0xFFFF)
+                        {
+                            temp_string[length++] = 0xE0 | (c1 >> 12);         /* 1110xxxx */
+                            temp_string[length++] = 0x80 | ((c1 >> 6) & 0x3F); /* 10xxxxxx */
+                            temp_string[length++] = 0x80 | (c1 & 0x3F);        /* 10xxxxxx */
+                        }
+                        else if (c1 <= 0x10FFFF)
+                        {
+                            temp_string[length++] = 0xF0 | (c1 >> 18);          /* 11110xxx */
+                            temp_string[length++] = 0x80 | ((c1 >> 12) & 0x3F); /* 10xxxxxx */
+                            temp_string[length++] = 0x80 | ((c1 >> 6) & 0x3F);  /* 10xxxxxx */
+                            temp_string[length++] = 0x80 | (c1 & 0x3F);         /* 10xxxxxx */
+                        }
+                        break;
+
+                    default:
+                        json__panic(state, Type::String, Error::UnknownToken, "Unknown escape character");
+                        break;
+                    }
+                }
+                else
+                {
+                    switch (c0)
+                    {
+                    case '\r':
+                    case '\n':
+                        json__panic(state, Type::String, Error::UnexpectedToken, "Unexpected newline characters '%c'", c0);
+                        break;
+
+                    default:
+                        temp_string[length++] = c0;
                         break;
                     }
                 }
 
+                json__next_char(state);
+            }
+            json__match_char(state, Type::String, '"');
+
+            if (!value)
+            {
+                value = json__make_value(state, Type::String);
+            }
+            else
+            {
+                value->type = Type::String;
+            }
+
+            if (temp_string)
+            {
+                temp_string[length] = 0;
+
+                size_t size = ((size_t)length + 1);
+                char *string = (char *)json__bucket_resize(state->string_bucket, temp_string - HEADER_SIZE, capacity, size);
+
+                /* String header */
+                ((int *)string)[0] = length;
+                ((int *)string)[1] = json__hash(temp_string, length);
+
+                value->string = string + HEADER_SIZE;
+            }
+
+            return value;
+        }
+    }
+
+    /* @funcdef: json__parse_object */
+    static Value* json__parse_object(State* state, Value* root)
+    {
+        if (json__skip_space(state) < 0)
+        {
+            return NULL;
+        }
+        else
+        {
+            json__match_char(state, Type::Object, '{');
+
+            if (!root)
+            {
+                root = json__make_value(state, Type::Object);
+            }
+            else
+            {
+                root->type = Type::Object;
+                root->object = NULL;
+            }
+
+            int length = 0;
+            while (json__skip_space(state) > 0 && json__peek_char(state) != '}')
+            {
+                if (length > 0)
+                {
+                    json__match_char(state, Type::Object, ',');
+                }
+
+                Value* token = NULL;
+                if (json__skip_space(state) == '"')
+                {
+                    token = json__parse_string(state, NULL);
+                }
+                else
+                {
+                    json__panic(state, Type::Object, Error::UnexpectedToken,
+                                "Expected <string> for <member-name> of <object>");
+                }
+                const char *name = token->string;
+
+                json__skip_space(state);
+                json__match_char(state, Type::Object, ':');
+
+                Value* value = json__parse_single(state, token);
+
+                /* Append new pair of value to container */
+                int old_length = length++;
+                int old_size = sizeof(int) + old_length * sizeof(root->object[0]);
+                int new_size = sizeof(int) + length * sizeof(root->object[0]);
+                void *new_values = json__bucket_resize(state->values_bucket,
+                                                    root->object ? (int *)root->object - 1 : NULL,
+                                                    old_size,
+                                                    new_size);
                 if (!new_values)
                 {
-                    /* Create new buffer */
-                    state->values_bucket = json__make_bucket(state, state->values_bucket, JSON_VALUE_BUCKETS, 1);
-                    
-                    /* Continue get new buffer for values */
-                    new_values = json__bucket_extract(state->values_bucket, length);
+                    /* Get from unused buckets */
+                    while (state->values_bucket && state->values_bucket->prev)
+                    {
+                        state->values_bucket = state->values_bucket->prev;
+                        new_values = json__bucket_extract(state->values_bucket, length);
+                        if (new_values)
+                        {
+                            break;
+                        }
+                    }
+
                     if (!new_values)
                     {
-                        json__panic(state, JSON_OBJECT, JSON_ERROR_MEMORY, "Out of memory when create <object>");
-                    }
-                    else if (root->object)
-                    {
-                        memcpy(new_values, (int*)root->object - 1, old_size);
+                        /* Create new buffer */
+                        state->values_bucket = json__make_bucket(state, state->values_bucket, JSON_VALUE_BUCKETS, 1);
+
+                        /* Continue get new buffer for values */
+                        new_values = json__bucket_extract(state->values_bucket, length);
+                        if (!new_values)
+                        {
+                            json__panic(state, Type::Object, Error::OutOfMemory, "Out of memory when create <object>");
+                        }
+                        else if (root->object)
+                        {
+                            memcpy(new_values, (int *)root->object - 1, old_size);
+                        }
                     }
                 }
+
+                /* When code reach here, new_values should not invalid */
+                assert(new_values != NULL && "An error occurred but is not handled");
+
+                /* Well done */
+                *((void**)&root->object) = (int*)new_values + 1;
+                root->object[old_length].name  = name;
+                root->object[old_length].value = value;
             }
 
-            /* When code reach here, new_values should not invalid */
-            assert(new_values != NULL && "An error occurred but is not handled");
-
-            /* Well done */
-            *((void**)&root->object) = (int*)new_values + 1;
-            root->object[old_length].name  = name;
-            root->object[old_length].value = value;
-        }
-
-        if (root->object)
-        {
-            *((int*)root->object - 1) = length;
-        }
-
-        json__skip_space(state);
-        json__match_char(state, JSON_OBJECT, '}');
-        return root;
-    }
-}
-         
-/* @region: json_parse_in */
-static json_value_t* json_parse_in(json_state_t* state)
-{
-    if (!state)
-    {
-        return NULL;
-    }
-
-    if (json__skip_space(state) == '{')
-    {
-        if (setjmp(state->errjmp) == 0)
-        {
-            json_value_t* value = json__parse_object(state, NULL);
+            if (root->object)
+            {
+                *((int *)root->object - 1) = length;
+            }
 
             json__skip_space(state);
-            if (!json__is_eof(state))
-            {
-                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed. JSON is start with <object>.");
-            }
-
-            return value;
+            json__match_char(state, Type::Object, '}');
+            return root;
         }
-        else
+    }
+
+    /* @region: json_parse_in */
+    static Value* json_parse_in(State* state)
+    {
+        if (!state)
         {
             return NULL;
         }
-    }
-    else if (json__skip_space(state) == '[')
-    {
-        if (setjmp(state->errjmp) == 0)
+
+        if (json__skip_space(state) == '{')
         {
-            json_value_t* value = json__parse_array(state, NULL);
-
-            json__skip_space(state);
-            if (!json__is_eof(state))
+            if (setjmp(state->errjmp) == 0)
             {
-                json__panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed. JSON is start with <array>.");
-            }
+                Value* value = json__parse_object(state, NULL);
 
-            return value;
+                json__skip_space(state);
+                if (!json__is_eof(state))
+                {
+                    json__panic(state, Type::Null, Error::WrongFormat, "JSON is not well-formed. JSON is start with <object>.");
+                }
+
+                return value;
+            }
+            else
+            {
+                return NULL;
+            }
+        }
+        else if (json__skip_space(state) == '[')
+        {
+            if (setjmp(state->errjmp) == 0)
+            {
+                Value* value = json__parse_array(state, NULL);
+
+                json__skip_space(state);
+                if (!json__is_eof(state))
+                {
+                    json__panic(state, Type::Null, Error::WrongFormat, "JSON is not well-formed. JSON is start with <array>.");
+                }
+
+                return value;
+            }
+            else
+            {
+                return NULL;
+            }
         }
         else
         {
+            json__set_error(state, Type::Null, Error::WrongFormat,
+                            "JSON must be starting with '{' or '[', first character is '%c'",
+                            json__peek_char(state));
             return NULL;
         }
     }
-    else
+
+    /* @funcdef: parse */
+    const Value& parse(const char* json, State** out_state)
     {
-        json__set_error(state, JSON_NONE, JSON_ERROR_FORMAT, 
-                        "JSON must be starting with '{' or '[', first character is '%c'", 
-                        json__peek_char(state));
-        return NULL;
+        Settings settings;
+        settings.data = NULL;
+        settings.free = json__free;
+        settings.malloc = json__malloc;
+
+        return parse(json, &settings, out_state);
     }
-}
 
-/* @funcdef: json_parse */
-json_value_t* json_parse(const char* json, json_state_t** out_state)
-{
-    json_settings_t settings;
-    settings.data   = NULL;
-    settings.free   = json__free;
-    settings.malloc = json__malloc;
-
-    return json_parse_ex(json, &settings, out_state);
-}
-
-/* @funcdef: json_parse_ex */
-json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** out_state)
-{
-    json_state_t* state = out_state && *out_state ? json__reuse_state(*out_state, json, settings) : json__make_state(json, settings);
-    json_value_t* value = json_parse_in(state);
-
-    if (value)
+    /* @funcdef: parse */
+    const Value& parse(const char* json, const Settings* settings, State** out_state)
     {
-        if (out_state)
+        State* state = out_state && *out_state ? json__reuse_state(*out_state, json, settings) : json__make_state(json, settings);
+        Value* value = json_parse_in(state);
+
+        if (value)
         {
-            *out_state = state;
-        }
-        else
-        {
-            if (state)
+            if (out_state)
             {
-                state->next = root_state;
-                root_state  = state;
+                *out_state = state;
+            }
+            else
+            {
+                if (state)
+                {
+                    state->next = root_state;
+                    root_state = state;
+                }
             }
         }
-    }
-    else
-    {
-        if (out_state)
-        {
-            *out_state = state;
-        }
         else
+        {
+            if (out_state)
+            {
+                *out_state = state;
+            }
+            else
+            {
+                json__free_state(state);
+            }
+        }
+
+        return value ? *value : Value::NONE;
+    }
+
+    /* @funcdef: release */
+    void release(State* state)
+    {
+        if (state)
         {
             json__free_state(state);
         }
-    }
-
-    return value;
-}
-
-/* @funcdef: json_release */
-void json_release(json_state_t* state)
-{
-    if (state)
-    {
-        json__free_state(state);
-    }
-    else
-    {
-        json__free_state(root_state);
-        root_state = NULL;
-    }
-}
-
-/* @funcdef: json_get_errno */
-json_error_t json_get_errno(const json_state_t* state)
-{
-    if (state)
-    {
-        return state->errnum;
-    }
-    else
-    {
-        return JSON_ERROR_NONE;
-    }
-}
-
-/* @funcdef: json_get_error */
-const char* json_get_error(const json_state_t* state)
-{
-    if (state)
-    {
-        return state->errmsg;
-    }
-    else
-    {
-        return NULL;
-    }
-}
-
-/* @funcdef: json_length */
-int json_length(const json_value_t* x)
-{
-    if (x)
-    {
-        switch (x->type)
+        else
         {
-        case JSON_ARRAY:
-            return x->array ? *((int*)x->array - 1) : 0;
-
-        case JSON_STRING:
-            return x->string ? *((int*)x->string - 2) : 0;
-
-        case JSON_OBJECT:
-            return x->object ? *((int*)x->object - 1) : 0;
-
-        default:
-            break;
+            json__free_state(root_state);
+            root_state = NULL;
         }
     }
 
-    return 0;
-}
-
-/* @funcdef: json_equals */
-json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
-{
-    int i, n;
-
-    if (a == b)
+    /* @funcdef: get_errno */
+    Error get_errno(const State* state)
     {
-        return JSON_TRUE;
-    }
-
-    if (!a || !b)
-    {
-        return JSON_FALSE;
-    }
-
-    if (a->type != b->type)
-    {
-        return JSON_FALSE;
-    }
-
-    switch (a->type)
-    {
-    case JSON_NULL:
-    case JSON_NONE:
-        return JSON_TRUE;
-
-    case JSON_NUMBER:
-        return a->number == b->number;
-
-    case JSON_BOOLEAN:
-        return a->boolean == b->boolean;
-
-    case JSON_ARRAY:
-        if ((n = json_length(a)) == json_length(b))
+        if (state)
         {
-            for (i = 0; i < n; i++)
-            {
-                if (!json_equals(a->array[i], b->array[i]))
-                {
-                    return JSON_FALSE;
-                }
-            }
+            return state->errnum;
         }
-        return JSON_TRUE;
-
-    case JSON_OBJECT:
-        if ((n = json_length(a)) == json_length(b))
+        else
         {
-            for (i = 0; i < n; i++)
-            {
-                const char* str0 = a->object[i].name;
-                const char* str1 = a->object[i].name;
-                if (((int*)str0 - 2)[1] != ((int*)str1 - 2)[1] || strcmp(str0, str1) == 0)
-                {
-                    return JSON_FALSE;
-                }
-
-                if (!json_equals(a->object[i].value, b->object[i].value))
-                {
-                    return JSON_FALSE;
-                }
-            }
+            return Error::None;
         }
-        return JSON_TRUE;
-
-    case JSON_STRING:
-        return ((int*)a->string - 2)[1] == ((int*)b->string - 2)[1] && strcmp(a->string, b->string) == 0;
     }
 
-    return JSON_FALSE;
-}
-
-/* @funcdef: json_find */
-json_value_t* json_find(const json_value_t* obj, const char* name)
-{
-    if (obj && obj->type == JSON_OBJECT)
+    /* @funcdef: get_error */
+    const char* get_error(const State* state)
     {
+        if (state)
+        {
+            return state->errmsg;
+        }
+        else
+        {
+            return NULL;
+        }
+    }
+
+    /* @funcdef: equals */
+    bool equals(const Value& a, const Value& b)
+    {
+        // meta compare
+        if (&a == &b)                       return true;
+        if (!a || !b || a.type != b.type)   return false;
+
         int i, n;
-        int hash = json__hash((void*)name, strlen(name));
-        for (i = 0, n = json_length(obj); i < n; i++)
+        switch (a.type)
         {
-            const char* str = obj->object[i].name;
-            if (hash == ((int*)str - 2)[1] && strcmp(str, name) == 0)
+        case Type::Null:
+            return true;
+
+        case Type::Number:
+            return a.number == b.number;
+
+        case Type::Boolean:
+            return a.boolean == b.boolean;
+
+        case Type::Array:
+            if ((n = a.length()) == b.length())
             {
-                return obj->object[i].value;
-            }
-        }
-    }
-
-    return NULL;
-}
-
-/* @funcdef: json_write */
-void json_write(const json_value_t* value, FILE* out)
-{
-    if (value)
-    {
-        int i, n;
-
-        switch (value->type)
-        {
-        case JSON_NULL:
-            fprintf(out, "null");
-            break;
-
-        case JSON_NUMBER:
-            fprintf(out, "%lf", value->number);
-            break;
-
-        case JSON_BOOLEAN:
-            fprintf(out, "%s", value->boolean ? "true" : "false");
-            break;
-
-        case JSON_STRING:
-            fprintf(out, "\"%s\"", value->string);
-            break;
-
-        case JSON_ARRAY:
-            fprintf(out, "[");
-            for (i = 0, n = json_length(value); i < n; i++)
-            {
-                json_write(value->array[i], out);
-                if (i < n - 1)
+                for (i = 0; i < n; i++)
                 {
-                    fprintf(out, ",");
+                    if (!equals(a[i], b[i]))
+                    {
+                        return false;
+                    }
                 }
             }
-            fprintf(out, "]");
-            break;
+            return true;
 
-        case JSON_OBJECT:
-            fprintf(out, "{");
-            for (i = 0, n = json_length(value); i < n; i++)
+        case Type::Object:
+            if ((n = a.length()) == b.length())
             {
-                fprintf(out, "\"%s\" : ", value->object[i].name);
-                json_write(value->object[i].value, out);
-                if (i < n - 1)
+                for (i = 0; i < n; i++)
                 {
-                    fprintf(out, ",");
-                }            
-            }
-            fprintf(out, "}");
-            break;
+                    const char* str0 = a.object[i].name;
+                    const char* str1 = a.object[i].name;
+                    if (((int*)str0 - 2)[1] != ((int*)str1 - 2)[1] || strcmp(str0, str1) == 0)
+                    {
+                        return false;
+                    }
 
-        case JSON_NONE:
-        default:
-            break;
+                    if (!equals(*a.object[i].value, *b.object[i].value))
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+
+        case Type::String:
+            return ((int*)a.string - 2)[1] == ((int*)b.string - 2)[1] && strcmp(a.string, b.string) == 0;
+        }
+
+        return false;
+    }
+
+    /* @funcdef: find */
+    const Value& find(const Value& obj, const char* name)
+    {
+        if (obj && obj.type == Type::Object)
+        {
+            int i, n;
+            int hash = json__hash((void*)name, strlen(name));
+            for (i = 0, n = obj.length(); i < n; i++)
+            {
+                const char* str = obj.object[i].name;
+                if (hash == ((int*)str - 2)[1] && strcmp(str, name) == 0)
+                {
+                    return *obj.object[i].value;
+                }
+            }
+        }
+
+        return Value::NONE;
+    }
+
+    /* @funcdef: write */
+    void write(const Value& value, FILE* out)
+    {
+        if (value)
+        {
+            int i, n;
+
+            switch (value.type)
+            {
+            case Type::Null:
+                fprintf(out, "null");
+                break;
+
+            case Type::Number:
+                fprintf(out, "%lf", value.number);
+                break;
+
+            case Type::Boolean:
+                fprintf(out, "%s", value.boolean ? "true" : "false");
+                break;
+
+            case Type::String:
+                fprintf(out, "\"%s\"", value.string);
+                break;
+
+            case Type::Array:
+                fprintf(out, "[");
+                for (i = 0, n = value.length(); i < n; i++)
+                {
+                    write(value[i], out);
+                    if (i < n - 1)
+                    {
+                        fprintf(out, ",");
+                    }
+                }
+                fprintf(out, "]");
+                break;
+
+            case Type::Object:
+                fprintf(out, "{");
+                for (i = 0, n = value.length(); i < n; i++)
+                {
+                    fprintf(out, "\"%s\" : ", value.object[i].name);
+                    write(*value.object[i].value, out);
+                    if (i < n - 1)
+                    {
+                        fprintf(out, ",");
+                    }
+                }
+                fprintf(out, "}");
+                break;
+
+            default:
+                break;
+            }
         }
     }
-}          
 
-/* @funcdef: json_print */
-void json_print(const json_value_t* value, FILE* out)
-{
-    if (value)
+    /* @funcdef: print */
+    void print(const Value& value, FILE *out)
     {
-        int i, n;
-        static int indent = 0;
-
-        switch (value->type)
+        if (value)
         {
-        case JSON_NULL:
-            fprintf(out, "null");
-            break;
+            int i, n;
+            static int indent = 0;
 
-        case JSON_NUMBER:
-            fprintf(out, "%lf", value->number);
-            break;
-
-        case JSON_BOOLEAN:
-            fprintf(out, "%s", value->boolean ? "true" : "false");
-            break;
-
-        case JSON_STRING:
-            fprintf(out, "\"%s\"", value->string);
-            break;
-
-        case JSON_ARRAY:
-            fprintf(out, "[\n");
-
-            indent++;
-            for (i = 0, n = json_length(value); i < n; i++)
+            switch (value.type)
             {
-                int j, m;
-                for (j = 0, m = indent * 4; j < m; j++)
+            case Type::Null:
+                fprintf(out, "null");
+                break;
+
+            case Type::Number:
+                fprintf(out, "%lf", value.number);
+                break;
+
+            case Type::Boolean:
+                fprintf(out, "%s", value.boolean ? "true" : "false");
+                break;
+
+            case Type::String:
+                fprintf(out, "\"%s\"", value.string);
+                break;
+
+            case Type::Array:
+                fprintf(out, "[\n");
+
+                indent++;
+                for (i = 0, n = value.length(); i < n; i++)
+                {
+                    int j, m;
+                    for (j = 0, m = indent * 4; j < m; j++)
+                    {
+                        fputc(' ', out);
+                    }
+
+                    print(value[i], out);
+                    if (i < n - 1)
+                    {
+                        fputc(',', out);
+                    }
+                    fprintf(out, "\n");
+                }
+                indent--;
+
+                for (i = 0, n = indent * 4; i < n; i++)
+                {
+                    fprintf(out, " ");
+                }
+                fputc(']', out);
+                break;
+
+            case Type::Object:
+                fprintf(out, "{\n");
+
+                indent++;
+                for (i = 0, n = value.length(); i < n; i++)
+                {
+                    int j, m;
+                    for (j = 0, m = indent * 4; j < m; j++)
+                    {
+                        fputc(' ', out);
+                    }
+
+                    fprintf(out, "\"%s\" : ", value.object[i].name);
+                    print(*value.object[i].value, out);
+                    if (i < n - 1)
+                    {
+                        fputc(',', out);
+                    }
+                    fputc('\n', out);
+                }
+                indent--;
+
+                for (i = 0, n = indent * 4; i < n; i++)
                 {
                     fputc(' ', out);
                 }
+                fputc('}', out);
+                break;
 
-                json_print(value->array[i], out);
-                if (i < n - 1)
-                {
-                    fputc(',', out);
-                }
-                fprintf(out, "\n");
+            default:
+                break;
             }
-            indent--;
-
-            for (i = 0, n = indent * 4; i < n; i++)
-            {
-                fprintf(out, " ");
-            }  
-            fputc(']', out);
-            break;
-
-        case JSON_OBJECT:
-            fprintf(out, "{\n");
-
-            indent++;
-            for (i = 0, n = json_length(value); i < n; i++)
-            {
-                int j, m;
-                for (j = 0, m = indent * 4; j < m; j++)
-                {
-                    fputc(' ', out);
-                }
-
-                fprintf(out, "\"%s\" : ", value->object[i].name);
-                json_print(value->object[i].value, out);
-                if (i < n - 1)
-                {
-                    fputc(',', out);
-                }
-                fputc('\n', out);
-            }
-            indent--;
-
-            for (i = 0, n = indent * 4; i < n; i++)
-            {                    
-                fputc(' ', out);
-            }                    
-            fputc('}', out);
-            break;
-
-        case JSON_NONE:
-        default:
-            break;
         }
     }
-}
+} // namespace json
 
 #endif /* JSON_IMPL */
 
