@@ -1,5 +1,5 @@
 ﻿/******************************************************
- * Simple json parser written in ANSI C
+ * C++ simple JSON parser
  *
  * @author: MaiHD
  * @license: Public domain
@@ -27,7 +27,7 @@
 #  endif
 #endif
 
-#include <stdio.h>
+#include <stdlib.h>
 
 namespace json 
 {
@@ -80,19 +80,6 @@ namespace json
     JSON_API void         release(State* state);
     JSON_API Error        get_errno(const State* state);
     JSON_API const char*  get_error(const State* state);
-
-    JSON_API bool         equals(const Value& a, const Value& b);
-    JSON_API const Value& find(const Value& obj, const char* name);
-
-    JSON_INLINE bool operator==(const Value& a, const Value& b)
-    {
-        return equals(a, b);
-    }
-
-    JSON_INLINE bool operator!=(const Value& a, const Value& b)
-    {
-        return !equals(a, b);
-    }
 
     /**
      * JSON value
@@ -150,6 +137,9 @@ namespace json
                 return 0;
             }
         }
+        
+        JSON_API static bool  equals(const Value& a, const Value& b);
+        JSON_API const Value& find(const char* name) const;
 
     public: // @region: Indexor
         JSON_INLINE const Value& operator[] (int index) const
@@ -166,7 +156,7 @@ namespace json
 
         JSON_INLINE const Value& operator[] (const char* name) const
         {
-            return find(*this, name);
+            return this->find(name);
         }
 
     public: // @region: Conversion
@@ -204,6 +194,16 @@ namespace json
             }
         }
     };
+
+    JSON_INLINE bool operator==(const Value& a, const Value& b)
+    {
+        return Value::equals(a, b);
+    }
+
+    JSON_INLINE bool operator!=(const Value& a, const Value& b)
+    {
+        return !Value::equals(a, b);
+    }
 }
 
 /* END OF __JSON_H__ */
@@ -1496,8 +1496,8 @@ namespace json
     const Value& parse(const char* json, State** out_state)
     {
         Settings settings;
-        settings.data = NULL;
-        settings.free = json__free;
+        settings.data   = NULL;
+        settings.free   = json__free;
         settings.malloc = json__malloc;
 
         return parse(json, &settings, out_state);
@@ -1565,12 +1565,12 @@ namespace json
         return (state) ? state->errmsg : NULL;
     }
 
-    /* @funcdef: equals */
-    bool equals(const Value& a, const Value& b)
+    /* @funcdef: Value::equals */
+    bool Value::equals(const Value& a, const Value& b)
     {
         // meta compare
-        if (&a == &b)                       return true;
-        if (!a || !b || a.type != b.type)   return false;
+        if (&a == &b)                     return true;
+        if (!a || !b || a.type != b.type) return false;
 
         int i, n;
         switch (a.type)
@@ -1624,19 +1624,19 @@ namespace json
         return false;
     }
 
-    /* @funcdef: find */
-    const Value& find(const Value& obj, const char* name)
+    /* @funcdef: Value::find */
+    const Value& Value::find(const char* name) const
     {
-        if (obj && obj.type == Type::Object)
+        if (this->type == Type::Object)
         {
             int i, n;
             int hash = json__hash((void*)name, strlen(name));
-            for (i = 0, n = obj.length(); i < n; i++)
+            for (i = 0, n = this->length(); i < n; i++)
             {
-                const char* str = obj.object[i].name;
+                const char* str = this->object[i].name;
                 if (hash == ((int*)str - 2)[1] && strcmp(str, name) == 0)
                 {
-                    return *obj.object[i].value;
+                    return *this->object[i].value;
                 }
             }
         }

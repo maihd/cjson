@@ -1,5 +1,5 @@
 ﻿/******************************************************
- * Simple json parser written in ANSI C
+ * C++ simple JSON parser
  *
  * @author: MaiHD
  * @license: Public domain
