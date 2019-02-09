@@ -42,12 +42,6 @@ void json::release(json::State* state);
 json::Error json::get_errno(const json::State* state); // Get error number of [given state] or [last state] (when state = NULL) 
 const char* json::get_error(const json::State* state); // Get error string of [given state] or [last state] (when state = NULL)
 
-void json::print(const json::Value* value, FILE* out); 
-// Stringify output to file, more readable + size bigger  than json_write
-
-void json::write(const json::Value* value, FILE* out); 
-// Stringify output to file, less readable + size smaller than json_print
-
 bool json::equals(const json::Value* a, const json::Value* b);
 // Depth compare two JSON values
 
