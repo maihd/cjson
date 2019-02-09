@@ -30,6 +30,156 @@ static char* strtrim_fast(char* str)
     return str;
 }
 
+namespace json
+{
+    /* @funcdef: write */
+    void write(const Value& value, FILE* out)
+    {
+        if (value)
+        {
+            int i, n;
+
+            switch (value.type)
+            {
+            case Type::Null:
+                fprintf(out, "null");
+                break;
+
+            case Type::Number:
+                fprintf(out, "%lf", value.number);
+                break;
+
+            case Type::Boolean:
+                fprintf(out, "%s", value.boolean ? "true" : "false");
+                break;
+
+            case Type::String:
+                fprintf(out, "\"%s\"", value.string);
+                break;
+
+            case Type::Array:
+                fprintf(out, "[");
+                for (i = 0, n = value.length(); i < n; i++)
+                {
+                    write(value[i], out);
+                    if (i < n - 1)
+                    {
+                        fprintf(out, ",");
+                    }
+                }
+                fprintf(out, "]");
+                break;
+
+            case Type::Object:
+                fprintf(out, "{");
+                for (i = 0, n = value.length(); i < n; i++)
+                {
+                    fprintf(out, "\"%s\" : ", value.object[i].name);
+                    write(*value.object[i].value, out);
+                    if (i < n - 1)
+                    {
+                        fprintf(out, ",");
+                    }
+                }
+                fprintf(out, "}");
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+
+    /* @funcdef: print */
+    void print(const Value& value, FILE *out)
+    {
+        if (value)
+        {
+            int i, n;
+            static int indent = 0;
+
+            switch (value.type)
+            {
+            case Type::Null:
+                fprintf(out, "null");
+                break;
+
+            case Type::Number:
+                fprintf(out, "%lf", value.number);
+                break;
+
+            case Type::Boolean:
+                fprintf(out, "%s", value.boolean ? "true" : "false");
+                break;
+
+            case Type::String:
+                fprintf(out, "\"%s\"", value.string);
+                break;
+
+            case Type::Array:
+                fprintf(out, "[\n");
+
+                indent++;
+                for (i = 0, n = value.length(); i < n; i++)
+                {
+                    int j, m;
+                    for (j = 0, m = indent * 4; j < m; j++)
+                    {
+                        fputc(' ', out);
+                    }
+
+                    print(value[i], out);
+                    if (i < n - 1)
+                    {
+                        fputc(',', out);
+                    }
+                    fprintf(out, "\n");
+                }
+                indent--;
+
+                for (i = 0, n = indent * 4; i < n; i++)
+                {
+                    fprintf(out, " ");
+                }
+                fputc(']', out);
+                break;
+
+            case Type::Object:
+                fprintf(out, "{\n");
+
+                indent++;
+                for (i = 0, n = value.length(); i < n; i++)
+                {
+                    int j, m;
+                    for (j = 0, m = indent * 4; j < m; j++)
+                    {
+                        fputc(' ', out);
+                    }
+
+                    fprintf(out, "\"%s\" : ", value.object[i].name);
+                    print(*value.object[i].value, out);
+                    if (i < n - 1)
+                    {
+                        fputc(',', out);
+                    }
+                    fputc('\n', out);
+                }
+                indent--;
+
+                for (i = 0, n = indent * 4; i < n; i++)
+                {
+                    fputc(' ', out);
+                }
+                fputc('}', out);
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+}
+
 int main(int argc, char* argv[])
 {
     signal(SIGINT, _sighandler);

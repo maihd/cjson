@@ -27,8 +27,6 @@
 #  endif
 #endif
 
-#include <stdio.h>
-
 namespace json 
 {
     /**
@@ -80,9 +78,6 @@ namespace json
     JSON_API void         release(State* state);
     JSON_API Error        get_errno(const State* state);
     JSON_API const char*  get_error(const State* state);
-
-    JSON_API void         print(const Value& value, FILE* out);
-    JSON_API void         write(const Value& value, FILE* out);
 
     JSON_API bool         equals(const Value& a, const Value& b);
     JSON_API const Value& find(const Value& obj, const char* name);
