@@ -1353,12 +1353,12 @@ namespace json
         return (state) ? state->errmsg : NULL;
     }
 
-    /* @funcdef: equals */
-    bool equals(const Value& a, const Value& b)
+    /* @funcdef: Value::equals */
+    bool Value::equals(const Value& a, const Value& b)
     {
         // meta compare
-        if (&a == &b)                       return true;
-        if (!a || !b || a.type != b.type)   return false;
+        if (&a == &b)                     return true;
+        if (!a || !b || a.type != b.type) return false;
 
         int i, n;
         switch (a.type)
@@ -1412,19 +1412,19 @@ namespace json
         return false;
     }
 
-    /* @funcdef: find */
-    const Value& find(const Value& obj, const char* name)
+    /* @funcdef: Value::find */
+    const Value& Value::find(const char* name) const
     {
-        if (obj && obj.type == Type::Object)
+        if (this->type == Type::Object)
         {
             int i, n;
             int hash = json__hash((void*)name, strlen(name));
-            for (i = 0, n = obj.length(); i < n; i++)
+            for (i = 0, n = this->length(); i < n; i++)
             {
-                const char* str = obj.object[i].name;
+                const char* str = this->object[i].name;
                 if (hash == ((int*)str - 2)[1] && strcmp(str, name) == 0)
                 {
-                    return *obj.object[i].value;
+                    return *this->object[i].value;
                 }
             }
         }

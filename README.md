@@ -1,5 +1,5 @@
 # Introduction [![Build Status](https://travis-ci.org/maihd/json.svg?branch=master)](https://travis-ci.org/maihd/json)
-Simple JSON parser written in ANSI C/C++
+Simple JSON parser written in ANSI C++
 
 ## API
 ```C++
@@ -11,13 +11,20 @@ struct json::Value
     union 
     {
         double          number;
-        json_bool_t     boolean;   
+        bool            boolean;   
         const char*     string;
         json::Value**   array;  
         struct {...}    object;
     };
 
     int length() const;
+    // Get length of value, available [ string, array, object ]
+
+    const json::Value& json::find(const char* name);
+    // Find value with of member with name
+
+    static bool json::equals(const json::Value& a, const json::Value& b);
+    // Deep compare two JSON values
 };
 
 bool operator==(const json::Value& a, const json::Value& b);
@@ -30,8 +37,8 @@ struct json::Settings
     void  (*free)(void* data, void* pointer);   // Your memory deallocate function
 };
 
-json::Value* json::parse(const char* json_code, json::State** out_state);
-json::Value* json::parse(const char* json_code, json::Settings* settings, json::State** out_state);
+const json::Value& json::parse(const char* json_code, json::State** out_state);
+const json::Value& json::parse(const char* json_code, json::Settings* settings, json::State** out_state);
 // 1. json_code : the JSON content from JSON's source (from memory, from file)
 // 2. out_state : the JSON state for parsing json code, contain usage memory (can be NULL, library will hold it), can be reuse by give it an valid state
 // 3. settings  : the parsing settings, and only custom memory management by now
@@ -41,12 +48,6 @@ void json::release(json::State* state);
 
 json::Error json::get_errno(const json::State* state); // Get error number of [given state] or [last state] (when state = NULL) 
 const char* json::get_error(const json::State* state); // Get error string of [given state] or [last state] (when state = NULL)
-
-bool json::equals(const json::Value* a, const json::Value* b);
-// Depth compare two JSON values
-
-json::Value* json::find(const json::Value* obj, const char* name);
-// Get value that is contained by `obj`
 
 // Find more details, or helper functions in json.h
 ```

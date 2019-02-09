@@ -79,19 +79,6 @@ namespace json
     JSON_API Error        get_errno(const State* state);
     JSON_API const char*  get_error(const State* state);
 
-    JSON_API bool         equals(const Value& a, const Value& b);
-    JSON_API const Value& find(const Value& obj, const char* name);
-
-    JSON_INLINE bool operator==(const Value& a, const Value& b)
-    {
-        return equals(a, b);
-    }
-
-    JSON_INLINE bool operator!=(const Value& a, const Value& b)
-    {
-        return !equals(a, b);
-    }
-
     /**
      * JSON value
      */
@@ -148,6 +135,9 @@ namespace json
                 return 0;
             }
         }
+        
+        JSON_API static bool  equals(const Value& a, const Value& b);
+        JSON_API const Value& find(const char* name) const;
 
     public: // @region: Indexor
         JSON_INLINE const Value& operator[] (int index) const
@@ -164,7 +154,7 @@ namespace json
 
         JSON_INLINE const Value& operator[] (const char* name) const
         {
-            return find(*this, name);
+            return this->find(name);
         }
 
     public: // @region: Conversion
@@ -202,6 +192,16 @@ namespace json
             }
         }
     };
+
+    JSON_INLINE bool operator==(const Value& a, const Value& b)
+    {
+        return Value::equals(a, b);
+    }
+
+    JSON_INLINE bool operator!=(const Value& a, const Value& b)
+    {
+        return !Value::equals(a, b);
+    }
 }
 
 /* END OF __JSON_H__ */
