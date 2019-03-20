@@ -1,17 +1,17 @@
-CC=g++
-CFLAGS=-Wall -O0 -std=c++11 -fno-exceptions
+CC=gcc
+CFLAGS=-Wall -O0
 
 .PHONY: clean
 
 test:
-	$(CC) -o json_test.exe src/json_test.cc $(CFLAGS)
+	$(CC) -o json_test.exe src/json_test.c $(CFLAGS)
 
 unit_test:
-	$(CC) -o json_unit_test.exe src/json_unit_test.cc $(CFLAGS)
+	$(CC) -o json_unit_test.exe src/json_unit_test.c $(CFLAGS)
 	./json_unit_test.exe $(wildcard ./testdb/json/*.json)
 
 unit_test_dbg:
-	$(CC) -o json_unit_test.exe src/json_unit_test.cc $(CFLAGS) -g
+	$(CC) -o json_unit_test.exe src/json_unit_test.c $(CFLAGS) -g
 	gdb json_unit_test
 
 clean:
@@ -24,7 +24,7 @@ lib:
 	echo ""                         >> json.h
 	echo "#ifdef JSON_IMPL"         >> json.h
 	echo ""                         >> json.h	
-	cat ./src/json.cc               >> json.h
+	cat ./src/json.c                >> json.h
 	echo ""                         >> json.h
 	echo ""                         >> json.h
 	echo "#endif /* JSON_IMPL */"   >> json.h
