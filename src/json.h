@@ -37,7 +37,7 @@ extern "C" {
 /**
  * JSON type of json value
  */
-typedef enum json_type
+typedef enum JsonType
 {
     JSON_NONE,
     JSON_NULL,
@@ -46,12 +46,12 @@ typedef enum json_type
     JSON_NUMBER,
     JSON_STRING,
     JSON_BOOLEAN,
-} json_type_t;
+} JsonType;
 
 /**
  * JSON error code
  */
-typedef enum json_error
+typedef enum JsonError
 {
     JSON_ERROR_NONE,
     
@@ -67,24 +67,24 @@ typedef enum json_error
 
     JSON_ERROR_MEMORY,
     JSON_ERROR_INTERNAL,
-} json_error_t;
+} JsonError;
 
-typedef struct json_state json_state_t;
-typedef struct json_value json_value_t;
+typedef struct JsonState JsonState;
+typedef struct JsonValue JsonValue;
 
 /**
  * JSON boolean data type
  */
 #ifdef __cplusplus
-typedef bool json_bool_t;
+typedef bool JsonBoolean;
 #define JSON_TRUE  true
 #define JSON_FALSE false
 #else
-typedef enum json_bool_t
+typedef enum JsonBoolean
 {
 	JSON_TRUE  = 1,
 	JSON_FALSE = 0,
-} json_bool_t;
+} JsonBoolean;
 #endif
 
 typedef struct
@@ -92,62 +92,62 @@ typedef struct
     void* data;
     void* (*malloc)(void* data, size_t size);
     void  (*free)(void* data, void* pointer);
-} json_settings_t;
+} JsonSettings;
 
-JSON_API extern const json_value_t JSON_VALUE_NONE;
+JSON_API extern const JsonValue JSON_VALUE_NONE;
 
-JSON_API json_value_t* json_parse(const char* json, json_state_t** state);
-JSON_API json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** state);
+JSON_API JsonValue*    json_parse(const char* json, JsonState** state);
+JSON_API JsonValue*    json_parse_ex(const char* json, const JsonSettings* settings, JsonState** state);
 
-JSON_API void          json_release(json_state_t* state);
+JSON_API void          json_release(JsonState* state);
 
-JSON_API json_error_t  json_get_errno(const json_state_t* state);
-JSON_API const char*   json_get_error(const json_state_t* state);
+JSON_API JsonError     json_get_errno(const JsonState* state);
+JSON_API const char*   json_get_error(const JsonState* state);
 
-JSON_API void          json_print(const json_value_t* value, FILE* out);
-JSON_API void          json_write(const json_value_t* value, FILE* out);
+JSON_API void          json_print(const JsonValue* value, FILE* out);
+JSON_API void          json_write(const JsonValue* value, FILE* out);
 
-JSON_API int           json_length(const json_value_t* x);
-JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b);
-JSON_API json_value_t* json_find(const json_value_t* obj, const char* name);
+JSON_API int           json_length(const JsonValue* x);
+JSON_API JsonBoolean   json_equals(const JsonValue* a, const JsonValue* b);
+JSON_API JsonValue*    json_find(const JsonValue* obj, const char* name);
 
 /**
  * JSON value
  */
-struct json_value
+struct JsonValue
 {
-    json_type_t type;
+    JsonType type;
     union
     {
 		double      number;
-		json_bool_t boolean;
+		JsonBoolean boolean;
 
 		const char* string;
 
-        struct json_value** array;
+        struct JsonValue** array;
 
         struct
         {
             const char*        name;
-            struct json_value* value;
+            struct JsonValue* value;
         }* object;
     };
 
 #ifdef __cplusplus
 public: // @region: Constructors
-    JSON_INLINE json_value()
+    JSON_INLINE JsonValue()
 	{	
         memset(this, 0, sizeof(*this));
 	}
 
-    JSON_INLINE ~json_value()
+    JSON_INLINE ~JsonValue()
     {
         // SHOULD BE EMPTY
         // Memory are managed by json_state_t
     }
 
 public: // @region: Indexor
-	JSON_INLINE const json_value& operator[] (int index) const
+	JSON_INLINE const JsonValue& operator[] (int index) const
 	{
 		if (type != JSON_ARRAY || index < 0 || index > json_length(this))
 		{
@@ -159,9 +159,9 @@ public: // @region: Indexor
 		}	
 	}
 
-	JSON_INLINE const json_value& operator[] (const char* name) const
+	JSON_INLINE const JsonValue& operator[] (const char* name) const
 	{
-		json_value_t* value = json_find(this, name);
+		JsonValue* value = json_find(this, name);
         return value ? *value : JSON_VALUE_NONE;
 	}
 

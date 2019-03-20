@@ -154,7 +154,6 @@
     <ClInclude Include="..\src\json.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\json.c" />
     <ClCompile Include="..\src\json_unit_test.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

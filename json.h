@@ -37,7 +37,7 @@ extern "C" {
 /**
  * JSON type of json value
  */
-typedef enum json_type
+typedef enum JsonType
 {
     JSON_NONE,
     JSON_NULL,
@@ -46,12 +46,12 @@ typedef enum json_type
     JSON_NUMBER,
     JSON_STRING,
     JSON_BOOLEAN,
-} json_type_t;
+} JsonType;
 
 /**
  * JSON error code
  */
-typedef enum json_error
+typedef enum JsonError
 {
     JSON_ERROR_NONE,
     
@@ -67,24 +67,24 @@ typedef enum json_error
 
     JSON_ERROR_MEMORY,
     JSON_ERROR_INTERNAL,
-} json_error_t;
+} JsonError;
 
-typedef struct json_state json_state_t;
-typedef struct json_value json_value_t;
+typedef struct JsonState JsonState;
+typedef struct JsonValue JsonValue;
 
 /**
  * JSON boolean data type
  */
 #ifdef __cplusplus
-typedef bool json_bool_t;
+typedef bool JsonBoolean;
 #define JSON_TRUE  true
 #define JSON_FALSE false
 #else
-typedef enum json_bool_t
+typedef enum JsonBoolean
 {
 	JSON_TRUE  = 1,
 	JSON_FALSE = 0,
-} json_bool_t;
+} JsonBoolean;
 #endif
 
 typedef struct
@@ -92,62 +92,62 @@ typedef struct
     void* data;
     void* (*malloc)(void* data, size_t size);
     void  (*free)(void* data, void* pointer);
-} json_settings_t;
+} JsonSettings;
 
-JSON_API extern const json_value_t JSON_VALUE_NONE;
+JSON_API extern const JsonValue JSON_VALUE_NONE;
 
-JSON_API json_value_t* json_parse(const char* json, json_state_t** state);
-JSON_API json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** state);
+JSON_API JsonValue* json_parse(const char* json, JsonState** state);
+JSON_API JsonValue* json_parse_ex(const char* json, const JsonSettings* settings, JsonState** state);
 
-JSON_API void          json_release(json_state_t* state);
+JSON_API void          json_release(JsonState* state);
 
-JSON_API json_error_t  json_get_errno(const json_state_t* state);
-JSON_API const char*   json_get_error(const json_state_t* state);
+JSON_API JsonError  json_get_errno(const JsonState* state);
+JSON_API const char*   json_get_error(const JsonState* state);
 
-JSON_API void          json_print(const json_value_t* value, FILE* out);
-JSON_API void          json_write(const json_value_t* value, FILE* out);
+JSON_API void          json_print(const JsonValue* value, FILE* out);
+JSON_API void          json_write(const JsonValue* value, FILE* out);
 
-JSON_API int           json_length(const json_value_t* x);
-JSON_API json_bool_t   json_equals(const json_value_t* a, const json_value_t* b);
-JSON_API json_value_t* json_find(const json_value_t* obj, const char* name);
+JSON_API int           json_length(const JsonValue* x);
+JSON_API JsonBoolean   json_equals(const JsonValue* a, const JsonValue* b);
+JSON_API JsonValue* json_find(const JsonValue* obj, const char* name);
 
 /**
  * JSON value
  */
-struct json_value
+struct JsonValue
 {
-    json_type_t type;
+    JsonType type;
     union
     {
 		double      number;
-		json_bool_t boolean;
+		JsonBoolean boolean;
 
 		const char* string;
 
-        struct json_value** array;
+        struct JsonValue** array;
 
         struct
         {
             const char*        name;
-            struct json_value* value;
+            struct JsonValue* value;
         }* object;
     };
 
 #ifdef __cplusplus
 public: // @region: Constructors
-    JSON_INLINE json_value()
+    JSON_INLINE JsonValue()
 	{	
         memset(this, 0, sizeof(*this));
 	}
 
-    JSON_INLINE ~json_value()
+    JSON_INLINE ~JsonValue()
     {
         // SHOULD BE EMPTY
         // Memory are managed by json_state_t
     }
 
 public: // @region: Indexor
-	JSON_INLINE const json_value& operator[] (int index) const
+	JSON_INLINE const JsonValue& operator[] (int index) const
 	{
 		if (type != JSON_ARRAY || index < 0 || index > json_length(this))
 		{
@@ -159,9 +159,9 @@ public: // @region: Indexor
 		}	
 	}
 
-	JSON_INLINE const json_value& operator[] (const char* name) const
+	JSON_INLINE const JsonValue& operator[] (const char* name) const
 	{
-		json_value_t* value = json_find(this, name);
+		JsonValue* value = json_find(this, name);
         return value ? *value : JSON_VALUE_NONE;
 	}
 
@@ -239,7 +239,7 @@ public: // @region: Conversion
 #endif
 
 #ifndef JSON_VALUE_POOL_COUNT
-#define JSON_VALUE_POOL_COUNT (4096/sizeof(json_value_t))
+#define JSON_VALUE_POOL_COUNT (4096/sizeof(JsonValue))
 #endif
 
 typedef struct json_pool
@@ -260,9 +260,9 @@ typedef struct json_bucket
     size_t capacity;
 } json_bucket_t;
 
-struct json_state
+struct JsonState
 {
-    struct json_state* next;
+    struct JsonState* next;
     json_pool_t* value_pool;
 
     json_bucket_t* values_bucket;
@@ -276,15 +276,15 @@ struct json_state
     size_t      length;
     const char* buffer;
     
-    json_error_t errnum;
+    JsonError errnum;
     char*        errmsg;
     jmp_buf      errjmp;
 
-    json_settings_t settings; /* Runtime settings */
+    JsonSettings settings; /* Runtime settings */
 };
 
-static json_state_t* root_state = NULL;
-const struct json_value JSON_VALUE_NONE;
+static JsonState* root_state = NULL;
+const struct JsonValue JSON_VALUE_NONE;
 
 /* @funcdef: json__malloc */
 static void* json__malloc(void* data, size_t size)
@@ -301,7 +301,7 @@ static void json__free(void* data, void* pointer)
 }
 
 /* @funcdef: json__set_error_valist */
-static void json__set_error_valist(json_state_t* state, json_type_t type, json_error_t code, const char* fmt, va_list valist)
+static void json__set_error_valist(JsonState* state, JsonType type, JsonError code, const char* fmt, va_list valist)
 {
     const int errmsg_size = 1024;
 
@@ -356,7 +356,7 @@ static void json__set_error_valist(json_state_t* state, json_type_t type, json_e
 }
 
 /* @funcdef: json__set_error */
-static void json__set_error(json_state_t* state, json_type_t type, json_error_t code, const char* fmt, ...)
+static void json__set_error(JsonState* state, JsonType type, JsonError code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
@@ -365,7 +365,7 @@ static void json__set_error(json_state_t* state, json_type_t type, json_error_t 
 }
 
 /* funcdef: json__panic */
-static void json__panic(json_state_t* state, json_type_t type, json_error_t code, const char* fmt, ...)
+static void json__panic(JsonState* state, JsonType type, JsonError code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
@@ -376,7 +376,7 @@ static void json__panic(json_state_t* state, json_type_t type, json_error_t code
 }
 
 /* funcdef: json__make_pool */
-static json_pool_t* json__make_pool(json_state_t* state, json_pool_t* prev, int count, int size)
+static json_pool_t* json__make_pool(JsonState* state, json_pool_t* prev, int count, int size)
 {
     if (count <= 0 || size <= 0)
     {
@@ -409,7 +409,7 @@ static json_pool_t* json__make_pool(json_state_t* state, json_pool_t* prev, int 
 }
 
 /* funcdef: json__free_pool */
-static void json__free_pool(json_state_t* state, json_pool_t* pool)
+static void json__free_pool(JsonState* state, json_pool_t* pool)
 {
     if (pool)
     {
@@ -449,7 +449,7 @@ static void json__pool_collect(json_pool_t* pool, void* ptr)
 #endif
 
 /* funcdef: json__make_bucket */
-static json_bucket_t* json__make_bucket(json_state_t* state, json_bucket_t* prev, size_t count, size_t size)
+static json_bucket_t* json__make_bucket(JsonState* state, json_bucket_t* prev, size_t count, size_t size)
 {
     if (count <= 0 || size <= 0)
     {
@@ -474,7 +474,7 @@ static json_bucket_t* json__make_bucket(json_state_t* state, json_bucket_t* prev
 }
 
 /* funcdef: json__free_bucket */
-static void json__free_bucket(json_state_t* state, json_bucket_t* bucket)
+static void json__free_bucket(JsonState* state, json_bucket_t* bucket)
 {
     if (bucket)
     {
@@ -529,7 +529,7 @@ static void* json__bucket_resize(json_bucket_t* bucket, void* ptr, int old_count
 }
 
 /* @funcdef: json__make_value */
-static json_value_t* json__make_value(json_state_t* state, json_type_t type)
+static JsonValue* json__make_value(JsonState* state, JsonType type)
 {
     if (!state->value_pool || !state->value_pool->head)
     {
@@ -539,7 +539,7 @@ static json_value_t* json__make_value(json_state_t* state, json_type_t type)
         }
         else
         {
-            state->value_pool = json__make_pool(state, state->value_pool, JSON_VALUE_POOL_COUNT, sizeof(json_value_t));
+            state->value_pool = json__make_pool(state, state->value_pool, JSON_VALUE_POOL_COUNT, sizeof(JsonValue));
         }
 
 		if (!state->value_pool)
@@ -548,10 +548,10 @@ static json_value_t* json__make_value(json_state_t* state, json_type_t type)
 		}
     }
     
-    json_value_t* value = (json_value_t*)json__pool_extract(state->value_pool);
+    JsonValue* value = (JsonValue*)json__pool_extract(state->value_pool);
     if (value)
     {
-		memset(value, 0, sizeof(json_value_t));
+		memset(value, 0, sizeof(JsonValue));
 		value->type    = type;
 		value->boolean = JSON_FALSE;
     }
@@ -563,9 +563,9 @@ static json_value_t* json__make_value(json_state_t* state, json_type_t type)
 }
 
 /* @funcdef: json__make_state */
-static json_state_t* json__make_state(const char* json, const json_settings_t* settings)
+static JsonState* json__make_state(const char* json, const JsonSettings* settings)
 {
-    json_state_t* state = (json_state_t*)settings->malloc(settings->data, sizeof(json_state_t));
+    JsonState* state = (JsonState*)settings->malloc(settings->data, sizeof(JsonState));
     if (state)
     {
 		state->next   = NULL;
@@ -589,7 +589,7 @@ static json_state_t* json__make_state(const char* json, const json_settings_t* s
 }
 
 /* @funcdef: json__reuse_state */
-static json_state_t* json__reuse_state(json_state_t* state, const char* json, const json_settings_t* settings)
+static JsonState* json__reuse_state(JsonState* state, const char* json, const JsonSettings* settings)
 {
     if (state)
     {
@@ -599,7 +599,7 @@ static json_state_t* json__reuse_state(json_state_t* state, const char* json, co
         }
         else
         {
-            json_state_t* list = root_state;
+            JsonState* list = root_state;
             while (list)
             {
                 if (list->next == state)
@@ -680,11 +680,11 @@ static json_state_t* json__reuse_state(json_state_t* state, const char* json, co
 }
 
 /* @funcdef: json__free_state */
-static void json__free_state(json_state_t* state)
+static void json__free_state(JsonState* state)
 {
     if (state)
     {
-		json_state_t* next = state->next;
+		JsonState* next = state->next;
 
         json__free_bucket(state, state->values_bucket);
         json__free_bucket(state, state->string_bucket);
@@ -698,19 +698,19 @@ static void json__free_state(json_state_t* state)
 }
 
 /* @funcdef: json__is_eof */
-static int json__is_eof(json_state_t* state)
+static int json__is_eof(JsonState* state)
 {
     return state->cursor >= state->length || state->buffer[state->cursor] <= 0;
 }
 
 /* @funcdef: json__peek_char */
-static int json__peek_char(json_state_t* state)
+static int json__peek_char(JsonState* state)
 {
     return state->buffer[state->cursor];
 }
 
 /* @funcdef: json__next_char */
-static int json__next_char(json_state_t* state)
+static int json__next_char(JsonState* state)
 {
     if (json__is_eof(state))
     {
@@ -736,7 +736,7 @@ static int json__next_char(json_state_t* state)
 
 #if 0 /* UNUSED */
 /* @funcdef: json__make_value */
-static int next_line(json_state_t* state)
+static int next_line(JsonState* state)
 {
     int c = json__peek_char(state);
     while (c > 0 && c != '\n')
@@ -748,7 +748,7 @@ static int next_line(json_state_t* state)
 #endif
 
 /* @funcdef: json__skip_space */
-static int json__skip_space(json_state_t* state)
+static int json__skip_space(JsonState* state)
 {
     int c = json__peek_char(state);
     while (c > 0 && isspace(c))
@@ -759,7 +759,7 @@ static int json__skip_space(json_state_t* state)
 }
 
 /* @funcdef: json__match_char */
-static int json__match_char(json_state_t* state, json_type_t type, int c)
+static int json__match_char(JsonState* state, JsonType type, int c)
 {
     if (json__peek_char(state) == c)
     {
@@ -826,14 +826,14 @@ static int json__hash(void* buf, size_t len)
 
 /* All parse functions declaration */
 
-static json_value_t* json__parse_array(json_state_t* state, json_value_t* value);
-static json_value_t* json__parse_single(json_state_t* state, json_value_t* value);
-static json_value_t* json__parse_object(json_state_t* state, json_value_t* value);
-static json_value_t* json__parse_number(json_state_t* state, json_value_t* value);
-static json_value_t* json__parse_string(json_state_t* state, json_value_t* value);
+static JsonValue* json__parse_array(JsonState* state, JsonValue* value);
+static JsonValue* json__parse_single(JsonState* state, JsonValue* value);
+static JsonValue* json__parse_object(JsonState* state, JsonValue* value);
+static JsonValue* json__parse_number(JsonState* state, JsonValue* value);
+static JsonValue* json__parse_string(JsonState* state, JsonValue* value);
 
 /* @funcdef: json__parse_number */
-static json_value_t* json__parse_number(json_state_t* state, json_value_t* value)
+static JsonValue* json__parse_number(JsonState* state, JsonValue* value)
 {
     if (json__skip_space(state) < 0)
     {
@@ -1003,7 +1003,7 @@ static json_value_t* json__parse_number(json_state_t* state, json_value_t* value
 }
 
 /* @funcdef: json__parse_array */
-static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
+static JsonValue* json__parse_array(JsonState* state, JsonValue* root)
 {
     if (json__skip_space(state) < 0)
     {
@@ -1023,7 +1023,7 @@ static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
         }
 
 	    int            length = 0;
-	    json_value_t** values = NULL;
+	    JsonValue** values = NULL;
 	
 	    while (json__skip_space(state) > 0 && json__peek_char(state) != ']')
 	    {
@@ -1032,10 +1032,10 @@ static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
                 json__match_char(state, JSON_ARRAY, ',');
 	        }
 	    
-	        json_value_t* value = json__parse_single(state, NULL);
+	        JsonValue* value = json__parse_single(state, NULL);
             
-            int   old_size   = sizeof(int) + length * sizeof(json_value_t*);
-            int   new_size   = sizeof(int) + (length + 1) * sizeof(json_value_t*);
+            int   old_size   = sizeof(int) + length * sizeof(JsonValue*);
+            int   new_size   = sizeof(int) + (length + 1) * sizeof(JsonValue*);
             void* new_values = json__bucket_resize(state->values_bucket, 
                                              values ? (int*)values - 1 : NULL, 
                                              old_size, 
@@ -1071,7 +1071,7 @@ static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
                 }
             }
 
-            values = (json_value_t**)((int*)new_values + 1);
+            values = (JsonValue**)((int*)new_values + 1);
 	        values[length++] = value;
 	    }
 
@@ -1089,7 +1089,7 @@ static json_value_t* json__parse_array(json_state_t* state, json_value_t* root)
 }
 
 /* json__parse_single */
-static json_value_t* json__parse_single(json_state_t* state, json_value_t* value)
+static JsonValue* json__parse_single(JsonState* state, JsonValue* value)
 {
     if (json__skip_space(state) < 0)
     {
@@ -1161,7 +1161,7 @@ static json_value_t* json__parse_single(json_state_t* state, json_value_t* value
 }
 
 /* @funcdef: json__parse_string */
-static json_value_t* json__parse_string(json_state_t* state, json_value_t* value)
+static JsonValue* json__parse_string(JsonState* state, JsonValue* value)
 {
     const int HEADER_SIZE = 2 * sizeof(int);
 
@@ -1331,7 +1331,7 @@ static json_value_t* json__parse_string(json_state_t* state, json_value_t* value
 }
 
 /* @funcdef: json__parse_object */
-static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
+static JsonValue* json__parse_object(JsonState* state, JsonValue* root)
 {
     if (json__skip_space(state) < 0)
     {
@@ -1359,7 +1359,7 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
                 json__match_char(state, JSON_OBJECT, ',');
             }
 
-            json_value_t* token = NULL;
+            JsonValue* token = NULL;
             if (json__skip_space(state) == '"')
             {
                 token = json__parse_string(state, NULL);
@@ -1374,7 +1374,7 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
             json__skip_space(state);
             json__match_char(state, JSON_OBJECT, ':');
 
-            json_value_t* value = json__parse_single(state, token);
+            JsonValue* value = json__parse_single(state, token);
 
             /* Append new pair of value to container */
             int   old_length = length++;
@@ -1436,7 +1436,7 @@ static json_value_t* json__parse_object(json_state_t* state, json_value_t* root)
 }
          
 /* @region: json_parse_in */
-static json_value_t* json_parse_in(json_state_t* state)
+static JsonValue* json_parse_in(JsonState* state)
 {
     if (!state)
     {
@@ -1447,7 +1447,7 @@ static json_value_t* json_parse_in(json_state_t* state)
     {
         if (setjmp(state->errjmp) == 0)
         {
-            json_value_t* value = json__parse_object(state, NULL);
+            JsonValue* value = json__parse_object(state, NULL);
 
             json__skip_space(state);
             if (!json__is_eof(state))
@@ -1466,7 +1466,7 @@ static json_value_t* json_parse_in(json_state_t* state)
     {
         if (setjmp(state->errjmp) == 0)
         {
-            json_value_t* value = json__parse_array(state, NULL);
+            JsonValue* value = json__parse_array(state, NULL);
 
             json__skip_space(state);
             if (!json__is_eof(state))
@@ -1491,9 +1491,9 @@ static json_value_t* json_parse_in(json_state_t* state)
 }
 
 /* @funcdef: json_parse */
-json_value_t* json_parse(const char* json, json_state_t** out_state)
+JsonValue* json_parse(const char* json, JsonState** out_state)
 {
-    json_settings_t settings;
+    JsonSettings settings;
     settings.data   = NULL;
     settings.free   = json__free;
     settings.malloc = json__malloc;
@@ -1502,10 +1502,10 @@ json_value_t* json_parse(const char* json, json_state_t** out_state)
 }
 
 /* @funcdef: json_parse_ex */
-json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, json_state_t** out_state)
+JsonValue* json_parse_ex(const char* json, const JsonSettings* settings, JsonState** out_state)
 {
-    json_state_t* state = out_state && *out_state ? json__reuse_state(*out_state, json, settings) : json__make_state(json, settings);
-    json_value_t* value = json_parse_in(state);
+    JsonState* state = out_state && *out_state ? json__reuse_state(*out_state, json, settings) : json__make_state(json, settings);
+    JsonValue* value = json_parse_in(state);
 
     if (value)
     {
@@ -1538,7 +1538,7 @@ json_value_t* json_parse_ex(const char* json, const json_settings_t* settings, j
 }
 
 /* @funcdef: json_release */
-void json_release(json_state_t* state)
+void json_release(JsonState* state)
 {
     if (state)
     {
@@ -1552,7 +1552,7 @@ void json_release(json_state_t* state)
 }
 
 /* @funcdef: json_get_errno */
-json_error_t json_get_errno(const json_state_t* state)
+JsonError json_get_errno(const JsonState* state)
 {
     if (state)
     {
@@ -1565,7 +1565,7 @@ json_error_t json_get_errno(const json_state_t* state)
 }
 
 /* @funcdef: json_get_error */
-const char* json_get_error(const json_state_t* state)
+const char* json_get_error(const JsonState* state)
 {
     if (state)
     {
@@ -1578,7 +1578,7 @@ const char* json_get_error(const json_state_t* state)
 }
 
 /* @funcdef: json_length */
-int json_length(const json_value_t* x)
+int json_length(const JsonValue* x)
 {
     if (x)
     {
@@ -1602,7 +1602,7 @@ int json_length(const json_value_t* x)
 }
 
 /* @funcdef: json_equals */
-json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
+JsonBoolean json_equals(const JsonValue* a, const JsonValue* b)
 {
     int i, n;
 
@@ -1674,7 +1674,7 @@ json_bool_t json_equals(const json_value_t* a, const json_value_t* b)
 }
 
 /* @funcdef: json_find */
-json_value_t* json_find(const json_value_t* obj, const char* name)
+JsonValue* json_find(const JsonValue* obj, const char* name)
 {
     if (obj && obj->type == JSON_OBJECT)
     {
@@ -1694,7 +1694,7 @@ json_value_t* json_find(const json_value_t* obj, const char* name)
 }
 
 /* @funcdef: json_write */
-void json_write(const json_value_t* value, FILE* out)
+void json_write(const JsonValue* value, FILE* out)
 {
     if (value)
     {
@@ -1753,7 +1753,7 @@ void json_write(const json_value_t* value, FILE* out)
 }          
 
 /* @funcdef: json_print */
-void json_print(const json_value_t* value, FILE* out)
+void json_print(const JsonValue* value, FILE* out)
 {
     if (value)
     {

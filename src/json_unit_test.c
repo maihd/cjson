@@ -78,14 +78,14 @@ int main(int argc, char* argv[])
             json_debug_t debug;
             memset(&debug, 0, sizeof(debug));
 
-            json_settings_t settings;
+            JsonSettings settings;
             settings.data   = &debug;
             settings.free   = json_debug_free;
             settings.malloc = json_debug_malloc;
 
             double dt = get_time();
-            json_state_t* state = NULL;
-            json_value_t* value = json_parse_ex(buffer, &settings, &state);
+            JsonState* state = NULL;
+            JsonValue* value = json_parse_ex(buffer, &settings, &state);
             if (json_get_errno(state) != JSON_ERROR_NONE || !value)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, json_get_error(state));
