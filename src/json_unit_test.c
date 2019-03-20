@@ -11,11 +11,11 @@
 typedef struct
 {
     size_t alloced;
-} json_debug_t;
+} JsonDebugSettings;
 
 static void* json_debug_malloc(void* data, size_t size)
 {
-    json_debug_t* debug = (json_debug_t*)data;
+    JsonDebugSettings* debug = (JsonDebugSettings*)data;
     debug->alloced += size;
     return malloc(size);
 }
@@ -75,7 +75,7 @@ int main(int argc, char* argv[])
             buffer[filesize] = 0;
             fread(buffer, filesize, sizeof(char), file);
 
-            json_debug_t debug;
+            JsonDebugSettings debug;
             memset(&debug, 0, sizeof(debug));
 
             JsonSettings settings;
