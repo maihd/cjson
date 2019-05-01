@@ -152,6 +152,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\src\json.h" />
+    <ClInclude Include="..\src\json_impl.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\json_unit_test.c" />

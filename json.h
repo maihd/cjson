@@ -1183,13 +1183,14 @@ static JsonValue* json__parse_string(JsonState* state, JsonValue* value)
         {
             if (length > capacity)
             {
+                capacity <<= 1;
                 if (tmp_string != tmp_buffer)
                 {
-                    tmp_string = malloc(capacity << 1);
+                    tmp_string = (char*)malloc(capacity);
                 }
                 else
                 {
-                    tmp_string = realloc(tmp_string, capacity << 1);
+                    tmp_string = (char*)realloc(tmp_string, capacity);
                     if (!tmp_string)
                     {
                         json__panic(state, JSON_STRING, JSON_ERROR_MEMORY, "Out of memory when create new <string>");

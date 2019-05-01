@@ -18,14 +18,18 @@ clean:
 	rm -rf *.o *.exe
 
 lib:
-	rm -f json.h
+	@rm -f json.h
 
-	cat ./src/json.h                >> json.h
-	echo ""                         >> json.h
-	echo "#ifdef JSON_IMPL"         >> json.h
-	echo ""                         >> json.h	
-	cat ./src/json.c                >> json.h
-	echo ""                         >> json.h
-	echo ""                         >> json.h
-	echo "#endif /* JSON_IMPL */"   >> json.h
-	echo ""                         >> json.h
+	@cat ./src/json.h                >> json.h
+	@echo ""                         >> json.h
+	@echo "#ifdef JSON_IMPL"         >> json.h
+	@echo ""                         >> json.h	
+	@cat ./src/json_impl.h           >> json.h
+	@echo ""                         >> json.h
+	@echo ""                         >> json.h
+	@echo "#endif /* JSON_IMPL */"   >> json.h
+	@echo ""                         >> json.h
+
+	@gcc -o json_build_test.exe json_build_test.c && rm json_build_test.exe \
+		&& echo "Make single header library success." \
+		|| echo "Make single header library failed."

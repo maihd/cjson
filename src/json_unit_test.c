@@ -6,7 +6,7 @@
 #include <string.h>
 
 #include "./json.h"
-#include "./json.c"
+#include "./json_impl.h"
 
 typedef struct
 {
