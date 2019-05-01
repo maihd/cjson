@@ -1,55 +1,16 @@
 # Introduction [![Build Status](https://travis-ci.org/maihd/json.svg?branch=master)](https://travis-ci.org/maihd/json)
 Simple JSON parser written in ANSI C++
 
-## API
-```C++
-struct json::State; // Implicit structure, manage parsing context
+## Build
+```
+# Run REPL test
+make test
 
-struct json::Value
-{
-    json::Type type;
-    union 
-    {
-        double          number;
-        bool            boolean;   
-        const char*     string;
-        json::Value**   array;  
-        struct {...}    object;
-    };
+# Run unit tests
+make unit_test
 
-    int length() const;
-    // Get length of value, available [ string, array, object ]
-
-    const json::Value& json::find(const char* name);
-    // Find value with of member with name
-
-    static bool json::equals(const json::Value& a, const json::Value& b);
-    // Deep compare two JSON values
-};
-
-bool operator==(const json::Value& a, const json::Value& b);
-bool operator!=(const json::Value& a, const json::Value& b);
-
-struct json::Settings
-{
-    void* data;                                 // Your memory buffer
-    void* (*malloc)(void* data, size_t size);   // Your memory allocate function
-    void  (*free)(void* data, void* pointer);   // Your memory deallocate function
-};
-
-const json::Value& json::parse(const char* json_code, json::State** out_state);
-const json::Value& json::parse(const char* json_code, json::Settings* settings, json::State** out_state);
-// 1. json_code : the JSON content from JSON's source (from memory, from file)
-// 2. out_state : the JSON state for parsing json code, contain usage memory (can be NULL, library will hold it), can be reuse by give it an valid state
-// 3. settings  : the parsing settings, and only custom memory management by now
-
-void json::release(json::State* state);
-// Release state, when state is null, library will implicit remove states that it hold
-
-json::Error json::get_errno(const json::State* state); // Get error number of [given state] or [last state] (when state = NULL) 
-const char* json::get_error(const json::State* state); // Get error string of [given state] or [last state] (when state = NULL)
-
-// Find more details, or helper functions in json.h
+# Make single header libary (when you want to make sure json.h is the newest version)
+make lib
 ```
 
 ## Examples
@@ -106,6 +67,57 @@ int main(int argc, char* argv[])
     
     return 0;
 }
+```
+
+## API
+```C++
+struct json::State; // Implicit structure, manage parsing context
+
+struct json::Value
+{
+    json::Type type;
+    union 
+    {
+        double          number;
+        bool            boolean;   
+        const char*     string;
+        json::Value**   array;  
+        struct {...}    object;
+    };
+
+    int length() const;
+    // Get length of value, available [ string, array, object ]
+
+    const json::Value& json::find(const char* name);
+    // Find value with of member with name
+
+    static bool json::equals(const json::Value& a, const json::Value& b);
+    // Deep compare two JSON values
+};
+
+bool operator==(const json::Value& a, const json::Value& b);
+bool operator!=(const json::Value& a, const json::Value& b);
+
+struct json::Settings
+{
+    void* data;                                 // Your memory buffer
+    void* (*malloc)(void* data, size_t size);   // Your memory allocate function
+    void  (*free)(void* data, void* pointer);   // Your memory deallocate function
+};
+
+const json::Value& json::parse(const char* json_code, json::State** out_state);
+const json::Value& json::parse(const char* json_code, json::Settings* settings, json::State** out_state);
+// 1. json_code : the JSON content from JSON's source (from memory, from file)
+// 2. out_state : the JSON state for parsing json code, contain usage memory (can be NULL, library will hold it), can be reuse by give it an valid state
+// 3. settings  : the parsing settings, and only custom memory management by now
+
+void json::release(json::State* state);
+// Release state, when state is null, library will implicit remove states that it hold
+
+json::Error json::get_errno(const json::State* state); // Get error number of [given state] or [last state] (when state = NULL) 
+const char* json::get_error(const json::State* state); // Get error string of [given state] or [last state] (when state = NULL)
+
+// Find more details, or helper functions in json.h
 ```
 
 ## Metadata

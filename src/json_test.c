@@ -1,8 +1,8 @@
 #include <signal.h>
 #include <setjmp.h>
 
-#define JSON_IMPL
-#include "../json.h"
+#include "./json.h"
+#include "./json_impl.h"
 
 static jmp_buf jmpenv;
 
