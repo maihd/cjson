@@ -273,7 +273,7 @@ struct JsonParser
     size_t line;
     size_t column;
     size_t cursor;
-    //json_type_t parsing_value_type;
+    //json_type_t parsingType;
     
     size_t      length;
     const char* buffer;
