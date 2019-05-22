@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "./json.h"
-#include "./json_impl.h"
+#include "./Json.h"
+#include "./JsonImpl.h"
 
 typedef struct
 {
