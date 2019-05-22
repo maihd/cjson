@@ -22,6 +22,47 @@
 typedef struct JsonPool   JsonPool;
 typedef struct JsonBucket JsonBucket;
 
+#define JsonArray_GetRaw(a)             ((int*)(a) - 2)
+#define JsonArray_Init()                0
+#define JsonArray_Free(a, alloc)        ((a) ? (alloc)->free((alloc)->data, JsonArray_GetRaw(a)) : (void)0)
+#define JsonArray_GetSize(a)            ((a) ? JsonArray_GetRaw(a)[0] : 0)
+#define JsonArray_GetCount(a)           ((a) ? JsonArray_GetRaw(a)[1] : 0)
+#define JsonArray_Push(a, v, alloc)     (JsonArray_Ensure(a, JsonArray_GetCount(a) + 1, alloc) ? ((void)((a)[JsonArray_GetRaw(a)[1]++] = v), 1) : 0)
+#define JsonArray_Pop(a, v, alloc)      ((a)[--JsonArray_GetRaw(a)[1]]);
+#define JsonArray_Ensure(a, n, alloc)   ((!(a) || JsonArray_GetSize(a) < (n)) ? (*((void**)&(a))=JsonArray_Grow(a, n, sizeof(a[0]), alloc)) != NULL : 1)
+
+static void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocator* allocator)
+{
+    assert(reqsize > 0);
+    assert(elemsize > 0);
+    assert(allocator != NULL);
+
+    int* raw   = array ? JsonArray_GetRaw(array) : NULL;
+    int  size  = array && raw[0] > 0 ? raw[0] : 8;
+    int  count = JsonArray_GetCount(array);
+
+    while (size < reqsize) size *= 2;
+
+    int* new_array = (int*)allocator->alloc(allocator->data, sizeof(int) * 2 + size * elemsize);
+    if (new_array)
+    {
+        new_array[0] = size;
+        new_array[1] = count;
+
+        if (raw)
+        {
+            memcpy(new_array, raw, count * elemsize);
+        }
+
+        return new_array + 2;
+    }
+    else
+    {
+        return NULL;
+    }
+}
+
+
 struct JsonPool
 {
     JsonPool* prev;
@@ -35,9 +76,9 @@ struct JsonBucket
     JsonBucket* prev;
     JsonBucket* next;
 
-    size_t size;
-    size_t count;
-    size_t capacity;
+    int size;
+    int count;
+    int capacity;
 };
 
 struct JsonParser
@@ -46,15 +87,13 @@ struct JsonParser
     JsonPool*   valuePool;
 
     JsonBucket* stringBucket;
-    JsonBucket* arrayValuesBucket;
-    JsonBucket* objectValuesBucket;
     
-    size_t   line;
-    size_t   column;
-    size_t   cursor;
+    int      line;
+    int      column;
+    int      cursor;
     JsonType parsingType;
     
-    size_t      length;
+    int         length;
     const char* buffer;
     
     JsonError   errnum;
@@ -68,7 +107,7 @@ static JsonParser* rootParser = NULL;
 const struct JsonValue JSON_VALUE_NONE;
 
 /* @funcdef: Json_Alloc */
-static void* Json_Alloc(void* data, size_t size)
+static void* Json_Alloc(void* data, int size)
 {
     (void)data;
     return malloc(size);
@@ -158,10 +197,8 @@ static void Json_Panic(JsonParser* parser, JsonType type, JsonError code, const 
 /* funcdef: JsonPool_Make */
 static JsonPool* JsonPool_Make(JsonParser* parser, JsonPool* prev, int count, int size)
 {
-    if (count <= 0 || size <= 0)
-    {
-		return NULL;
-    }
+    assert(size > 0);
+    assert(count > 0);
 
     int pool_size = count * (sizeof(void*) + size);
     JsonPool* pool = (JsonPool*)parser->allocator.alloc(parser->allocator.data, sizeof(JsonPool) + pool_size);
@@ -229,7 +266,7 @@ static void JsonPool_Release(JsonPool* pool, void* ptr)
 #endif
 
 /* funcdef: JsonBucket_Make */
-static JsonBucket* JsonBucket_Make(JsonParser* parser, JsonBucket* prev, size_t count, size_t size)
+static JsonBucket* JsonBucket_Make(JsonParser* parser, JsonBucket* prev, int count, int size)
 {
     if (count <= 0 || size <= 0)
     {
@@ -357,7 +394,7 @@ static JsonParser* JsonParser_Make(const char* json, const JsonAllocator* alloca
 		parser->column = 1;
 		parser->cursor = 0;
 		parser->buffer = json;
-		parser->length = strlen(json);
+		parser->length = (int)strlen(json);
 
 		parser->errmsg = NULL;
 		parser->errnum = JSON_ERROR_NONE;
@@ -408,13 +445,9 @@ static JsonParser* JsonParser_Reuse(JsonParser* parser, const char* json, const 
             JsonPool_Free(parser, parser->valuePool);
 
             JsonBucket_Free(parser, parser->stringBucket);
-            //JsonBucket_Free(parser, parser->arrayValuesBucket);
-            //JsonBucket_Free(parser, parser->objectValuesBucket);
 
 		    parser->valuePool            = NULL;
             parser->stringBucket         = NULL;
-            //parser->arrayValuesBucket    = NULL;
-            //parser->objectValuesBucket   = NULL;
 
             parser->allocator.free(parser->allocator.data, parser->errmsg); 
             parser->errmsg = NULL;
@@ -442,32 +475,6 @@ static JsonParser* JsonParser_Reuse(JsonParser* parser, const char* json, const 
                 if (parser->stringBucket->prev)
                 {
                     parser->stringBucket = parser->stringBucket->prev;
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            while (parser->arrayValuesBucket)
-            {
-                parser->arrayValuesBucket->count = 0;
-                if (parser->arrayValuesBucket->prev)
-                {
-                    parser->arrayValuesBucket = parser->arrayValuesBucket->prev;
-                }
-                else
-                {
-                    break;
-                }
-            }
-            
-            while (parser->objectValuesBucket)
-            {
-                parser->objectValuesBucket->count = 0;
-                if (parser->objectValuesBucket->prev)
-                {
-                    parser->objectValuesBucket = parser->objectValuesBucket->prev;
                 }
                 else
                 {
@@ -830,52 +837,17 @@ static JsonValue* JsonParser_ParseArray(JsonParser* parser, JsonValue* root)
 	        }
 	    
 	        JsonValue* value = JsonParser_ParseSingle(parser, NULL);
-            
-            int   oldSize   = sizeof(int) + (length + 0) * sizeof(JsonValue*);
-            int   newSize   = sizeof(int) + (length + 1) * sizeof(JsonValue*);
-            //void* newValues = values;
-            void* newValues = JsonBucket_Resize(parser->arrayValuesBucket, values ? (int*)values - 1 : NULL, oldSize, newSize);
-            if (!newValues)
-            {
-                /* Get from unused buckets (a.k.a reuse json_state_t) */
-                while (parser->arrayValuesBucket && parser->arrayValuesBucket->prev)
-                {
-                    parser->arrayValuesBucket = parser->arrayValuesBucket->prev;
-                    newValues = JsonBucket_Acquire(parser->arrayValuesBucket, newSize);
-                    if (!newValues)
-                    {
-                        break;
-                    }
-                }
-            
-                if (!newValues)
-                {
-                    /* Create new buckets */
-                    parser->arrayValuesBucket = JsonBucket_Make(parser, parser->arrayValuesBucket, JSON_VALUE_BUCKETS, 1);
-                    
-                    newValues = JsonBucket_Acquire(parser->arrayValuesBucket, newSize);
-                    if (!newValues)
-                    {
-                        Json_Panic(parser, JSON_ARRAY, JSON_ERROR_MEMORY, "Out of memory when create <array>");
-                    }
-                    else if (values)
-                    {
-                        memcpy(newValues, (int*)values - 1, oldSize);
-                    }
-                }
-            }
-
-            values = (JsonValue**)((int*)newValues + 1);
-	        values[length++] = value;
+            JsonArray_Push(values, value, &parser->allocator);
+            length++;
 	    }
 
 	    JsonParser_SkipSpace(parser);
 	    JsonParser_MatchChar(parser, JSON_ARRAY, ']');
 
-        if (values)
-        {
-            *((int*)values - 1) = length;
-        }
+        //if (values)
+        //{
+        //    *((int*)values - 1) = length;
+        //}
 
 	    root->array = values;
 	    return root;
@@ -957,6 +929,8 @@ static JsonValue* JsonParser_ParseSingle(JsonParser* parser, JsonValue* value)
 static const char* JsonParser_ParseStringNoToken(JsonParser* parser)
 {
     const int HEADER_SIZE = sizeof(int);
+
+    JsonParser_MatchChar(parser, JSON_STRING, '"');
 
     int   i;
     int   c0, c1;
@@ -1079,8 +1053,8 @@ static const char* JsonParser_ParseStringNoToken(JsonParser* parser)
     {
         tmpString[length] = 0;
 
-        size_t size   = HEADER_SIZE + ((size_t)length + 1);
-        char*  string = (char*)JsonBucket_Acquire(parser->stringBucket, size);
+        int   size   = HEADER_SIZE + (length + 1);
+        char* string = (char*)JsonBucket_Acquire(parser->stringBucket, size);
         if (!string)
         {
             /* Get from unused buckets */
@@ -1106,7 +1080,6 @@ static const char* JsonParser_ParseStringNoToken(JsonParser* parser)
 
         /* String header */
         ((int*)string)[0] = length;
-        //((int*)string)[1] = JsonHash(tmpString, length);
         string = string + HEADER_SIZE;
 
 #if defined(_MSC_VER) && _MSC_VER >= 1200
@@ -1135,8 +1108,6 @@ static JsonValue* JsonParser_ParseString(JsonParser* parser, JsonValue* value)
     }
     else
     {
-        JsonParser_MatchChar(parser, JSON_STRING, '"');
-
         const char* string = JsonParser_ParseStringNoToken(parser);
         if (!string)
         {
@@ -1172,6 +1143,10 @@ static JsonValue* JsonParser_ParseObject(JsonParser* parser, JsonValue* root)
         if (!root)
         {
             root = JsonValue_Make(parser, JSON_OBJECT);
+            if (root->object)
+            {
+                JsonArray_GetRaw(root->object)[1] = 0;
+            }
         }
         else
         {
@@ -1193,68 +1168,24 @@ static JsonValue* JsonParser_ParseObject(JsonParser* parser, JsonValue* root)
             }
 
             const char* name       = JsonParser_ParseStringNoToken(parser);
-            int         nameLength = JsonLength(name);
+            int         nameLength = name ? ((int*)name - 1)[0] : 0;
 
             JsonParser_SkipSpace(parser);
             JsonParser_MatchChar(parser, JSON_OBJECT, ':');
 
             JsonValue* value = JsonParser_ParseSingle(parser, NULL);
 
-            /* Append new pair of value to container */
-            int   oldLength = length++;
-            int   oldSize   = sizeof(int) + oldLength * sizeof(root->object[0]);
-            int   newSize   = sizeof(int) + length * sizeof(root->object[0]);
-            //void* newValues = NULL;
-            void* newValues = JsonBucket_Resize(parser->objectValuesBucket,
-                                                   root->object ? (int*)root->object - 1 : NULL,
-                                                   oldSize, 
-                                                   newSize);
-            if (!newValues)
-            {
-                /* Get from unused buckets */
-                while (parser->objectValuesBucket && parser->objectValuesBucket->prev)
-                {
-                    parser->objectValuesBucket = parser->objectValuesBucket->prev;
-                    newValues = JsonBucket_Acquire(parser->objectValuesBucket, length);
-                    if (newValues)
-                    {
-                        break;
-                    }
-                }
-            
-                if (!newValues)
-                {
-                    /* Create new buffer */
-                    parser->objectValuesBucket = JsonBucket_Make(parser, parser->objectValuesBucket, JSON_VALUE_BUCKETS, 1);
-                    
-                    /* Continue get new buffer for values */
-                    newValues = JsonBucket_Acquire(parser->objectValuesBucket, length);
-                    if (!newValues)
-                    {
-                        Json_Panic(parser, JSON_OBJECT, JSON_ERROR_MEMORY, "Out of memory when create <object>");
-                    }
-                    else if (root->object)
-                    {
-                        memcpy(newValues, (int*)root->object - 1, oldSize);
-                    }
-                }
-            }
-
-            /* When code reach here, newValues should not invalid */
-            assert(newValues != NULL && "An error occurred but is not handled");
-
             /* Well done */
-            *((void**)&root->object) = (int*)newValues + 1;
-            root->object[oldLength].hash  = JsonHash(name, nameLength);
+            //*((void**)&root->object) = (int*)newValues + 1;
+            JsonObjectEntry entry;
+            entry.hash  = JsonHash(name, nameLength);
 #ifdef JSON_OBJECT_KEYNAME
-            root->object[oldLength].name  = name;
+            entry.name  = name;
 #endif
-            root->object[oldLength].value = value;
-        }
+            entry.value = value;
+            JsonArray_Push(root->object, entry, &parser->allocator);
 
-        if (root->object)
-        {
-            *((int*)root->object - 1) = length;
+            length++;
         }
 
         JsonParser_SkipSpace(parser);
@@ -1413,13 +1344,13 @@ int JsonLength(const JsonValue* x)
         switch (x->type)
         {
         case JSON_ARRAY:
-            return x->array ? *((int*)x->array - 1) : 0;
+            return JsonArray_GetCount(x->array);
 
         case JSON_STRING:
             return x->string ? *((int*)x->string - 2) : 0;
 
         case JSON_OBJECT:
-            return x->object ? *((int*)x->object - 1) : 0;
+            return JsonArray_GetCount(x->array);
 
         default:
             break;
@@ -1512,12 +1443,13 @@ JsonValue* JsonFind(const JsonValue* obj, const char* name)
     if (obj && obj->type == JSON_OBJECT)
     {
         int i, n;
-        int hash = JsonHash((void*)name, strlen(name));
+        int hash = JsonHash((void*)name, (int)strlen(name));
         for (i = 0, n = JsonLength(obj); i < n; i++)
         {
-            if (hash == obj->object[i].hash)
+            JsonObjectEntry* entry = &obj->object[i];
+            if (hash == entry->hash)
             {
-                return obj->object[i].value;
+                return entry->value;
             }
         }
     }

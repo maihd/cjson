@@ -1,4 +1,4 @@
-/******************************************************
+﻿/******************************************************
  * Simple json parser written in ANSI C
  *
  * @author: MaiHD
@@ -35,7 +35,7 @@
 extern "C" {
 #endif
 
-struct FILE;
+//struct FILE;
 
 /**
     * JSON type of json value
@@ -107,8 +107,8 @@ JSON_API void          JsonRelease(JsonParser* parser);
 JSON_API JsonError     JsonGetError(const JsonParser* parser);
 JSON_API const char*   JsonGetErrorString(const JsonParser* parser);
 
-JSON_API void          JsonPrint(const JsonValue* value, FILE* out);
-JSON_API void          JsonWrite(const JsonValue* value, FILE* out);
+//JSON_API void          JsonPrint(const JsonValue* value, FILE* out);
+//JSON_API void          JsonWrite(const JsonValue* value, FILE* out);
 
 JSON_API int           JsonLength(const JsonValue* x);
 JSON_API JsonBoolean   JsonEquals(const JsonValue* a, const JsonValue* b);
@@ -118,9 +118,19 @@ JSON_API int           JsonHash(const void* buffer, int length);
 JSON_API JsonValue*    JsonFind(const JsonValue* x, const char* name);
 JSON_API JsonValue*    JsonFindWithHash(const JsonValue* x, int hash);
 
+typedef struct JsonObjectEntry
+{
+    int               hash;
+    struct JsonValue* value;
+
+#ifdef JSON_OBJECT_KEYNAME
+    const char*       name;
+#endif
+} JsonObjectEntry;
+
 /**
-    * JSON value
-    */
+* JSON value
+*/
 struct JsonValue
 {
     JsonType type;
@@ -133,15 +143,7 @@ struct JsonValue
 
         struct JsonValue** array;
 
-        struct
-        {
-            int               hash;
-            struct JsonValue* value;
-
-#ifdef JSON_OBJECT_KEYNAME
-            const char*       name;
-#endif
-        }*object;
+        JsonObjectEntry* object;
     };
 
 #ifdef __cplusplus
