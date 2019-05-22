@@ -151,11 +151,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\json.h" />
-    <ClInclude Include="..\src\json_impl.h" />
+    <ClCompile Include="..\src\json_unit_test.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\json_unit_test.c" />
+    <ClInclude Include="..\src\Json.h" />
+    <ClInclude Include="..\src\JsonEx.h" />
+    <ClInclude Include="..\src\JsonImpl.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
