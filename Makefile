@@ -4,7 +4,7 @@ CFLAGS=-Wall -O0
 .PHONY: clean
 
 test:
-	$(CC) -o json_test.exe src/json_test.c $(CFLAGS)'
+	$(CC) -o json_test.exe src/Json_TokenTest.c $(CFLAGS)
 	./json_test.exe
 
 unit_test:
