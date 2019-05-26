@@ -26,6 +26,8 @@ static void json_debug_free(void* data, void* ptr)
 {
     //assert(ptr && "Internal error: attempt free with nullptr");
 
+    //JsonDebugAllocator* debug = (JsonDebugAllocator*)data;
+    //debug->alloced -= size;
     (void)data;
     free(ptr);
 }
