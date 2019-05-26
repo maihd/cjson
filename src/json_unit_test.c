@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
             settings.alloc = json_debug_alloc;
 
             double dt = get_time();
-            JsonParser* state = NULL;
+            JsonState* state = NULL;
             JsonValue* value = JsonParseEx(buffer, &settings, &state);
             if (JsonGetError(state) != JSON_ERROR_NONE || !value)
             {
@@ -99,9 +99,10 @@ int main(int argc, char* argv[])
             }
             dt = get_time() - dt;
 
-            JsonValue* firstObject = value && JsonLength(value) > 0 ? value->array[0] : NULL;
-
-            JsonValue* idValue = JsonFind(firstObject, "_id");
+            //int length = JsonLength(value);
+            //JsonValue* firstObject = value && JsonLength(value) > 0 ? value->array[0] : NULL;
+            //
+            //JsonValue* idValue = JsonFind(firstObject, "_id");
 
             JsonRelease(state);
             fclose(file);

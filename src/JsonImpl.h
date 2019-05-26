@@ -10,11 +10,19 @@
 #ifndef JSON_INLINE
 #  if defined(_MSC_VER)
 #     define JSON_INLINE __forceinline
+#  elif defined(__GNUC__) || defined(__clang__)
+#     define JSON_INLINE __inline__ __attribute__((always_inline))
 #  elif defined(__cplusplus)
 #     define JSON_INLINE inline
 #  else
 #     define JSON_INLINE 
 #  endif
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#   define JSON_MAYBE_UNUSED __attribute__((unused))
+#else
+#   define JSON_MAYBE_UNUSED
 #endif
 
 #ifndef JSON_VALUE_BUCKETS
@@ -29,16 +37,28 @@
 #define JSON_VALUE_POOL_COUNT (4096/sizeof(JsonValue))
 #endif
 
-typedef struct JsonPool   JsonPool;
-typedef struct JsonBucket JsonBucket;
+typedef struct JsonPool JsonPool;
 
 typedef struct JsonArray
 {
     void*       next;
     int         size;
     int         count;
-    JsonValue   items[];
+    char        buffer[];
 } JsonArray;
+
+/* Next power of two */
+static JSON_INLINE JSON_MAYBE_UNUSED int Json_NextPOT(int x)
+{
+    x  = x - 1;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    x++;
+    return x;
+}
 
 #define JsonArray_GetRaw(a)             ((JsonArray*)((char*)(a) - sizeof(JsonArray)))
 #define JsonArray_Init()                0
@@ -48,13 +68,12 @@ typedef struct JsonArray
 #define JsonArray_GetUsageMemory(a)     (sizeof(JsonArray) + JsonArray_GetCount(a) * sizeof(*(a)))
 #define JsonArray_Push(a, v, alloc)     (JsonArray_Ensure(a, JsonArray_GetCount(a) + 1, alloc) ? ((void)((a)[JsonArray_GetRaw(a)->count++] = v), 1) : 0)
 #define JsonArray_Pop(a, v, alloc)      ((a)[--JsonArray_GetRaw(a)->count]);
-#define JsonArray_Ensure(a, n, alloc)   ((!(a) || JsonArray_GetSize(a) < (n)) ? (*((void**)&(a))=JsonArray_Grow(a, n, sizeof((a)[0]), alloc)) != NULL : 1)
+#define JsonArray_Ensure(a, n, alloc)   ((!(a) || JsonArray_GetSize(a) < (n)) ? (*((void**)&(a))=JsonArray_Grow(a, Json_NextPOT(n), sizeof((a)[0]), alloc)) != NULL : 1)
 #define JsonArray_Clear(a)              ((a) ? (void)(JsonArray_GetRaw(a)->count = 0) : (void)0)
-#define JsonArray_Clone(a, mem)         ((a) ? memcpy((mem)->alloc((mem)->data, JsonArray_GetUsageMemory(a)), JsonArray_GetRaw(a), JsonArray_GetUsageMemory(a)) : NULL)
+#define JsonArray_Clone(a, alloc)       ((a) ? memcpy(JsonArray_Grow(0, JsonArray_GetCount(a), sizeof((a)[0]), alloc), JsonArray_GetRaw(a), JsonArray_GetUsageMemory(a)) : NULL)
 
-static void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocator* allocator)
+static void* JSON_MAYBE_UNUSED JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocator* allocator)
 {
-    assert(reqsize > 0);
     assert(elemsize > 0);
     assert(allocator != NULL);
 
@@ -66,15 +85,10 @@ static void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocato
     {
         return array;
     }
-
-    /* Next power of two reqsize */
-    size  = reqsize - 1;
-    size |= size >> 1;
-    size |= size >> 2;
-    size |= size >> 4;
-    size |= size >> 8;
-    size |= size >> 16;
-    size++;
+    else
+    {
+        size = reqsize;
+    }
 
     JsonArray* newArray = (JsonArray*)allocator->alloc(allocator->data, sizeof(JsonArray) + size * elemsize);
     if (newArray)
@@ -82,18 +96,50 @@ static void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocato
         newArray->size  = size;
         newArray->count = count;
 
-        if (raw)
+        if (raw && count > 0)
         {
-            memcpy(newArray->items, raw->items, count * elemsize);
+            memcpy(newArray->buffer, raw->buffer, count * elemsize);
             free(raw);
         }
 
-        return newArray->items;
+        return newArray->buffer;
     }
     else
     {
         return NULL;
     }
+}
+
+#define JsonTempArray(T, CAPACITY)  struct {    \
+    T*  array;                                  \
+    int count;                                  \
+    T   buffer[CAPACITY]; }
+
+#define JsonTempArray_Init()              { 0, 0 }
+#define JsonTempArray_Free(a, alloc)      JsonArray_Free((a)->array, alloc)
+#define JsonTempArray_Push(a, v, alloc)   ((a)->count >= sizeof((a)->buffer) / sizeof((a)->buffer[0]) ? 0 : ((a)->buffer[(a)->count++] = v, 1))
+#define JsonTempArray_ToArray(a, alloc)   JsonTempArray_ToArrayFunc(a, (int)sizeof((a)->buffer[0]), alloc)
+
+static void* JsonTempArray_ToArrayFunc(void* tempArray, int itemSize, JsonAllocator* allocator)
+{
+    typedef JsonTempArray(char, 0) TempArrayView;
+    TempArrayView* tempArrayView = (TempArrayView*)tempArray;
+
+    void* array = JsonArray_Grow(0, tempArrayView->count, itemSize, allocator);
+    if (array)
+    {
+        JsonArray* realArray = JsonArray_GetRaw(array);
+        realArray->count = tempArrayView->count;
+        memcpy(array, tempArrayView->buffer, tempArrayView->count * itemSize);
+
+        //if (itemSize == 8)
+        //{
+        //    JsonValue** values = (JsonValue*)array;
+        //    (void)values;
+        //    values += 1;
+        //}
+    }
+    return array;
 }
 
 struct JsonPool
@@ -109,31 +155,27 @@ struct JsonPool
     JsonAllocator*  allocator;
 };
 
-struct JsonBucket
+struct JsonStringPool
 {
-    JsonBucket* prev;
-    JsonBucket* next;
-
-    int size;
-    int count;
-    int capacity;
+    int  size;
+    int  count;
+    char buffer[];
 };
 
-struct JsonParser
+struct JsonState
 {
-    JsonParser*     next;
+    JsonValue*      root;
+    JsonState*     next;
     JsonPool*       valuePool;
     JsonPool*       arrayPool;  /* For parsing */
 
-    JsonBucket*     stringBucket;
-    
     int             line;
     int             column;
     int             cursor;
     JsonType        parsingType;
     
     int             length;
-    const char*     buffer;
+    char*           buffer;
     
     JsonError       errnum;
     char*           errmsg;
@@ -142,7 +184,7 @@ struct JsonParser
     JsonAllocator   allocator; /* Runtime allocator */
 };
 
-static JsonParser* rootParser = NULL;
+static JsonState* rootState = NULL;
 
 /* @funcdef: Json_Alloc */
 static void* Json_Alloc(void* data, int size)
@@ -158,7 +200,7 @@ static void Json_Free(void* data, void* pointer)
     free(pointer);
 }
 
-static void Json_SetErrorArgs(JsonParser* parser, JsonType type, JsonError code, const char* fmt, va_list valist)
+static void Json_SetErrorArgs(JsonState* state, JsonType type, JsonError code, const char* fmt, va_list valist)
 {
     const int errmsg_size = 1024;
 
@@ -194,52 +236,52 @@ static void Json_SetErrorArgs(JsonParser* parser, JsonType type, JsonError code,
         break;
     }
 
-    parser->errnum = code;
-    if (parser->errmsg == NULL)
+    state->errnum = code;
+    if (state->errmsg == NULL)
     {
-        parser->errmsg = (char*)parser->allocator.alloc(parser->allocator.data, errmsg_size);
+        state->errmsg = (char*)state->allocator.alloc(state->allocator.data, errmsg_size);
     }
 
     char final_format[1024];
     char templ_format[1024] = "%s\n\tAt line %d, column %d. Parsing token: <%s>.";
 
 #if defined(_MSC_VER) && _MSC_VER >= 1200
-    sprintf_s(final_format, sizeof(final_format), templ_format, fmt, parser->line, parser->column, type_name);
-    sprintf_s(parser->errmsg, errmsg_size, final_format, valist);
+    sprintf_s(final_format, sizeof(final_format), templ_format, fmt, state->line, state->column, type_name);
+    sprintf_s(state->errmsg, errmsg_size, final_format, valist);
 #else
-    sprintf(final_format, templ_format, fmt, parser->line, parser->column, type_name);
-    sprintf(parser->errmsg, final_format, valist);
+    sprintf(final_format, templ_format, fmt, state->line, state->column, type_name);
+    sprintf(state->errmsg, final_format, valist);
 #endif
 }
 
 /* @funcdef: Json_SetError */
-static void Json_SetError(JsonParser* parser, JsonType type, JsonError code, const char* fmt, ...)
+static void Json_SetError(JsonState* state, JsonType type, JsonError code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
-    Json_SetErrorArgs(parser, type, code, fmt, varg);
+    Json_SetErrorArgs(state, type, code, fmt, varg);
     va_end(varg);
 }
 
 /* funcdef: Json_Panic */
-static void Json_Panic(JsonParser* parser, JsonType type, JsonError code, const char* fmt, ...)
+static void Json_Panic(JsonState* state, JsonType type, JsonError code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
-    Json_SetErrorArgs(parser, type, code, fmt, varg);
+    Json_SetErrorArgs(state, type, code, fmt, varg);
     va_end(varg);
 
-    longjmp(parser->errjmp, code);
+    longjmp(state->errjmp, code);
 }
 
 /* funcdef: JsonPool_Make */
-static JsonPool* JsonPool_Make(JsonParser* parser, JsonPool* prev, int count, int size, int grow)
+static JsonPool* JsonPool_Make(JsonState* state, JsonPool* prev, int count, int size, int grow)
 {
     assert(size > 0);
     assert(count >= 0);
 
     int pool_size = count * (sizeof(void*) + size);
-    JsonPool* pool = (JsonPool*)parser->allocator.alloc(parser->allocator.data, sizeof(JsonPool) + pool_size);
+    JsonPool* pool = (JsonPool*)state->allocator.alloc(state->allocator.data, sizeof(JsonPool) + pool_size);
     if (pool)
     {
         if (prev)
@@ -251,7 +293,7 @@ static JsonPool* JsonPool_Make(JsonParser* parser, JsonPool* prev, int count, in
         pool->size      = size;
 		pool->prev      = prev;
 		pool->next      = NULL;
-        pool->allocator = &parser->allocator;
+        pool->allocator = &state->allocator;
 
         if (count > 0)
         {
@@ -275,12 +317,12 @@ static JsonPool* JsonPool_Make(JsonParser* parser, JsonPool* prev, int count, in
 }
 
 /* funcdef: JsonPool_Free */
-static void JsonPool_Free(JsonParser* parser, JsonPool* pool)
+static void JsonPool_Free(JsonState* state, JsonPool* pool)
 {
     if (pool)
     {
-		JsonPool_Free(parser, pool->prev);
-		parser->allocator.free(parser->allocator.data, pool);
+		JsonPool_Free(state, pool->prev);
+		state->allocator.free(state->allocator.data, pool);
     }
 }
 
@@ -305,7 +347,7 @@ static void* JsonPool_Acquire(JsonPool* pool)
 }
 
 /* funcdef: JsonPool_Release */
-static void JsonPool_Release(JsonPool* pool, void* ptr)
+static void JSON_MAYBE_UNUSED JsonPool_Release(JsonPool* pool, void* ptr)
 {
     if (ptr)
     {
@@ -315,110 +357,27 @@ static void JsonPool_Release(JsonPool* pool, void* ptr)
     }
 }
 
-/* funcdef: JsonBucket_Make */
-static JsonBucket* JsonBucket_Make(JsonParser* parser, JsonBucket* prev, int count, int size)
-{
-    if (count <= 0 || size <= 0)
-    {
-        return NULL;
-    }
-
-    JsonBucket* bucket = (JsonBucket*)parser->allocator.alloc(parser->allocator.data, sizeof(JsonBucket) + count * size);
-    if (bucket)
-    {
-        if (prev)
-        {
-            prev->next = bucket;
-        }
-
-        bucket->prev     = prev;
-        bucket->next     = NULL;
-        bucket->size     = size;
-        bucket->count    = 0;
-        bucket->capacity = count;
-    }
-    return bucket;
-}
-
-/* funcdef: JsonBucket_Free */
-static void JsonBucket_Free(JsonParser* parser, JsonBucket* bucket)
-{
-    if (bucket)
-    {
-        /* Free next */
-        JsonBucket_Free(parser, bucket->next);
-
-        /* Free now */ 
-        parser->allocator.free(parser->allocator.data, bucket);
-    }
-}
-
-/* funcdef: JsonBucket_Acquire */
-static void* JsonBucket_Acquire(JsonBucket* bucket, int count)
-{
-    if (!bucket || count <= 0)
-    {
-        return NULL;
-    }
-    else if (bucket->count + count <= bucket->capacity)
-    {
-        void* res = (char*)bucket + sizeof(JsonBucket) + bucket->size * bucket->count;
-        bucket->count += count;
-        return res;
-    }
-    else
-    {
-        return NULL;
-    }
-}
-
-/* funcdef: JsonBucket_Resize */
-static void* JsonBucket_Resize(JsonBucket* bucket, void* ptr, int oldCount, int newCount)
-{
-    if (!bucket || newCount <= 0)
-    {
-        return NULL;
-    }
-
-    if (!ptr)
-    {
-        return JsonBucket_Acquire(bucket, newCount);
-    }
-
-    char* begin = (char*)bucket + sizeof(JsonBucket);
-    char* end   = begin + bucket->size * bucket->count;
-    if ((char*)ptr + bucket->size * oldCount == end && bucket->count + (newCount - oldCount) <= bucket->capacity)
-    {
-        bucket->count += (newCount - oldCount);
-        return ptr;
-    }
-    else
-    {
-        return NULL;
-    }
-}
-
 /* @funcdef: JsonValue_Make */
-static JsonValue* JsonValue_Make(JsonParser* parser, JsonType type)
+static JsonValue* JsonValue_Make(JsonState* state, JsonType type)
 {
-    if (!parser->valuePool || !parser->valuePool->head)
+    if (!state->valuePool || !state->valuePool->head)
     {
-        if (parser->valuePool && parser->valuePool->prev)
+        if (state->valuePool && state->valuePool->prev)
         {
-            parser->valuePool = parser->valuePool->prev;
+            state->valuePool = state->valuePool->prev;
         }
         else
         {
-            parser->valuePool = JsonPool_Make(parser, parser->valuePool, JSON_VALUE_POOL_COUNT, sizeof(JsonValue), JSON_FALSE);
+            state->valuePool = JsonPool_Make(state, state->valuePool, JSON_VALUE_POOL_COUNT, sizeof(JsonValue), JSON_FALSE);
         }
 
-		if (!parser->valuePool)
+		if (!state->valuePool)
 		{
-			Json_Panic(parser, type, JSON_ERROR_MEMORY, "Out of memory");
+			Json_Panic(state, type, JSON_ERROR_MEMORY, "Out of memory");
 		}
     }
     
-    JsonValue* value = (JsonValue*)JsonPool_Acquire(parser->valuePool);
+    JsonValue* value = (JsonValue*)JsonPool_Acquire(state->valuePool);
     if (value)
     {
 		memset(value, 0, sizeof(JsonValue));
@@ -427,166 +386,192 @@ static JsonValue* JsonValue_Make(JsonParser* parser, JsonType type)
     }
     else
     {
-		Json_Panic(parser, type, JSON_ERROR_MEMORY, "Out of memory");
+		Json_Panic(state, type, JSON_ERROR_MEMORY, "Out of memory");
     }
     return value;
 }
 
-/* @funcdef: JsonParser_Make */
-static JsonParser* JsonParser_Make(const char* json, const JsonAllocator* allocator)
+static void JsonValue_ReleaseMemory(JsonValue* value, JsonAllocator* allocator)
 {
-    JsonParser* parser = (JsonParser*)allocator->alloc(allocator->data, sizeof(JsonParser));
-    if (parser)
+    if (value)
     {
-		parser->next            = NULL;
+        switch (value->type)
+        {
+        case JSON_ARRAY:
+            for (int i = 0, n = JsonLength(value); i < n; i++)
+            {
+                JsonValue_ReleaseMemory(value->array[i], allocator);
+            }
+            JsonArray_Free(value->array, allocator);
+            break;
 
-		parser->line            = 1;
-		parser->column          = 1;
-		parser->cursor          = 0;
-		parser->buffer          = json;
-		parser->length          = (int)strlen(json);
+        case JSON_OBJECT:
+            for (int i = 0, n = JsonLength(value); i < n; i++)
+            {
+                JsonValue_ReleaseMemory(value->object[i].value, allocator);
+            }
+            JsonArray_Free(value->object, allocator);
+            break;
 
-		parser->errmsg          = NULL;
-		parser->errnum          = JSON_ERROR_NONE;
-
-		parser->valuePool       = NULL;
-        parser->stringBucket    = NULL;
-        parser->arrayPool       = NULL;
-        //parser->arrayValuesBucket    = NULL;
-        //parser->objectValuesBucket   = NULL;
-
-        parser->allocator = *allocator;
+        default:
+            break;
+        }
     }
-    return parser;
 }
 
-/* @funcdef: JsonParser_Reuse */
-static JsonParser* JsonParser_Reuse(JsonParser* parser, const char* json, const JsonAllocator* allocator)
+/* @funcdef: JsonState_Make */
+static JsonState* JsonState_Make(const char* json, const JsonAllocator* allocator)
 {
-    if (parser)
+    JsonState* state = (JsonState*)allocator->alloc(allocator->data, sizeof(JsonState));
+    if (state)
     {
-        if (parser == rootParser)
+		state->next            = NULL;
+
+		state->line            = 1;
+		state->column          = 1;
+		state->cursor          = 0;
+		state->length          = (int)strlen(json);
+		state->buffer          = (char*)memcpy(allocator->alloc(allocator->data, state->length), json, state->length);
+
+		state->errmsg          = NULL;
+		state->errnum          = JSON_ERROR_NONE;
+
+		state->valuePool       = NULL;
+        state->arrayPool       = NULL;
+        //state->arrayValuesBucket    = NULL;
+        //state->objectValuesBucket   = NULL;
+
+        state->allocator = *allocator;
+    }
+    return state;
+}
+
+/* @funcdef: JsonState_Reuse */
+static JsonState* JsonState_Reuse(JsonState* state, const char* json, const JsonAllocator* allocator)
+{
+    if (state)
+    {
+        if (state == rootState)
         {
-            rootParser = parser->next;
+            rootState = state->next;
         }
         else
         {
-            JsonParser* list = rootParser;
+            JsonState* list = rootState;
             while (list)
             {
-                if (list->next == parser)
+                if (list->next == state)
                 {
-                    list->next = parser->next;
+                    list->next = state->next;
                 }
             }
 
-		    parser->next = NULL;
+		    state->next = NULL;
         }
 
-		parser->line   = 1;
-		parser->column = 1;
-		parser->cursor = 0;
-		parser->buffer = json;
-		parser->errnum = JSON_ERROR_NONE;
+		state->line   = 1;
+		state->column = 1;
+		state->cursor = 0;
+		state->errnum = JSON_ERROR_NONE;
 
-        if (parser->allocator.data != allocator->data ||
-            parser->allocator.free != allocator->free ||
-            parser->allocator.alloc != allocator->alloc)
+        int newLength = (int)strlen(json);
+
+        if (state->allocator.data  != allocator->data ||
+            state->allocator.free  != allocator->free ||
+            state->allocator.alloc != allocator->alloc)
         {
-            JsonPool_Free(parser, parser->valuePool);
+            JsonPool_Free(state, state->valuePool);
+            state->valuePool = NULL;
 
-            JsonBucket_Free(parser, parser->stringBucket);
+            state->allocator.free(state->allocator.data, state->errmsg); 
+            state->errmsg = NULL;
 
-		    parser->valuePool            = NULL;
-            parser->stringBucket         = NULL;
-
-            parser->allocator.free(parser->allocator.data, parser->errmsg); 
-            parser->errmsg = NULL;
+            state->allocator.free(state->allocator.data, state->buffer);
+            state->buffer = allocator->alloc(allocator->data, newLength);
         }
         else
         {
-            if (parser->errmsg) parser->errmsg[0] = 0;
+            if (state->errmsg) state->errmsg[0] = 0;
 
-            while (parser->valuePool)
+            while (state->valuePool)
             {
-                parser->valuePool->head = (void**)(parser->valuePool + 1);
-                if (parser->valuePool->prev)
+                state->valuePool->head = (void**)(state->valuePool + 1);
+                if (state->valuePool->prev)
                 {
                     break;
                 }
                 else
                 {
-                    parser->valuePool = parser->valuePool->prev;
+                    state->valuePool = state->valuePool->prev;
                 }
             }
 
-            while (parser->stringBucket)
+            if (state->length < newLength)
             {
-                parser->stringBucket->count = 0;
-                if (parser->stringBucket->prev)
-                {
-                    parser->stringBucket = parser->stringBucket->prev;
-                }
-                else
-                {
-                    break;
-                }
+                allocator->free(allocator->data, state->buffer);
+                state->buffer = allocator->alloc(allocator->data, newLength);
             }
         }
+
+        state->length = newLength;
+        state->buffer = (char*)memcpy(state->buffer, json, newLength + 1);
     }
-    return parser;
+    return state;
 }
 
-/* @funcdef: JsonParser_Free */
-static void JsonParser_Free(JsonParser* parser)
+/* @funcdef: JsonState_Free */
+static void JsonState_Free(JsonState* state)
 {
-    if (parser)
+    if (state)
     {
-		JsonParser* next = parser->next;
+        JsonValue* root = state->root;
+        JsonValue_ReleaseMemory(root, &state->allocator);
 
-        //JsonBucket_Free(parser, parser->objectValuesBucket);
-        //JsonBucket_Free(parser, parser->arrayValuesBucket);
-        JsonBucket_Free(parser, parser->stringBucket);
-		JsonPool_Free(parser, parser->valuePool);
+		JsonState* next = state->next;
 
-		parser->allocator.free(parser->allocator.data, parser->errmsg);
-		parser->allocator.free(parser->allocator.data, parser);
+        //JsonStringPool_Free(state, state->objectValuesBucket);
+        //JsonStringPool_Free(state, state->arrayValuesBucket);
+		JsonPool_Free(state, state->valuePool);
 
-		JsonParser_Free(next);
+        state->allocator.free(state->allocator.data, state->buffer);
+		state->allocator.free(state->allocator.data, state->errmsg);
+		state->allocator.free(state->allocator.data, state);
+
+		JsonState_Free(next);
     }
 }
 
-/* @funcdef: JsonParser_IsEOF */
-static int JsonParser_IsEOF(JsonParser* parser)
+/* @funcdef: Json_IsEOF */
+static int Json_IsEOF(JsonState* state)
 {
-    return parser->cursor >= parser->length || parser->buffer[parser->cursor] <= 0;
+    return state->cursor >= state->length || state->buffer[state->cursor] <= 0;
 }
 
-/* @funcdef: JsonParser_PeekChar */
-static int JsonParser_PeekChar(JsonParser* parser)
+/* @funcdef: Json_PeekChar */
+static int Json_PeekChar(JsonState* state)
 {
-    return parser->buffer[parser->cursor];
+    return state->buffer[state->cursor];
 }
 
-/* @funcdef: JsonParser_NextChar */
-static int JsonParser_NextChar(JsonParser* parser)
+/* @funcdef: Json_NextChar */
+static int Json_NextChar(JsonState* state)
 {
-    if (JsonParser_IsEOF(parser))
+    if (Json_IsEOF(state))
     {
 		return -1;
     }
     else
     {
-		int c = parser->buffer[++parser->cursor];
+		int c = state->buffer[++state->cursor];
 
 		if (c == '\n')
 		{
-			parser->line++;
-			parser->column = 1;
+			state->line++;
+			state->column = 1;
 		}
 		else
 		{
-			parser->column = parser->column + 1;
+			state->column = state->column + 1;
 		}
 		
 		return c;
@@ -594,38 +579,38 @@ static int JsonParser_NextChar(JsonParser* parser)
 }
 
 #if 0 /* UNUSED */
-static int JsonParser_NextLine(JsonParser* parser)
+static int Json_NextLine(JsonState* state)
 {
-    int c = JsonParser_PeekChar(parser);
+    int c = Json_PeekChar(state);
     while (c > 0 && c != '\n')
     {
-		c = JsonParser_NextChar(parser);
+		c = Json_NextChar(state);
     }
-    return JsonParser_NextChar(parser);
+    return Json_NextChar(state);
 }
 #endif
 
-/* @funcdef: JsonParser_SkipSpace */
-static int JsonParser_SkipSpace(JsonParser* parser)
+/* @funcdef: Json_SkipSpace */
+static int Json_SkipSpace(JsonState* state)
 {
-    int c = JsonParser_PeekChar(parser);
+    int c = Json_PeekChar(state);
     while (c > 0 && isspace(c))
     {
-		c = JsonParser_NextChar(parser);
+		c = Json_NextChar(state);
     }
     return c;
 }
 
-/* @funcdef: JsonParser_MatchChar */
-static int JsonParser_MatchChar(JsonParser* parser, JsonType type, int c)
+/* @funcdef: Json_MatchChar */
+static int Json_MatchChar(JsonState* state, JsonType type, int c)
 {
-    if (JsonParser_PeekChar(parser) == c)
+    if (Json_PeekChar(state) == c)
     {
-		return JsonParser_NextChar(parser);
+		return Json_NextChar(state);
     }
     else
     {
-        Json_Panic(parser, type, JSON_ERROR_UNMATCH, "Expected '%c'", c);
+        Json_Panic(state, type, JSON_ERROR_UNMATCH, "Expected '%c'", c);
 		return -1;
     }
 }
@@ -684,45 +669,45 @@ int JsonHash(const void* buf, int len)
 
 /* All parse functions declaration */
 
-static JsonValue* JsonParser_ParseArray(JsonParser* parser);
-static JsonValue* JsonParser_ParseSingle(JsonParser* parser);
-static JsonValue* JsonParser_ParseObject(JsonParser* parser);
-static JsonValue* JsonParser_ParseNumber(JsonParser* parser);
-static JsonValue* JsonParser_ParseString(JsonParser* parser);
+static JsonValue* Json_ParseArray(JsonState* state);
+static JsonValue* Json_ParseSingle(JsonState* state);
+static JsonValue* Json_ParseObject(JsonState* state);
+static JsonValue* Json_ParseNumber(JsonState* state);
+static JsonValue* Json_ParseString(JsonState* state);
 
-/* @funcdef: JsonParser_ParseNumber */
-static JsonValue* JsonParser_ParseNumber(JsonParser* parser)
+/* @funcdef: Json_ParseNumber */
+static JsonValue* Json_ParseNumber(JsonState* state)
 {
-    if (JsonParser_SkipSpace(parser) < 0)
+    if (Json_SkipSpace(state) < 0)
     {
 		return NULL;
     }
     else
     {
-		int c = JsonParser_PeekChar(parser);
+		int c = Json_PeekChar(state);
 		int sign = 1;
 		
 		if (c == '+')
 		{
-			c = JsonParser_NextChar(parser);
-			Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "JSON does not support number start with '+'");
+			c = Json_NextChar(state);
+			Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "JSON does not support number start with '+'");
 		}
 		else if (c == '-')
 		{
 			sign = -1;
-			c = JsonParser_NextChar(parser);
+			c = Json_NextChar(state);
 		}
 		else if (c == '0')
 		{
-			c = JsonParser_NextChar(parser);
+			c = Json_NextChar(state);
 			if (!isspace(c) && !ispunct(c))
 			{
-				Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "JSON does not support number start with '0' (only standalone '0' is accepted)");
+				Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "JSON does not support number start with '0' (only standalone '0' is accepted)");
 			}
 		}
 		else if (!isdigit(c))
 		{
-			Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Unexpected '%c'", c);
+			Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Unexpected '%c'", c);
 		}
 
 		int    dot    = 0;
@@ -739,11 +724,11 @@ static JsonValue* JsonParser_ParseNumber(JsonParser* parser)
             {
                 if (exp)
                 {
-                    Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many 'e' are presented in a <number>");
+                    Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many 'e' are presented in a <number>");
                 }
                 else if (dot && numpow == 1)
                 {
-                    Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
+                    Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED,
                                 "'.' is presented in number token, but require a digit after '.' ('%c')", c);
                 }
                 else
@@ -756,11 +741,11 @@ static JsonValue* JsonParser_ParseNumber(JsonParser* parser)
 			{
                 if (exp)
                 {
-                    Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Cannot has '.' after 'e' is presented in a <number>");
+                    Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Cannot has '.' after 'e' is presented in a <number>");
                 }
 				else if (dot)
 				{
-					Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many '.' are presented in a <number>");
+					Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many '.' are presented in a <number>");
 				}
 				else
 				{
@@ -771,11 +756,11 @@ static JsonValue* JsonParser_ParseNumber(JsonParser* parser)
             {
                 if (expchk)
                 {
-                    Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "'%c' is presented after digits are presented of exponent part", c);
+                    Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "'%c' is presented after digits are presented of exponent part", c);
                 }
                 else if (expsgn)
                 {
-                    Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many signed characters are presented after 'e'");
+                    Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "Too many signed characters are presented after 'e'");
                 }
                 else
                 {
@@ -807,21 +792,21 @@ static JsonValue* JsonParser_ParseNumber(JsonParser* parser)
                 }
 			}
 
-			c = JsonParser_NextChar(parser);
+			c = Json_NextChar(state);
 		}
 
         if (exp && !expchk)
         {
-            Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "'e' is presented in number token, but require a digit after 'e' ('%c')", c);
+            Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "'e' is presented in number token, but require a digit after 'e' ('%c')", c);
         }
 		if (dot && numpow == 1)
 		{
-			Json_Panic(parser, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "'.' is presented in number token, but require a digit after '.' ('%c')", c);
+			Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "'.' is presented in number token, but require a digit after '.' ('%c')", c);
 			return NULL;
 		}
 		else
 		{
-            JsonValue* value = JsonValue_Make(parser, JSON_NUMBER);
+            JsonValue* value = JsonValue_Make(state, JSON_NUMBER);
 			value->number = sign * number;
 
             if (exp)
@@ -848,76 +833,81 @@ static JsonValue* JsonParser_ParseNumber(JsonParser* parser)
     }
 }
 
-/* @funcdef: JsonParser_ParseArray */
-static JsonValue* JsonParser_ParseArray(JsonParser* parser)
+/* @funcdef: Json_ParseArray */
+static JsonValue* Json_ParseArray(JsonState* state)
 {
-    if (JsonParser_SkipSpace(parser) < 0)
+    if (Json_SkipSpace(state) < 0)
     {
         return NULL;
     }
     else
     {
-	    JsonParser_MatchChar(parser, JSON_ARRAY, '[');
+	    Json_MatchChar(state, JSON_ARRAY, '[');
 
-        if (!parser->arrayPool)
-        {
-            parser->arrayPool = JsonPool_Make(parser, NULL, 0, 16 * sizeof(JsonValue*), JSON_FALSE);
-        }
+        //if (!state->arrayPool)
+        //{
+        //    state->arrayPool = JsonPool_Make(state, NULL, 0, 16 * sizeof(JsonValue*), JSON_FALSE);
+        //}
 
 	    int         length = 0;
-	    JsonValue** values = (JsonValue**)JsonPool_Acquire(parser->arrayPool);
+	    //JsonValue** values = (JsonValue**)JsonPool_Acquire(state->arrayPool);
+        //
+        //JsonArray_Clear(values);
 
-        JsonArray_Clear(values);
+        JsonTempArray(JsonValue*, 128) values = JsonTempArray_Init();
 
-	    while (JsonParser_SkipSpace(parser) > 0 && JsonParser_PeekChar(parser) != ']')
+	    while (Json_SkipSpace(state) > 0 && Json_PeekChar(state) != ']')
 	    {
 	        if (length > 0)
 	        {
-                JsonParser_MatchChar(parser, JSON_ARRAY, ',');
+                Json_MatchChar(state, JSON_ARRAY, ',');
 	        }
 	    
-	        JsonValue* value = JsonParser_ParseSingle(parser, NULL);
-            JsonArray_Push(values, value, &parser->allocator);
+	        JsonValue* value = Json_ParseSingle(state);
+            //JsonArray_Push(values, value, &state->allocator);
+            JsonTempArray_Push(&values, value, &state->allocator);
             length++;
 	    }
 
-	    JsonParser_SkipSpace(parser);
-	    JsonParser_MatchChar(parser, JSON_ARRAY, ']');
+	    Json_SkipSpace(state);
+	    Json_MatchChar(state, JSON_ARRAY, ']');
 
-        JsonValue* value = JsonValue_Make(parser, JSON_ARRAY);
-        value->array = JsonArray_Clone(values, &parser->allocator);
-        JsonPool_Release(parser->arrayPool, values);
+        JsonValue* value = JsonValue_Make(state, JSON_ARRAY);
+        //value->array = JsonArray_Clone(values, &state->allocator);
+        //JsonPool_Release(state->arrayPool, values);
+        value->array = (JsonValue**)JsonTempArray_ToArray(&values, &state->allocator);
+        JsonTempArray_Free(&values, &state->allocator);
 	    return value;
     }
 }
 
-/* JsonParser_ParseSingle */
-static JsonValue* JsonParser_ParseSingle(JsonParser* parser)
+/* Json_ParseSingle */
+static JsonValue* Json_ParseSingle(JsonState* state)
 {
-    if (JsonParser_SkipSpace(parser) < 0)
+    if (Json_SkipSpace(state) < 0)
     {
         return NULL;
     }
     else
     {
-	    int c = JsonParser_PeekChar(parser);
+	    int c = Json_PeekChar(state);
 	
 	    switch (c)
 	    {
 	    case '[':
-	        return JsonParser_ParseArray(parser);
+	        return Json_ParseArray(state);
 	    
 	    case '{':
-	        return JsonParser_ParseObject(parser);
+	        return Json_ParseObject(state);
 	    
 	    case '"':
-	        return JsonParser_ParseString(parser);
+	        return Json_ParseString(state);
 
 	    case '+': case '-': case '0': 
         case '1': case '2': case '3': 
         case '4': case '5': case '6': 
         case '7': case '8': case '9':
-	        return JsonParser_ParseNumber(parser);
+	        return Json_ParseNumber(state);
 	    
         default:
 	    {
@@ -925,24 +915,24 @@ static JsonValue* JsonParser_ParseSingle(JsonParser* parser)
 	        while (c > 0 && isalpha(c))
 	        {
                 length++;
-                c = JsonParser_NextChar(parser);
+                c = Json_NextChar(state);
 	        }
 
-	        const char* token = parser->buffer + parser->cursor - length;
+	        const char* token = state->buffer + state->cursor - length;
 	        if (length == 4 && strncmp(token, "true", 4) == 0)
 	        {
-                JsonValue* value = JsonValue_Make(parser, JSON_BOOLEAN);
+                JsonValue* value = JsonValue_Make(state, JSON_BOOLEAN);
                 value->boolean = JSON_TRUE;
                 return value;
 	        }
 	        else if (length == 4 && strncmp(token, "null", 4) == 0)
             {
-                JsonValue* value = JsonValue_Make(parser, JSON_NULL);
+                JsonValue* value = JsonValue_Make(state, JSON_NULL);
                 return value;
             }
 	        else if (length == 5 && strncmp(token, "false", 5) == 0)
 	        {
-                JsonValue* value = JsonValue_Make(parser, JSON_NULL);
+                JsonValue* value = JsonValue_Make(state, JSON_NULL);
                 value->boolean = JSON_FALSE;
                 return value;
 	        }
@@ -955,7 +945,7 @@ static JsonValue* JsonParser_ParseSingle(JsonParser* parser)
                     tmp[length] = token[length]; 
                 }
 
-                Json_Panic(parser, JSON_NONE, JSON_ERROR_UNEXPECTED, "Unexpected token '%s'", tmp);
+                Json_Panic(state, JSON_NONE, JSON_ERROR_UNEXPECTED, "Unexpected token '%s'", tmp);
 	        }
 	    } break;
 	    /* END OF SWITCH STATEMENT */
@@ -965,107 +955,85 @@ static JsonValue* JsonParser_ParseSingle(JsonParser* parser)
     }
 }
 
-static const char* JsonParser_ParseStringNoToken(JsonParser* parser)
+static const char* Json_ParseStringNoToken(JsonState* state, int* outLength)
 {
-    const int HEADER_SIZE = sizeof(int);
-
-    JsonParser_MatchChar(parser, JSON_STRING, '"');
+    Json_MatchChar(state, JSON_STRING, '"');
 
     int   i;
     int   c0, c1;
     int   length = 0;
-    char  tmpBuffer[1024];
-    char* tmpString = tmpBuffer;
-    int   capacity = sizeof(tmpBuffer);
-    while (!JsonParser_IsEOF(parser) && (c0 = JsonParser_PeekChar(parser)) != '"')
+    char* string = &state->buffer[state->cursor];
+    while (!Json_IsEOF(state) && (c0 = Json_PeekChar(state)) != '"')
     {
-        if (length > capacity)
-        {
-            capacity <<= 1;
-            if (tmpString != tmpBuffer)
-            {
-                tmpString = (char*)malloc(capacity);
-            }
-            else
-            {
-                tmpString = (char*)realloc(tmpString, capacity);
-                if (!tmpString)
-                {
-                    Json_Panic(parser, JSON_STRING, JSON_ERROR_MEMORY, "Out of memory when create new <string>");
-                    return NULL;
-                }
-            }
-        }
-
         if (c0 == '\\')
         {
-            c0 = JsonParser_NextChar(parser);
+            c0 = Json_NextChar(state);
             switch (c0)
             {
             case 'n':
-                tmpString[length++] = '\n';
+                string[length++] = '\n';
                 break;
 
             case 't':
-                tmpString[length++] = '\t';
+                string[length++] = '\t';
                 break;
 
             case 'r':
-                tmpString[length++] = '\r';
+                string[length++] = '\r';
                 break;
 
             case 'b':
-                tmpString[length++] = '\b';
+                string[length++] = '\b';
                 break;
 
             case '\\':
-                tmpString[length++] = '\\';
+                string[length++] = '\\';
                 break;
 
             case '"':
-                tmpString[length++] = '\"';
+                string[length++] = '\"';
                 break;
 
             case 'u':
                 c1 = 0;
                 for (i = 0; i < 4; i++)
                 {
-                    if (isxdigit((c0 = JsonParser_NextChar(parser))))
+                    if (isxdigit((c0 = Json_NextChar(state))))
                     {
                         c1 = c1 * 10 + (isdigit(c0) ? c0 - '0' : c0 < 'a' ? c0 - 'A' : c0 - 'a');
                     }
                     else
                     {
-                        Json_Panic(parser, JSON_STRING, JSON_ERROR_UNKNOWN, "Expected hexa character in unicode character");
+                        Json_Panic(state, JSON_STRING, JSON_ERROR_UNKNOWN, "Expected hexa character in unicode character");
                     }
                 }
 
                 if (c1 <= 0x7F)
                 {
-                    tmpString[length++] = c1;
+                    string[length++] = c1;
                 }
                 else if (c1 <= 0x7FF)
                 {
-                    tmpString[length++] = 0xC0 | (c1 >> 6);            /* 110xxxxx */
-                    tmpString[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
+                    string[length++] = 0xC0 | (c1 >> 6);            /* 110xxxxx */
+                    string[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
                 }
                 else if (c1 <= 0xFFFF)
                 {
-                    tmpString[length++] = 0xE0 | (c1 >> 12);           /* 1110xxxx */
-                    tmpString[length++] = 0x80 | ((c1 >> 6) & 0x3F);   /* 10xxxxxx */
-                    tmpString[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
+                    string[length++] = 0xE0 | (c1 >> 12);           /* 1110xxxx */
+                    string[length++] = 0x80 | ((c1 >> 6) & 0x3F);   /* 10xxxxxx */
+                    string[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
                 }
                 else if (c1 <= 0x10FFFF)
                 {
-                    tmpString[length++] = 0xF0 | (c1 >> 18);           /* 11110xxx */
-                    tmpString[length++] = 0x80 | ((c1 >> 12) & 0x3F);  /* 10xxxxxx */
-                    tmpString[length++] = 0x80 | ((c1 >> 6) & 0x3F);   /* 10xxxxxx */
-                    tmpString[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
+                    string[length++] = 0xF0 | (c1 >> 18);           /* 11110xxx */
+                    string[length++] = 0x80 | ((c1 >> 12) & 0x3F);  /* 10xxxxxx */
+                    string[length++] = 0x80 | ((c1 >> 6) & 0x3F);   /* 10xxxxxx */
+                    string[length++] = 0x80 | (c1 & 0x3F);          /* 10xxxxxx */
                 }
                 break;
 
             default:
-                Json_Panic(parser, JSON_STRING, JSON_ERROR_UNKNOWN, "Unknown escape character");
+                Json_Panic(state, JSON_STRING, JSON_ERROR_UNKNOWN, "Unknown escape character");
                 break;
             }
         }
@@ -1075,125 +1043,83 @@ static const char* JsonParser_ParseStringNoToken(JsonParser* parser)
             {
             case '\r':
             case '\n':
-                Json_Panic(parser, JSON_STRING, JSON_ERROR_UNEXPECTED, "Unexpected newline characters '%c'", c0);
+                Json_Panic(state, JSON_STRING, JSON_ERROR_UNEXPECTED, "Unexpected newline characters '%c'", c0);
                 break;
 
             default:
-                tmpString[length++] = c0;
+                length++;
+                //state->buffer[length++] = c0;
                 break;
             }
         }
 
-        JsonParser_NextChar(parser);
-    }
-    JsonParser_MatchChar(parser, JSON_STRING, '"');
-
-    if (tmpString)
-    {
-        tmpString[length] = 0;
-
-        int   size   = HEADER_SIZE + (length + 1);
-        char* string = (char*)JsonBucket_Acquire(parser->stringBucket, size);
-        if (!string)
-        {
-            /* Get from unused buckets */
-            while (parser->stringBucket && parser->stringBucket->prev)
-            {
-                parser->stringBucket = parser->stringBucket->prev;
-                string = (char*)JsonBucket_Acquire(parser->stringBucket, capacity);
-                if (string)
-                {
-                    break;
-                }
-            }
-
-            /* Create new bucket */
-            parser->stringBucket = JsonBucket_Make(parser, parser->stringBucket, JSON_STRING_BUCKETS, 1);
-            string = (char*)JsonBucket_Acquire(parser->stringBucket, capacity);
-            if (!string)
-            {
-                Json_Panic(parser, JSON_STRING, JSON_ERROR_MEMORY, "Out of memory when create new <string>");
-                return NULL;
-            }
-        }
-
-        /* String header */
-        ((int*)string)[0] = length;
-        string = string + HEADER_SIZE;
-
-#if defined(_MSC_VER) && _MSC_VER >= 1200
-        strncpy_s(string, length + 1, tmpString, length);
-#else
-        strncpy(string, tmpString, length);
-#endif
-
-        if (tmpString != tmpBuffer)
-        {
-            free(tmpString);
-        }
-
-        return string;
+        Json_NextChar(state);
     }
 
-    return NULL;
+    Json_MatchChar(state, JSON_STRING, '"');
+    if (outLength) *outLength = length;
+    string[length] = 0;
+    return string;
 }
 
-/* @funcdef: JsonParser_ParseString */
-static JsonValue* JsonParser_ParseString(JsonParser* parser)
+/* @funcdef: Json_ParseString */
+static JsonValue* Json_ParseString(JsonState* state)
 {
-    if (JsonParser_SkipSpace(parser) < 0)
+    if (Json_SkipSpace(state) < 0)
     {
         return NULL;
     }
     else
     {
-        const char* string = JsonParser_ParseStringNoToken(parser);
+        const char* string = Json_ParseStringNoToken(state, NULL);
         if (!string)
         {
 
             return NULL;
         }
 
-        JsonValue* value = JsonValue_Make(parser, JSON_STRING);
+        JsonValue* value = JsonValue_Make(state, JSON_STRING);
         value->string = string;
         return value;
     }
 }
 
-/* @funcdef: JsonParser_ParseObject */
-static JsonValue* JsonParser_ParseObject(JsonParser* parser)
+/* @funcdef: Json_ParseObject */
+static JsonValue* Json_ParseObject(JsonState* state)
 {
-    if (JsonParser_SkipSpace(parser) < 0)
+    if (Json_SkipSpace(state) < 0)
     {
         return NULL;
     }
     else
     {
-        JsonParser_MatchChar(parser, JSON_OBJECT, '{');
+        Json_MatchChar(state, JSON_OBJECT, '{');
 
-        JsonValue* root = JsonValue_Make(parser, JSON_OBJECT);
+        JsonTempArray(JsonObjectEntry, 128) values = JsonTempArray_Init();
+
+        JsonValue* root = JsonValue_Make(state, JSON_OBJECT);
         root->object = NULL;
 
         int length = 0;
-        while (JsonParser_SkipSpace(parser) > 0 && JsonParser_PeekChar(parser) != '}')
+        while (Json_SkipSpace(state) > 0 && Json_PeekChar(state) != '}')
         {
             if (length > 0)
             {
-                JsonParser_MatchChar(parser, JSON_OBJECT, ',');
+                Json_MatchChar(state, JSON_OBJECT, ',');
             }
 
-            if (JsonParser_SkipSpace(parser) != '"')
+            if (Json_SkipSpace(state) != '"')
             {
-                Json_Panic(parser, JSON_OBJECT, JSON_ERROR_UNEXPECTED, "Expected <string> for <member-key> of <object>");
+                Json_Panic(state, JSON_OBJECT, JSON_ERROR_UNEXPECTED, "Expected <string> for <member-key> of <object>");
             }
 
-            const char* name       = JsonParser_ParseStringNoToken(parser);
-            int         nameLength = name ? ((int*)name - 1)[0] : 0;
+            int         nameLength;
+            const char* name = Json_ParseStringNoToken(state, &nameLength);
 
-            JsonParser_SkipSpace(parser);
-            JsonParser_MatchChar(parser, JSON_OBJECT, ':');
+            Json_SkipSpace(state);
+            Json_MatchChar(state, JSON_OBJECT, ':');
 
-            JsonValue* value = JsonParser_ParseSingle(parser, NULL);
+            JsonValue* value = Json_ParseSingle(state);
 
             /* Well done */
             //*((void**)&root->object) = (int*)newValues + 1;
@@ -1203,37 +1129,40 @@ static JsonValue* JsonParser_ParseObject(JsonParser* parser)
             entry.name  = name;
 #endif
             entry.value = value;
-            JsonArray_Push(root->object, entry, &parser->allocator);
+            JsonTempArray_Push(&values, entry, &state->allocator);
+            //JsonArray_Push(root->object, entry, &state->allocator);
 
             length++;
         }
 
-        JsonParser_SkipSpace(parser);
-        JsonParser_MatchChar(parser, JSON_OBJECT, '}');
+        Json_SkipSpace(state);
+        Json_MatchChar(state, JSON_OBJECT, '}');
 
+        root->object = (JsonObjectEntry*)JsonTempArray_ToArray(&values, &state->allocator);
+        JsonTempArray_Free(&values, &state->allocator);
         return root;
     }
 }
          
 /* Internal parsing function
  */
-static JsonValue* JsonParser_ParseTopLevel(JsonParser* parser)
+static JsonValue* Json_ParseTopLevel(JsonState* state)
 {
-    if (!parser)
+    if (!state)
     {
         return NULL;
     }
 
-    if (JsonParser_SkipSpace(parser) == '{')
+    if (Json_SkipSpace(state) == '{')
     {
-        if (setjmp(parser->errjmp) == 0)
+        if (setjmp(state->errjmp) == 0)
         {
-            JsonValue* value = JsonParser_ParseObject(parser, NULL);
+            JsonValue* value = Json_ParseObject(state);
 
-            JsonParser_SkipSpace(parser);
-            if (!JsonParser_IsEOF(parser))
+            Json_SkipSpace(state);
+            if (!Json_IsEOF(state))
             {
-                Json_Panic(parser, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed. JSON is start with <object>.");
+                Json_Panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed. JSON is start with <object>.");
             }
 
             return value;
@@ -1243,16 +1172,16 @@ static JsonValue* JsonParser_ParseTopLevel(JsonParser* parser)
             return NULL;
         }
     }
-    else if (JsonParser_SkipSpace(parser) == '[')
+    else if (Json_SkipSpace(state) == '[')
     {
-        if (setjmp(parser->errjmp) == 0)
+        if (setjmp(state->errjmp) == 0)
         {
-            JsonValue* value = JsonParser_ParseArray(parser, NULL);
+            JsonValue* value = Json_ParseArray(state);
 
-            JsonParser_SkipSpace(parser);
-            if (!JsonParser_IsEOF(parser))
+            Json_SkipSpace(state);
+            if (!Json_IsEOF(state))
             {
-                Json_Panic(parser, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed. JSON is start with <array>.");
+                Json_Panic(state, JSON_NONE, JSON_ERROR_FORMAT, "JSON is not well-formed. JSON is start with <array>.");
             }
 
             return value;
@@ -1264,53 +1193,58 @@ static JsonValue* JsonParser_ParseTopLevel(JsonParser* parser)
     }
     else
     {
-        Json_SetError(parser, JSON_NONE, JSON_ERROR_FORMAT, 
-                      "JSON must be starting with '{' or '[', first character is '%c'", JsonParser_PeekChar(parser));
+        Json_SetError(state, JSON_NONE, JSON_ERROR_FORMAT, 
+                      "JSON must be starting with '{' or '[', first character is '%c'", Json_PeekChar(state));
         return NULL;
     }
 }
 
 /* @funcdef: JsonParse */
-JsonValue* JsonParse(const char* json, JsonParser** out_state)
+JsonValue* JsonParse(const char* json, JsonState** outState)
 {
     JsonAllocator allocator;
     allocator.data  = NULL;
     allocator.free  = Json_Free;
     allocator.alloc = Json_Alloc;
 
-    return JsonParseEx(json, &allocator, out_state);
+    return JsonParseEx(json, &allocator, outState);
 }
 
 /* @funcdef: JsonParseEx */
-JsonValue* JsonParseEx(const char* json, const JsonAllocator* allocator, JsonParser** outParser)
+JsonValue* JsonParseEx(const char* json, const JsonAllocator* allocator, JsonState** outState)
 {
-    JsonParser* parser = outParser && *outParser ? JsonParser_Reuse(*outParser, json, allocator) : JsonParser_Make(json, allocator);
-    JsonValue*  value = JsonParser_ParseTopLevel(parser);
+    JsonState* state = outState && *outState ? JsonState_Reuse(*outState, json, allocator) : JsonState_Make(json, allocator);
+    JsonValue* value = Json_ParseTopLevel(state);
 
     if (value)
     {
-        if (outParser)
+        if (state)
         {
-            *outParser = parser;
+            state->root = value;
+        }
+
+        if (outState)
+        {
+            *outState = state;
         }
         else
         {
-            if (parser)
+            if (state)
             {
-                parser->next = rootParser;
-                rootParser  = parser;
+                state->next = rootState;
+                rootState   = state;
             }
         }
     }
     else
     {
-        if (outParser)
+        if (outState)
         {
-            *outParser = parser;
+            *outState = state;
         }
         else
         {
-            JsonParser_Free(parser);
+            JsonState_Free(state);
         }
     }
 
@@ -1318,25 +1252,25 @@ JsonValue* JsonParseEx(const char* json, const JsonAllocator* allocator, JsonPar
 }
 
 /* @funcdef: JsonRelease */
-void JsonRelease(JsonParser* parser)
+void JsonRelease(JsonState* state)
 {
-    if (parser)
+    if (state)
     {
-        JsonParser_Free(parser);
+        JsonState_Free(state);
     }
     else
     {
-        JsonParser_Free(rootParser);
-        rootParser = NULL;
+        JsonState_Free(rootState);
+        rootState = NULL;
     }
 }
 
 /* @funcdef: JsonGetError */
-JsonError JsonGetError(const JsonParser* parser)
+JsonError JsonGetError(const JsonState* state)
 {
-    if (parser)
+    if (state)
     {
-        return parser->errnum;
+        return state->errnum;
     }
     else
     {
@@ -1345,11 +1279,11 @@ JsonError JsonGetError(const JsonParser* parser)
 }
 
 /* @funcdef: JsonGetErrorString */
-const char* JsonGetErrorString(const JsonParser* parser)
+const char* JsonGetErrorString(const JsonState* state)
 {
-    if (parser)
+    if (state)
     {
-        return parser->errmsg;
+        return state->errmsg;
     }
     else
     {
@@ -1368,10 +1302,10 @@ int JsonLength(const JsonValue* x)
             return JsonArray_GetCount(x->array);
 
         case JSON_STRING:
-            return x->string ? *((int*)x->string - 2) : 0;
+            return x->string ? (int)strlen(x->string) : 0;
 
         case JSON_OBJECT:
-            return JsonArray_GetCount(x->array);
+            return JsonArray_GetCount(x->object);
 
         default:
             break;

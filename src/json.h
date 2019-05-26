@@ -1,5 +1,5 @@
 ﻿/******************************************************
- * Simple json parser written in ANSI C
+ * Simple json state written in ANSI C
  *
  * @author: MaiHD
  * @license: Public domain
@@ -60,7 +60,7 @@ typedef enum JsonError
     JSON_ERROR_INTERNAL,
 } JsonError;
 
-typedef struct JsonParser    JsonParser;
+typedef struct JsonState     JsonState;
 typedef struct JsonValue     JsonValue;
 typedef struct JsonAllocator JsonAllocator;
 
@@ -73,13 +73,13 @@ typedef enum JsonBoolean
     JSON_FALSE = 0,
 } JsonBoolean;
 
-JSON_API JsonValue*    JsonParse(const char* json, JsonParser** parser);
-JSON_API JsonValue*    JsonParseEx(const char* json, const JsonAllocator* allocator, JsonParser** parser);
+JSON_API JsonValue*    JsonParse(const char* json, JsonState** outState);
+JSON_API JsonValue*    JsonParseEx(const char* json, const JsonAllocator* allocator, JsonState** outState);
 
-JSON_API void          JsonRelease(JsonParser* parser);
+JSON_API void          JsonRelease(JsonState* state);
 
-JSON_API JsonError     JsonGetError(const JsonParser* parser);
-JSON_API const char*   JsonGetErrorString(const JsonParser* parser);
+JSON_API JsonError     JsonGetError(const JsonState* state);
+JSON_API const char*   JsonGetErrorString(const JsonState* state);
 
 JSON_API int           JsonLength(const JsonValue* x);
 JSON_API JsonBoolean   JsonEquals(const JsonValue* a, const JsonValue* b);
@@ -121,8 +121,9 @@ struct JsonValue
 struct JsonAllocator
 {
     void* data;
+    void  (*free)(void* data, void* ptr);
     void* (*alloc)(void* data, int size);
-    void(*free)(void* data, void* ptr);
+    //void* (*realloc)(void* data, void* ptr, int size);
 };
 
 /* END OF EXTERN "C" */
