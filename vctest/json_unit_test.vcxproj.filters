@@ -18,15 +18,15 @@
     <ClCompile Include="..\src\json_unit_test.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\Json.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\Json.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\src\JsonEx.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\JsonImpl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

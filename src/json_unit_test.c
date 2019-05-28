@@ -4,9 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "./Json.h"
-#include "./JsonImpl.h"
 
 typedef struct
 {

@@ -67,11 +67,12 @@ typedef struct JsonAllocator JsonAllocator;
 /**
  * JSON boolean data type
  */
-typedef enum JsonBoolean
+typedef int JsonBoolean;
+enum 
 {
     JSON_TRUE  = 1,
     JSON_FALSE = 0,
-} JsonBoolean;
+};
 
 JSON_API JsonValue*    JsonParse(const char* json, JsonState** outState);
 JSON_API JsonValue*    JsonParseEx(const char* json, const JsonAllocator* allocator, JsonState** outState);
