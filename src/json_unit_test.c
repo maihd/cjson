@@ -13,7 +13,7 @@ typedef struct
     size_t alloced;
 } JsonDebugAllocator;
 
-static void* json_debug_alloc(void* data, int size)
+static void* JsonDebug_Alloc(void* data, int size)
 {
     assert(size > 0 && "Internal error: attempt alloc with size < 0");
 
@@ -22,7 +22,7 @@ static void* json_debug_alloc(void* data, int size)
     return malloc((size_t)size);
 }
 
-static void json_debug_free(void* data, void* ptr)
+static void JsonDebug_Free(void* data, void* ptr)
 {
     //assert(ptr && "Internal error: attempt free with nullptr");
 
@@ -86,8 +86,8 @@ int main(int argc, char* argv[])
 
             JsonAllocator settings;
             settings.data  = &debug;
-            settings.free  = json_debug_free;
-            settings.alloc = json_debug_alloc;
+            settings.free  = JsonDebug_Free;
+            settings.alloc = JsonDebug_Alloc;
 
             double dt = get_time();
             JsonState* state = NULL;
@@ -99,10 +99,10 @@ int main(int argc, char* argv[])
             }
             dt = get_time() - dt;
 
-            int length = JsonLength(value);
-            JsonValue* firstObject = value && JsonLength(value) > 0 ? &value->array[0] : NULL;
+            //int length = JsonLength(value);
+            //JsonValue* firstObject = value && JsonLength(value) > 0 ? &value->array[0] : NULL;
             //
-            JsonValue* idValue = JsonFind(firstObject, "_id");
+            //JsonValue* idValue = JsonFind(firstObject, "_id");
 
             JsonRelease(state);
             fclose(file);

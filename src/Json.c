@@ -27,27 +27,14 @@
 #   define JSON_MAYBE_UNUSED
 #endif
 
-#ifndef JSON_VALUE_BUCKETS
-#define JSON_VALUE_BUCKETS 4096
-#endif
-
-#ifndef JSON_STRING_BUCKETS
-#define JSON_STRING_BUCKETS 4096
-#endif
-
-#ifndef JSON_VALUE_POOL_COUNT
-#define JSON_VALUE_POOL_COUNT (4096/sizeof(JsonValue))
-#endif
-
-#define JSON_ALLOC(a, size, tag)    (a)->alloc((a)->data, size) 
-#define JSON_FREE(a, ptr, tag)      (a)->free((a)->data, ptr)
+#define JSON_ALLOC(a, size) (a)->alloc((a)->data, size) 
+#define JSON_FREE(a, ptr)   (a)->free((a)->data, ptr)
 
 typedef struct JsonArray
 {
-    void*       next;
-    int         size;
-    int         count;
-    char        buffer[];
+    int  size;
+    int  count;
+    char buffer[];
 } JsonArray;
 
 /* Next power of two */
@@ -63,7 +50,7 @@ static JSON_INLINE JSON_MAYBE_UNUSED int Json_NextPOT(int x)
     return x;
 }
 
-#define JsonArray_GetRaw(a)             ((JsonArray*)((char*)(a) - sizeof(JsonArray)))
+#define JsonArray_GetRaw(a)             ((JsonArray*)(a) - 1)
 #define JsonArray_Init()                0
 #define JsonArray_Free(a, alloc)        ((a) ? (alloc)->free((alloc)->data, JsonArray_GetRaw(a)) : (void)0)
 #define JsonArray_GetSize(a)            ((a) ? JsonArray_GetRaw(a)->size  : 0)
@@ -75,7 +62,7 @@ static JSON_INLINE JSON_MAYBE_UNUSED int Json_NextPOT(int x)
 #define JsonArray_Clear(a)              ((a) ? (void)(JsonArray_GetRaw(a)->count = 0) : (void)0)
 #define JsonArray_Clone(a, alloc)       ((a) ? memcpy(JsonArray_Grow(0, JsonArray_GetCount(a), sizeof((a)[0]), alloc), JsonArray_GetRaw(a), JsonArray_GetUsageMemory(a)) : NULL)
 
-static void* JSON_MAYBE_UNUSED JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocator* allocator)
+static void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocator* allocator)
 {
     assert(elemsize > 0);
     assert(allocator != NULL);
@@ -93,7 +80,7 @@ static void* JSON_MAYBE_UNUSED JsonArray_Grow(void* array, int reqsize, int elem
         size = reqsize;
     }
 
-    JsonArray* newArray = (JsonArray*)allocator->alloc(allocator->data, sizeof(JsonArray) + size * elemsize);
+    JsonArray* newArray = (JsonArray*)JSON_ALLOC(allocator, sizeof(JsonArray) + size * elemsize);
     if (newArray)
     {
         newArray->size  = size;
@@ -118,30 +105,33 @@ static void* JSON_MAYBE_UNUSED JsonArray_Grow(void* array, int reqsize, int elem
     int count;                                  \
     T   buffer[CAPACITY]; }
 
-#define JsonTempArray_Init()              { 0, 0 }
-#define JsonTempArray_Free(a, alloc)      JsonArray_Free((a)->array, alloc)
+#define JsonTempArray_Init(a)             { a, 0 }
 #define JsonTempArray_Push(a, v, alloc)   ((a)->count >= sizeof((a)->buffer) / sizeof((a)->buffer[0]) ? JsonArray_Push((a)->array, v, alloc) : ((a)->buffer[(a)->count++] = v, 1))
-#define JsonTempArray_ToArray(a, alloc)   JsonTempArray_ToArrayFunc(a, (int)sizeof((a)->buffer[0]), alloc)
+#define JsonTempArray_ToArray(a, alloc)   JsonTempArray_ToArrayFunc((a)->buffer, (a)->count, (a)->array, (int)sizeof((a)->buffer[0]), alloc)
 
-static void* JsonTempArray_ToArrayFunc(void* tempArray, int itemSize, JsonAllocator* allocator)
+static void* JsonTempArray_ToArrayFunc(void* buffer, int count, void* dynamicBuffer, int itemSize, JsonAllocator* allocator)
 {
-    typedef JsonTempArray(char, 0) TempArrayView;
-    TempArrayView* tempArrayView = (TempArrayView*)tempArray;
-
-    int   total = tempArrayView->count + JsonArray_GetCount(tempArrayView->array);
-    void* array = JsonArray_Grow(0, total, itemSize, allocator);
+    int        total = count + JsonArray_GetCount(dynamicBuffer);
+    JsonArray* array = JSON_ALLOC(allocator, sizeof(JsonArray) + total * itemSize);
     if (array)
     {
-        JsonArray* realArray = JsonArray_GetRaw(array);
-        realArray->count = total;
+        array->size  = total;
+        array->count = total;
 
-        memcpy(realArray->buffer, tempArrayView->buffer, tempArrayView->count * itemSize);
-        if (tempArrayView->array)
+        memcpy(array->buffer, buffer, count * itemSize);
+        if (dynamicBuffer)
         {
-            memcpy(&realArray->buffer[tempArrayView->count * itemSize], tempArrayView->array, (total - tempArrayView->count) * itemSize);
+            memcpy(&array->buffer[count * itemSize], dynamicBuffer, (total - count) * itemSize);
         }
+
+        //if (itemSize == 16)
+        //{
+        //    JsonValue* value = array->buffer;
+        //    (void)value;
+        //    value += 1;
+        //}
     }
-    return array;
+    return array->buffer;
 }
 
 struct JsonStringPool
@@ -167,6 +157,9 @@ struct JsonState
     JsonError       errnum;
     char*           errmsg;
     jmp_buf         errjmp;
+
+    JsonValue*       arrayBuffer;    /* For parsing array  */
+    JsonObjectEntry* objectBuffer;   /* For parsing object */
 
     JsonAllocator   allocator; /* Runtime allocator */
 };
@@ -295,18 +288,21 @@ static JsonState* JsonState_Make(const char* json, const JsonAllocator* allocato
     JsonState* state = (JsonState*)allocator->alloc(allocator->data, sizeof(JsonState));
     if (state)
     {
-		state->next            = NULL;
+		state->next         = NULL;
 
-		state->line            = 1;
-		state->column          = 1;
-		state->cursor          = 0;
-		state->length          = (int)strlen(json);
-		state->buffer          = (char*)memcpy(allocator->alloc(allocator->data, state->length), json, state->length);
+		state->line         = 1;
+		state->column       = 1;
+		state->cursor       = 0;
+		state->length       = (int)strlen(json);
+		state->buffer       = (char*)memcpy(allocator->alloc(allocator->data, state->length), json, state->length);
 
-		state->errmsg          = NULL;
-		state->errnum          = JSON_ERROR_NONE;
+		state->errmsg       = NULL;
+		state->errnum       = JSON_ERROR_NONE;
 
-        state->allocator = *allocator;
+        state->arrayBuffer  = NULL;
+        state->objectBuffer = NULL;
+
+        state->allocator    = *allocator;
     }
     return state;
 }
@@ -378,6 +374,8 @@ static void JsonState_Free(JsonState* state)
 
 		JsonState* next = state->next;
 
+        JsonArray_Free(state->objectBuffer, &state->allocator);
+        JsonArray_Free(state->arrayBuffer, &state->allocator);
         JSON_FREE(&state->allocator, state->buffer);
 		JSON_FREE(&state->allocator, state->errmsg);
 		JSON_FREE(&state->allocator, state);
@@ -691,7 +689,8 @@ static int Json_ParseArray(JsonState* state, JsonValue* outValue)
 	    Json_MatchChar(state, JSON_ARRAY, '[');
 
         int length = 0;
-        JsonTempArray(JsonValue, 32) values = JsonTempArray_Init();
+        JsonTempArray(JsonValue, 32) values = JsonTempArray_Init(state->arrayBuffer);
+        JsonArray_Clear(state->arrayBuffer);
 
 	    while (Json_SkipSpace(state) > 0 && Json_PeekChar(state) != ']')
 	    {
@@ -710,12 +709,13 @@ static int Json_ParseArray(JsonState* state, JsonValue* outValue)
 	    Json_SkipSpace(state);
 	    Json_MatchChar(state, JSON_ARRAY, ']');
 
+        void* buffer = values.buffer;
         JsonValue* resultArray = (JsonValue*)JsonTempArray_ToArray(&values, &state->allocator);
 
         outValue->type = JSON_ARRAY;
         outValue->array = resultArray;
-        JsonTempArray_Free(&values, &state->allocator);
 
+        state->arrayBuffer = values.array;
 	    return 1;
     }
 }
@@ -934,7 +934,8 @@ static int Json_ParseObject(JsonState* state, JsonValue* outValue)
     {
         Json_MatchChar(state, JSON_OBJECT, '{');
 
-        JsonTempArray(JsonObjectEntry, 32) values = JsonTempArray_Init();
+        JsonTempArray(JsonObjectEntry, 32) values = JsonTempArray_Init(state->objectBuffer);
+        JsonArray_Clear(state->objectBuffer);
 
         int length = 0;
         while (Json_SkipSpace(state) > 0 && Json_PeekChar(state) != '}')
@@ -977,8 +978,8 @@ static int Json_ParseObject(JsonState* state, JsonValue* outValue)
 
         outValue->type   = JSON_OBJECT;
         outValue->object = (JsonObjectEntry*)JsonTempArray_ToArray(&values, &state->allocator);
-        JsonTempArray_Free(&values, &state->allocator);
 
+        state->objectBuffer = values.array;
         return 1;
     }
 }
