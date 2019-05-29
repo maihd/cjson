@@ -112,7 +112,7 @@ static void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocato
 static void* JsonTempArray_ToArrayFunc(void* buffer, int count, void* dynamicBuffer, int itemSize, JsonAllocator* allocator)
 {
     int        total = count + JsonArray_GetCount(dynamicBuffer);
-    JsonArray* array = JSON_ALLOC(allocator, sizeof(JsonArray) + total * itemSize);
+    JsonArray* array = (JsonArray*)JSON_ALLOC(allocator, sizeof(JsonArray) + total * itemSize);
     if (array)
     {
         array->size  = total;
@@ -307,6 +307,7 @@ static JsonState* JsonState_Make(const char* json, const JsonAllocator* allocato
     return state;
 }
 
+#if 0 && not_used
 /* @funcdef: JsonState_Reuse */
 static JsonState* JsonState_Reuse(JsonState* state, const char* json, const JsonAllocator* allocator)
 {
@@ -363,6 +364,7 @@ static JsonState* JsonState_Reuse(JsonState* state, const char* json, const Json
     }
     return state;
 }
+#endif
 
 /* @funcdef: JsonState_Free */
 static void JsonState_Free(JsonState* state)
@@ -1053,7 +1055,7 @@ JsonValue* JsonParse(const char* json, JsonState** outState)
 /* @funcdef: JsonParseEx */
 JsonValue* JsonParseEx(const char* json, const JsonAllocator* allocator, JsonState** outState)
 {
-    JsonState* state = outState && *outState ? JsonState_Reuse(*outState, json, allocator) : JsonState_Make(json, allocator);
+    JsonState* state = JsonState_Make(json, allocator);
     JsonValue* value = Json_ParseTopLevel(state);
 
     if (value)
