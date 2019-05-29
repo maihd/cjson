@@ -10,7 +10,7 @@
 
 typedef struct
 {
-    size_t alloced;
+    int alloced;
 } JsonDebugAllocator;
 
 static void* JsonDebug_Alloc(void* data, int size)
@@ -19,6 +19,9 @@ static void* JsonDebug_Alloc(void* data, int size)
 
     JsonDebugAllocator* debug = (JsonDebugAllocator*)data;
     debug->alloced += size;
+
+    //printf("Allocate: %d - %d\n", size, debug->alloced);
+
     return malloc((size_t)size);
 }
 
