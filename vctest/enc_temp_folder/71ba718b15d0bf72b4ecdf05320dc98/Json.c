@@ -933,19 +933,11 @@ static char* Json_ParseStringNoToken(JsonState* state, int* outLength)
     }
 
     Json_MatchChar(state, JSON_STRING, '"');
-    if (buffer.count > 0)
-    {
-        if (outLength) *outLength = JsonTempArray_GetCount(&buffer);
-        JsonTempArray_Push(&buffer, 0, &state->allocator);
+    if (outLength) *outLength = JsonTempArray_GetCount(&buffer);
+    JsonTempArray_Push(&buffer, 0, &state->allocator);
 
-        char* string = JsonTempArray_ToString(&buffer, &state->allocator);
-        return string;
-    }
-    else
-    {
-        if (outLength) *outLength = 0;
-        return NULL;
-    }
+    char* string = JsonTempArray_ToString(&buffer, &state->allocator);
+    return string;
 }
 
 /* @funcdef: Json_ParseString */
