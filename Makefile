@@ -3,6 +3,10 @@ CFLAGS=-Wall -O0
 
 .PHONY: clean
 
+ifeq ($(OS), Windows_NT)
+CFLAGS+=-D_WIN32
+endif
+
 test:
 	$(CC) -o json_test.exe src/Json_TokenTest.c $(CFLAGS)
 	./json_test.exe

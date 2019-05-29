@@ -1,4 +1,4 @@
-﻿/******************************************************
+/******************************************************
  * Simple json state written in ANSI C
  *
  * @author: MaiHD
@@ -137,3 +137,4 @@ struct JsonAllocator
 
 /* END OF __JSON_H__ */
 #endif /* __JSON_H__ */
+

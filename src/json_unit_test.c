@@ -35,7 +35,7 @@ static void JsonDebug_Free(void* data, void* ptr)
     free(ptr);
 }
 
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(__cygwin__)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(__cygwin__) || defined(_WIN32)
 #include <Windows.h>
 
 double get_time(void)
@@ -74,10 +74,10 @@ int main(int argc, char* argv[])
         FILE* file = fopen(filename, "r");
         if (file)
         {
-            size_t filesize;
+            int filesize;
 
             fseek(file, 0, SEEK_END);
-            filesize = ftell(file);
+            filesize = (int)ftell(file);
             fseek(file, 0, SEEK_SET);
 
             buffer = (char*)realloc(buffer, (filesize + 1) * sizeof(char));
@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
             JsonRelease(state);
             fclose(file);
 
-            printf("Parsed file '%s'\n\t- file size:\t%zuB\n\t- memory usage:\t%zuB\n\t- times:\t%lfs\n\n", filename, filesize, debug.alloced, dt);
+            printf("Parsed file '%s'\n\t- file size:\t%dB\n\t- memory usage:\t%dB\n\t- times:\t%lfs\n\n", filename, filesize, debug.alloced, dt);
         }
     }
 
@@ -120,3 +120,4 @@ int main(int argc, char* argv[])
 #endif
     return 0;    
 }
+
