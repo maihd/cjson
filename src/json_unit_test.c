@@ -102,10 +102,10 @@ int main(int argc, char* argv[])
             }
             dt = get_time() - dt;
 
-            //int length = JsonLength(value);
-            //JsonValue* firstObject = value && JsonLength(value) > 0 ? &value->array[0] : NULL;
+            int length = value->length;
+            JsonValue* firstObject = value && length > 0 ? &value->array[0] : NULL;
             //
-            //JsonValue* idValue = JsonFind(firstObject, "_id");
+            JsonValue* idValue = JsonFind(firstObject, "_id");
 
             JsonRelease(state);
             fclose(file);

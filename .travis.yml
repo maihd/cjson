@@ -34,7 +34,7 @@ matrix:
       before_install: choco install make
       script: make unit_test CC=clang
 
-    - os: windows
-      language: c
-      script:
-        - echo .travis\\build_vs2017.bat | cmd
+#    - os: windows
+#      language: c
+#      script:
+#        - cmd .travis\\build_vs2017.bat

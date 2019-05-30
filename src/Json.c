@@ -21,24 +21,11 @@
 #  endif
 #endif
 
-#if defined(__GNUC__) || defined(__clang__)
-#   define JSON_MAYBE_UNUSED __attribute__((unused))
-#else
-#   define JSON_MAYBE_UNUSED
-#endif
-
 #define JSON_ALLOC(a, size) (a)->alloc((a)->data, size) 
 #define JSON_FREE(a, ptr)   (a)->free((a)->data, ptr)
 
-typedef struct JsonArray
-{
-    int  size;
-    int  count;
-    char buffer[];
-} JsonArray;
-
 /* Next power of two */
-static JSON_INLINE JSON_MAYBE_UNUSED int Json_NextPOT(int x)
+static JSON_INLINE int Json_NextPOT(int x)
 {
     x  = x - 1;
     x |= x >> 1;
@@ -49,6 +36,18 @@ static JSON_INLINE JSON_MAYBE_UNUSED int Json_NextPOT(int x)
     x++;
     return x;
 }
+
+//
+// JsonArray: dynamic, scalable array
+// @note: internal only
+// 
+
+typedef struct JsonArray
+{
+    int  size;
+    int  count;
+    char buffer[];
+} JsonArray;
 
 #define JsonArray_GetRaw(a)             ((JsonArray*)(a) - 1)
 #define JsonArray_Init()                0
@@ -62,7 +61,7 @@ static JSON_INLINE JSON_MAYBE_UNUSED int Json_NextPOT(int x)
 #define JsonArray_Clear(a)              ((a) ? (void)(JsonArray_GetRaw(a)->count = 0) : (void)0)
 #define JsonArray_Clone(a, alloc)       ((a) ? memcpy(JsonArray_Grow(0, JsonArray_GetCount(a), sizeof((a)[0]), alloc), JsonArray_GetRaw(a), JsonArray_GetUsageMemory(a)) : NULL)
 
-static void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocator* allocator)
+static JSON_INLINE void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocator* allocator)
 {
     assert(elemsize > 0);
     assert(allocator != NULL);
@@ -100,6 +99,11 @@ static void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocato
     }
 }
 
+//
+// JsonTempArray: memory-wise array for containing parsing value
+// @note: internal only
+// 
+
 #define JsonTempArray(T, CAPACITY)  struct {    \
     T*  array;                                  \
     int count;                                  \
@@ -109,57 +113,26 @@ static void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocato
 #define JsonTempArray_Free(a, alloc)      JsonArray_Free((a)->array, alloc)
 #define JsonTempArray_Push(a, v, alloc)   ((a)->count >= sizeof((a)->buffer) / sizeof((a)->buffer[0]) ? JsonArray_Push((a)->array, v, alloc) : ((a)->buffer[(a)->count++] = v, 1))
 #define JsonTempArray_GetCount(a)         ((a)->count + JsonArray_GetCount((a)->array))
-#define JsonTempArray_ToArray(a, alloc)   JsonTempArray_ToArrayFunc((a)->buffer, (a)->count, (a)->array, (int)sizeof((a)->buffer[0]), alloc)
-#define JsonTempArray_ToString(a, alloc)  JsonTempArray_ToStringFunc((a)->buffer, (a)->count, (a)->array, alloc)
+#define JsonTempArray_ToBuffer(a, alloc)  JsonTempArray_ToBufferFunc((a)->buffer, (a)->count, (a)->array, (int)sizeof((a)->buffer[0]), alloc)
 
-static void* JsonTempArray_ToArrayFunc(void* buffer, int count, void* dynamicBuffer, int itemSize, JsonAllocator* allocator)
+static JSON_INLINE void* JsonTempArray_ToBufferFunc(void* buffer, int count, void* dynamicBuffer, int itemSize, JsonAllocator* allocator)
 {
     int total = count + JsonArray_GetCount(dynamicBuffer);
     if (total > 0)
     {
-        JsonArray* array = (JsonArray*)JSON_ALLOC(allocator, sizeof(JsonArray) + total * itemSize);
+        void* array = (JsonArray*)JSON_ALLOC(allocator, total * itemSize);
         if (array)
         {
-            array->size = total;
-            array->count = total;
-
-            memcpy(array->buffer, buffer, count * itemSize);
+            memcpy(array, buffer, count * itemSize);
             if (total > count)
             {
-                memcpy(&array->buffer[count * itemSize], dynamicBuffer, (total - count) * itemSize);
-            }
-        }
-        return array->buffer;
-    }
-    return NULL;
-}
-
-static char* JsonTempArray_ToStringFunc(void* buffer, int count, void* dynamicBuffer, JsonAllocator* allocator)
-{
-    int total = count + JsonArray_GetCount(dynamicBuffer);
-    if (total > 0)
-    {
-        char* array = (char*)JSON_ALLOC(allocator, total);
-        if (array)
-        {
-            memcpy(array, buffer, count);
-            if (total > count)
-            {
-                memcpy(&array[count], dynamicBuffer, (total - count));
+                memcpy((char*)array + count * itemSize, dynamicBuffer, (total - count) * itemSize);
             }
         }
         return array;
     }
-
     return NULL;
 }
-
-struct JsonStringPool
-{
-    int  size;
-    int  count;
-    char buffer[];
-};
 
 struct JsonState
 {
@@ -279,19 +252,19 @@ static void JsonValue_ReleaseMemory(JsonValue* value, JsonAllocator* allocator)
         switch (value->type)
         {
         case JSON_ARRAY:
-            for (i = 0, n = JsonLength(value); i < n; i++)
+            for (i = 0, n = value->length; i < n; i++)
             {
                 JsonValue_ReleaseMemory(&value->array[i], allocator);
             }
-            JsonArray_Free(value->array, allocator);
+            JSON_FREE(allocator, value->array);
             break;
 
         case JSON_OBJECT:
-            for (i = 0, n = JsonLength(value); i < n; i++)
+            for (i = 0, n = value->length; i < n; i++)
             {
                 JsonValue_ReleaseMemory(&value->object[i].value, allocator);
             }
-            JsonArray_Free(value->object, allocator);
+            JSON_FREE(allocator, value->object);
             break;
 
         case JSON_STRING:
@@ -726,11 +699,9 @@ static int Json_ParseArray(JsonState* state, JsonValue* outValue)
 	    Json_SkipSpace(state);
 	    Json_MatchChar(state, JSON_ARRAY, ']');
 
-        JsonValue* resultArray = (JsonValue*)JsonTempArray_ToArray(&values, &state->allocator);
-
         outValue->type   = JSON_ARRAY;
-        outValue->array  = resultArray;
-        outValue->length = JsonArray_GetCount(resultArray);
+        outValue->length = JsonTempArray_GetCount(&values);
+        outValue->array  = (JsonValue*)JsonTempArray_ToBuffer(&values, &state->allocator);
 
         JsonTempArray_Free(&values, &state->allocator);
 	    return 1;
@@ -930,7 +901,7 @@ static char* Json_ParseStringNoToken(JsonState* state, int* outLength)
         if (outLength) *outLength = JsonTempArray_GetCount(&buffer);
         JsonTempArray_Push(&buffer, 0, &state->allocator);
 
-        char* string = JsonTempArray_ToString(&buffer, &state->allocator);
+        char* string = (char*)JsonTempArray_ToBuffer(&buffer, &state->allocator);
         JsonTempArray_Free(&buffer, &state->allocator);
 
         return string;
@@ -1004,11 +975,10 @@ static int Json_ParseObject(JsonState* state, JsonValue* outValue)
             /* Well done */
             //*((void**)&root->object) = (int*)newValues + 1;
             JsonObjectEntry entry;
-            entry.hash  = JsonHash(name, nameLength);
-#ifdef JSON_OBJECT_KEYNAME
-            entry.name  = name;
-#endif
-            entry.value = value;
+            entry.hash       = JsonHash(name, nameLength);
+            entry.name       = name;
+            entry.value      = value;
+            entry.nameLength = nameLength;
             JsonTempArray_Push(&values, entry, &state->allocator);
             //JsonArray_Push(root->object, entry, &state->allocator);
 
@@ -1019,8 +989,8 @@ static int Json_ParseObject(JsonState* state, JsonValue* outValue)
         Json_MatchChar(state, JSON_OBJECT, '}');
 
         outValue->type   = JSON_OBJECT;
-        outValue->object = (JsonObjectEntry*)JsonTempArray_ToArray(&values, &state->allocator);
-        outValue->length = JsonArray_GetCount(outValue->object);
+        outValue->length = JsonTempArray_GetCount(&values);
+        outValue->object = (JsonObjectEntry*)JsonTempArray_ToBuffer(&values, &state->allocator);
 
         JsonTempArray_Free(&values, &state->allocator);
         return 1;
@@ -1169,30 +1139,6 @@ const char* JsonGetErrorString(const JsonState* state)
     }
 }
 
-/* @funcdef: JsonLength */
-int JsonLength(const JsonValue* x)
-{
-    if (x)
-    {
-        switch (x->type)
-        {
-        case JSON_ARRAY:
-            return JsonArray_GetCount(x->array);
-
-        case JSON_STRING:
-            return x->string ? (int)strlen(x->string) : 0;
-
-        case JSON_OBJECT:
-            return JsonArray_GetCount(x->object);
-
-        default:
-            break;
-        }
-    }
-
-    return 0;
-}
-
 /* @funcdef: JsonEquals */
 JsonBoolean JsonEquals(const JsonValue* a, const JsonValue* b)
 {
@@ -1226,7 +1172,7 @@ JsonBoolean JsonEquals(const JsonValue* a, const JsonValue* b)
         return a->boolean == b->boolean;
 
     case JSON_ARRAY:
-        if ((n = JsonLength(a)) == JsonLength(b))
+        if ((n = a->length) == a->length)
         {
             for (i = 0; i < n; i++)
             {
@@ -1239,7 +1185,7 @@ JsonBoolean JsonEquals(const JsonValue* a, const JsonValue* b)
         return JSON_TRUE;
 
     case JSON_OBJECT:
-        if ((n = JsonLength(a)) == JsonLength(b))
+        if ((n = a->length) == b->length)
         {
             for (i = 0; i < n; i++)
             {
@@ -1249,6 +1195,7 @@ JsonBoolean JsonEquals(const JsonValue* a, const JsonValue* b)
                 //{
                 //    return JSON_FALSE;
                 //}
+                //if (strcmp(a->object[i].name, b->object[i].name) == 0)
                 if (a->object[i].hash != b->object[i].hash)
                 {
                     return JSON_FALSE;
@@ -1276,10 +1223,11 @@ JsonValue* JsonFind(const JsonValue* obj, const char* name)
     if (obj && obj->type == JSON_OBJECT)
     {
         int i, n;
-        int hash = JsonHash((void*)name, (int)strlen(name));
-        for (i = 0, n = JsonLength(obj); i < n; i++)
+        int hash = JsonHash(name, (int)strlen(name));
+        for (i = 0, n = obj->length; i < n; i++)
         {
             JsonObjectEntry* entry = &obj->object[i];
+            //if (strcmp(name, entry->name) == 0)
             if (hash == entry->hash)
             {
                 return &entry->value;
@@ -1296,7 +1244,7 @@ JsonValue* JsonFindWithHash(const JsonValue* obj, int hash)
     if (obj && obj->type == JSON_OBJECT)
     {
         int i, n;
-        for (i = 0, n = JsonLength(obj); i < n; i++)
+        for (i = 0, n = obj->length; i < n; i++)
         {
             if (hash == obj->object[i].hash)
             {

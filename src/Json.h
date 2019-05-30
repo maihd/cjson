@@ -12,10 +12,6 @@
 #define JSON_API
 #endif
 
-#if !defined(NDEBUG) || !defined(JSON_OBJECT_NO_KEYNAME)
-#define JSON_OBJECT_KEYNAME
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -55,9 +51,10 @@ typedef enum JsonError
     JSON_ERROR_INTERNAL,
 } JsonError;
 
-typedef struct JsonState     JsonState;
-typedef struct JsonValue     JsonValue;
-typedef struct JsonAllocator JsonAllocator;
+typedef struct JsonState        JsonState;
+typedef struct JsonValue        JsonValue;
+typedef struct JsonAllocator    JsonAllocator;
+typedef struct JsonObjectEntry  JsonObjectEntry;
 
 /**
  * JSON boolean data type
@@ -77,7 +74,6 @@ JSON_API void          JsonRelease(JsonState* state);
 JSON_API JsonError     JsonGetError(const JsonState* state);
 JSON_API const char*   JsonGetErrorString(const JsonState* state);
 
-JSON_API int           JsonLength(const JsonValue* x);
 JSON_API JsonBoolean   JsonEquals(const JsonValue* a, const JsonValue* b);
 
 JSON_API int           JsonHash(const void* buffer, int length);
@@ -85,7 +81,6 @@ JSON_API int           JsonHash(const void* buffer, int length);
 JSON_API JsonValue*    JsonFind(const JsonValue* x, const char* name);
 JSON_API JsonValue*    JsonFindWithHash(const JsonValue* x, int hash);
 
-typedef struct JsonObjectEntry JsonObjectEntry;
 
 /**
  * JSON value
@@ -109,12 +104,11 @@ struct JsonValue
 
 struct JsonObjectEntry
 {
+    const char*       name;
+    int               nameLength;
+
     int               hash;
     struct JsonValue  value;
-
-#ifdef JSON_OBJECT_KEYNAME
-    const char*       name;
-#endif
 };
 
 struct JsonAllocator
