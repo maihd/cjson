@@ -12,17 +12,17 @@ matrix:
       compiler:
         - gcc
         - clang
-      script: make && make unit_test
+      script: make unit_test
     
     - os: linux
       language: c++
       compiler: gcc
-      script: make && make unit_test
+      script: make unit_test
     
     - os: linux
       language: c++
       compiler: clang
-      script: make CC=clang && make unit_test CC=clang
+      script: make unit_test CC=clang
 
     - os: windows
       language: c
@@ -34,7 +34,7 @@ matrix:
       language: c
       compiler: clang
       before_install: choco install make
-      script: make CC=clang
+      script: make unit_test CC=clang
 
     - os: windows
       language: c
