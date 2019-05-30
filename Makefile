@@ -3,6 +3,8 @@ CFLAGS=-Wall -O0
 
 .PHONY: clean
 
+SRC=src/Json.c src/JsonEx.c
+
 ifeq ($(OS), Windows_NT)
 CFLAGS+=-D_WIN32
 endif
@@ -12,11 +14,11 @@ test:
 	./json_test.exe
 
 unit_test:
-	$(CC) -o json_unit_test.exe src/json_unit_test.c src/Json.c $(CFLAGS)
+	$(CC) -o json_unit_test.exe src/json_unit_test.c $(SRC) $(CFLAGS)
 	./json_unit_test.exe $(wildcard ./testdb/json/*.json)
 
 unit_test_dbg:
-	$(CC) -o json_unit_test.exe src/json_unit_test.c $(CFLAGS) -g
+	$(CC) -o json_unit_test.exe src/json_unit_test.c $(SRC) $(CFLAGS) -g
 	gdb json_unit_test
 
 clean:

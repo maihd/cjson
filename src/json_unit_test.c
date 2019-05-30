@@ -7,6 +7,7 @@
 #include <assert.h>
 
 #include "Json.h"
+#include "JsonEx.h"
 
 typedef struct
 {
@@ -67,6 +68,7 @@ int main(int argc, char* argv[])
 
     int   i, n;
     char* buffer = NULL;
+    void* allocatorBuffer = malloc(1024 * 1024);
     for (i = 1, n = argc; i < n; i++)
     {
         const char* filename = argv[i];
@@ -84,17 +86,20 @@ int main(int argc, char* argv[])
             buffer[filesize] = 0;
             fread(buffer, filesize, sizeof(char), file);
 
-            JsonDebugAllocator debug;
-            memset(&debug, 0, sizeof(debug));
+            //JsonDebugAllocator debug;
+            //memset(&debug, 0, sizeof(debug));
+            //
+            //JsonAllocator allocator;
+            //allocator.data  = &debug;
+            //allocator.free  = JsonDebug_Free;
+            //allocator.alloc = JsonDebug_Alloc;
 
-            JsonAllocator settings;
-            settings.data  = &debug;
-            settings.free  = JsonDebug_Free;
-            settings.alloc = JsonDebug_Alloc;
+            JsonTempAllocator allocator;
+            JsonTempAllocator_Init(&allocator, allocatorBuffer, 1024 * 1024);
 
             double dt = get_time();
             JsonState* state = NULL;
-            JsonValue* value = JsonParseEx(buffer, filesize, &settings, &state);
+            JsonValue* value = JsonParseEx(buffer, filesize, &allocator.super, &state);
             if (JsonGetError(state) != JSON_ERROR_NONE || !value)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, JsonGetErrorString(state));
@@ -107,10 +112,11 @@ int main(int argc, char* argv[])
             //
             JsonValue* idValue = JsonFind(firstObject, "_id");
 
-            JsonRelease(state);
+            // When use temp allocator, no need to release
+            //JsonRelease(state);
             fclose(file);
 
-            printf("Parsed file '%s'\n\t- file size:\t%dB\n\t- memory usage:\t%dB\n\t- times:\t%lfs\n\n", filename, filesize, debug.alloced, dt);
+            //printf("Parsed file '%s'\n\t- file size:\t%dB\n\t- memory usage:\t%dB\n\t- times:\t%lfs\n\n", filename, filesize, debug.alloced, dt);
         }
     }
 

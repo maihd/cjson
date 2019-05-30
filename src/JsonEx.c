@@ -149,8 +149,38 @@ void JsonPrint(const JsonValue* value, FILE* out)
     }
 }
 
-int JsonTempAllocator(JsonAllocator* allocator, void* buffer, int length)
+static void* Json_TempAlloc(JsonTempAllocator* data, int size)
 {
-    return 1;
+    if (data->marker + size <= data->length)
+    {
+        void* result  = (char*)data->buffer + data->marker;
+        data->marker += size;
+        return result;
+    }
+    
+    return NULL;
+}
+
+static void* Json_TempFree(void* data, void* ptr)
+{
+    (void)data;
+    (void)ptr;
+}
+
+bool JsonTempAllocator_Init(JsonTempAllocator* allocator, void* buffer, int length)
+{
+    if (buffer && length > 0)
+    {
+        allocator->super.data   = allocator;
+        allocator->super.free   = Json_TempFree;
+        allocator->super.alloc  = (void(*)(void*, int))Json_TempAlloc;
+        allocator->buffer       = buffer;
+        allocator->length       = length;
+        allocator->marker       = 0;
+
+        return true;
+    }
+
+    return false;
 }
 

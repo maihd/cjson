@@ -382,20 +382,16 @@ static int Json_MatchChar(JsonState* state, JsonType type, int c)
 
 /* All parse functions declaration */
 
-static bool Json_ParseArray(JsonState* state, JsonValue* outValue);
-static bool Json_ParseSingle(JsonState* state, JsonValue* outValue);
-static bool Json_ParseObject(JsonState* state, JsonValue* outValue);
-static bool Json_ParseNumber(JsonState* state, JsonValue* outValue);
-static bool Json_ParseString(JsonState* state, JsonValue* outValue);
+static void Json_ParseArray(JsonState* state, JsonValue* outValue);
+static void Json_ParseSingle(JsonState* state, JsonValue* outValue);
+static void Json_ParseObject(JsonState* state, JsonValue* outValue);
+static void Json_ParseNumber(JsonState* state, JsonValue* outValue);
+static void Json_ParseString(JsonState* state, JsonValue* outValue);
 
 /* @funcdef: Json_ParseNumber */
-static int Json_ParseNumber(JsonState* state, JsonValue* outValue)
+static void Json_ParseNumber(JsonState* state, JsonValue* outValue)
 {
-    if (Json_SkipSpace(state) < 0)
-    {
-		return 0;
-    }
-    else
+    if (Json_SkipSpace(state) > 0)
     {
 		int c = Json_PeekChar(state);
 		int sign = 1;
@@ -515,7 +511,6 @@ static int Json_ParseNumber(JsonState* state, JsonValue* outValue)
 		if (dot && numpow == 1)
 		{
 			Json_Panic(state, JSON_NUMBER, JSON_ERROR_UNEXPECTED, "'.' is presented in number token, but require a digit after '.' ('%c')", (char)c);
-			return 0;
 		}
 		else
 		{
@@ -542,19 +537,14 @@ static int Json_ParseNumber(JsonState* state, JsonValue* outValue)
             }
 
             *outValue = value;
-			return 1;
 		}
     }
 }
 
 /* @funcdef: Json_ParseArray */
-static int Json_ParseArray(JsonState* state, JsonValue* outValue)
+static void Json_ParseArray(JsonState* state, JsonValue* outValue)
 {
-    if (Json_SkipSpace(state) < 0)
-    {
-        return 0;
-    }
-    else
+    if (Json_SkipSpace(state) > 0)
     {
 	    Json_MatchChar(state, JSON_ARRAY, '[');
 
@@ -580,37 +570,36 @@ static int Json_ParseArray(JsonState* state, JsonValue* outValue)
         outValue->array  = (JsonValue*)JsonTempArray_ToBuffer(&values, &state->allocator);
 
         JsonTempArray_Free(&values, &state->allocator);
-	    return 1;
     }
 }
 
 /* Json_ParseSingle */
-static int Json_ParseSingle(JsonState* state, JsonValue* outValue)
+static void Json_ParseSingle(JsonState* state, JsonValue* outValue)
 {
-    if (Json_SkipSpace(state) < 0)
-    {
-        return 0;
-    }
-    else
+    if (Json_SkipSpace(state) > 0)
     {
 	    int c = Json_PeekChar(state);
 	
 	    switch (c)
 	    {
 	    case '[':
-	        return Json_ParseArray(state, outValue);
+	        Json_ParseArray(state, outValue);
+            break;
 	    
 	    case '{':
-	        return Json_ParseObject(state, outValue);
+	        Json_ParseObject(state, outValue);
+            break;
 	    
 	    case '"':
-	        return Json_ParseString(state, outValue);
+	        Json_ParseString(state, outValue);
+            break;
 
 	    case '+': case '-': case '0': 
         case '1': case '2': case '3': 
         case '4': case '5': case '6': 
         case '7': case '8': case '9':
-	        return Json_ParseNumber(state, outValue);
+	        Json_ParseNumber(state, outValue);
+            break;
 	    
         default:
 	    {
@@ -627,20 +616,17 @@ static int Json_ParseSingle(JsonState* state, JsonValue* outValue)
                 outValue->type      = JSON_BOOLEAN;
                 outValue->length    = 1;
                 outValue->boolean   = true;
-                return 1;
 	        }
 	        else if (length == 4 && strncmp(token, "null", 4) == 0)
             {
                 outValue->type      = JSON_NULL;
                 outValue->length    = 1;
-                return 1;
             }
 	        else if (length == 5 && strncmp(token, "false", 5) == 0)
 	        {
                 outValue->type      = JSON_BOOLEAN;
                 outValue->length    = 1;
                 outValue->boolean   = false;
-                return 1;
 	        }
 	        else
 	        {
@@ -656,8 +642,6 @@ static int Json_ParseSingle(JsonState* state, JsonValue* outValue)
 	    } break;
 	    /* END OF SWITCH STATEMENT */
         }
-
-        return 0;
     }
 }
 
@@ -789,37 +773,23 @@ static char* Json_ParseStringNoToken(JsonState* state, int* outLength)
 }
 
 /* @funcdef: Json_ParseString */
-static int Json_ParseString(JsonState* state, JsonValue* outValue)
+static void Json_ParseString(JsonState* state, JsonValue* outValue)
 {
-    if (Json_SkipSpace(state) < 0)
-    {
-        return 0;
-    }
-    else
+    if (Json_SkipSpace(state) > 0)
     {
         int length;
         const char* string = Json_ParseStringNoToken(state, &length);
-        if (!string)
-        {
-
-            return 0;
-        }
 
         outValue->type   = JSON_STRING;
         outValue->string = string;
         outValue->length = length;
-        return 1;
     }
 }
 
 /* @funcdef: Json_ParseObject */
-static int Json_ParseObject(JsonState* state, JsonValue* outValue)
+static void Json_ParseObject(JsonState* state, JsonValue* outValue)
 {
-    if (Json_SkipSpace(state) < 0)
-    {
-        return 0;
-    }
-    else
+    if (Json_SkipSpace(state) > 0)
     {
         Json_MatchChar(state, JSON_OBJECT, '{');
 
@@ -862,7 +832,6 @@ static int Json_ParseObject(JsonState* state, JsonValue* outValue)
         outValue->object = (JsonObjectEntry*)JsonTempArray_ToBuffer(&values, &state->allocator);
 
         JsonTempArray_Free(&values, &state->allocator);
-        return 1;
     }
 }
          

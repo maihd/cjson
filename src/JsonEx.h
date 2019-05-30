@@ -6,4 +6,12 @@
 JSON_API void JsonPrint(const JsonValue* value, FILE* out);
 JSON_API void JsonWrite(const JsonValue* value, FILE* out);
 
-JSON_API int JsonTempAllocator(JsonAllocator* allocator, void* buffer, int length);
+typedef struct JsonTempAllocator
+{
+    JsonAllocator   super;
+    void*           buffer;
+    int             length;
+    int             marker;
+} JsonTempAllocator;
+
+JSON_API bool JsonTempAllocator_Init(JsonTempAllocator* allocator, void* buffer, int length);
