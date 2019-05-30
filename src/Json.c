@@ -106,6 +106,7 @@ static void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocato
     T   buffer[CAPACITY]; }
 
 #define JsonTempArray_Init(a)             { a, 0 }
+#define JsonTempArray_Free(a, alloc)      JsonArray_Free((a)->array, alloc)
 #define JsonTempArray_Push(a, v, alloc)   ((a)->count >= sizeof((a)->buffer) / sizeof((a)->buffer[0]) ? JsonArray_Push((a)->array, v, alloc) : ((a)->buffer[(a)->count++] = v, 1))
 #define JsonTempArray_GetCount(a)         ((a)->count + JsonArray_GetCount((a)->array))
 #define JsonTempArray_ToArray(a, alloc)   JsonTempArray_ToArrayFunc((a)->buffer, (a)->count, (a)->array, (int)sizeof((a)->buffer[0]), alloc)
@@ -176,10 +177,6 @@ struct JsonState
     JsonError           errnum;
     char*               errmsg;
     jmp_buf             errjmp;
-
-    JsonValue*          arrayBuffer;    /* For parsing array  */
-    JsonObjectEntry*    objectBuffer;   /* For parsing object */
-    char*               stringBuffer;   /* For parsing string */
 
     JsonAllocator       allocator; /* Runtime allocator */
 };
@@ -324,10 +321,6 @@ static JsonState* JsonState_Make(const char* json, const JsonAllocator* allocato
 		state->errmsg       = NULL;
 		state->errnum       = JSON_ERROR_NONE;
 
-        state->arrayBuffer  = NULL;
-        state->objectBuffer = NULL;
-        state->stringBuffer = NULL;
-
         state->allocator    = *allocator;
     }
     return state;
@@ -402,9 +395,6 @@ static void JsonState_Free(JsonState* state)
 
 		JsonState* next = state->next;
 
-        JsonArray_Free(state->stringBuffer, &state->allocator);
-        JsonArray_Free(state->objectBuffer, &state->allocator);
-        JsonArray_Free(state->arrayBuffer, &state->allocator);
 		JSON_FREE(&state->allocator, state->errmsg);
 		JSON_FREE(&state->allocator, state);
 
@@ -717,8 +707,7 @@ static int Json_ParseArray(JsonState* state, JsonValue* outValue)
 	    Json_MatchChar(state, JSON_ARRAY, '[');
 
         int length = 0;
-        JsonTempArray(JsonValue, 32) values = JsonTempArray_Init(state->arrayBuffer);
-        JsonArray_Clear(state->arrayBuffer);
+        JsonTempArray(JsonValue, 32) values = JsonTempArray_Init(NULL);
 
 	    while (Json_SkipSpace(state) > 0 && Json_PeekChar(state) != ']')
 	    {
@@ -742,7 +731,7 @@ static int Json_ParseArray(JsonState* state, JsonValue* outValue)
         outValue->type = JSON_ARRAY;
         outValue->array = resultArray;
 
-        state->arrayBuffer = values.array;
+        JsonTempArray_Free(&values, &state->allocator);
 	    return 1;
     }
 }
@@ -828,8 +817,7 @@ static char* Json_ParseStringNoToken(JsonState* state, int* outLength)
     int   i;
     int   c0, c1;
 
-    JsonTempArray(char, 1024) buffer = JsonTempArray_Init(state->stringBuffer);
-    JsonArray_Clear(state->stringBuffer);
+    JsonTempArray(char, 1024) buffer = JsonTempArray_Init(NULL);
 
     while (!Json_IsEOF(state) && (c0 = Json_PeekChar(state)) != '"')
     {
@@ -939,6 +927,8 @@ static char* Json_ParseStringNoToken(JsonState* state, int* outLength)
         JsonTempArray_Push(&buffer, 0, &state->allocator);
 
         char* string = JsonTempArray_ToString(&buffer, &state->allocator);
+        JsonTempArray_Free(&buffer, &state->allocator);
+
         return string;
     }
     else
@@ -981,8 +971,7 @@ static int Json_ParseObject(JsonState* state, JsonValue* outValue)
     {
         Json_MatchChar(state, JSON_OBJECT, '{');
 
-        JsonTempArray(JsonObjectEntry, 32) values = JsonTempArray_Init(state->objectBuffer);
-        JsonArray_Clear(state->objectBuffer);
+        JsonTempArray(JsonObjectEntry, 32) values = JsonTempArray_Init(NULL);
 
         int length = 0;
         while (Json_SkipSpace(state) > 0 && Json_PeekChar(state) != '}')
@@ -1026,7 +1015,7 @@ static int Json_ParseObject(JsonState* state, JsonValue* outValue)
         outValue->type   = JSON_OBJECT;
         outValue->object = (JsonObjectEntry*)JsonTempArray_ToArray(&values, &state->allocator);
 
-        state->objectBuffer = values.array;
+        JsonTempArray_Free(&values, &state->allocator);
         return 1;
     }
 }
