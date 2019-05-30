@@ -173,7 +173,7 @@ bool JsonTempAllocator_Init(JsonTempAllocator* allocator, void* buffer, int leng
     {
         allocator->super.data   = allocator;
         allocator->super.free   = Json_TempFree;
-        allocator->super.alloc  = (void(*)(void*, int))Json_TempAlloc;
+        allocator->super.alloc  = (void*(*)(void*, int))Json_TempAlloc;
         allocator->buffer       = buffer;
         allocator->length       = length;
         allocator->marker       = 0;

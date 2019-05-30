@@ -22,17 +22,11 @@ matrix:
       compiler: clang
       script: make unit_test CC=clang
 
-    - os: windows
-      language: c
-      compiler: gcc
-      before_install: choco install make
-      script: make
-
-    - os: windows
-      language: c
-      compiler: clang
-      before_install: choco install make
-      script: make unit_test CC=clang
+    #- os: windows
+    #  language: c
+    #  compiler: clang
+    #  before_install: choco install make
+    #  script: make unit_test CC=clang
 
 #    - os: windows
 #      language: c
