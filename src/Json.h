@@ -14,6 +14,13 @@
 
 #ifdef __cplusplus
 extern "C" {
+#elif !defined(__bool_true_false_are_defined)
+typedef int bool;
+enum
+{
+    true  = 1,
+    false = 0,
+};
 #endif
 
 /**
@@ -56,35 +63,21 @@ typedef struct JsonValue        JsonValue;
 typedef struct JsonAllocator    JsonAllocator;
 typedef struct JsonObjectEntry  JsonObjectEntry;
 
-/**
- * JSON boolean data type
- */
-typedef int JsonBoolean;
-enum 
-{
-    JSON_TRUE  = 1,
-    JSON_FALSE = 0,
-};
-
-JSON_API JsonValue*    JsonParse(const char* json, JsonState** outState);
-JSON_API JsonValue*    JsonParseEx(const char* json, const JsonAllocator* allocator, JsonState** outState);
+JSON_API JsonValue*    JsonParse(const char* json, int jsonLength, JsonState** outState);
+JSON_API JsonValue*    JsonParseEx(const char* json, int jsonLength, const JsonAllocator* allocator, JsonState** outState);
 
 JSON_API void          JsonRelease(JsonState* state);
 
 JSON_API JsonError     JsonGetError(const JsonState* state);
 JSON_API const char*   JsonGetErrorString(const JsonState* state);
 
-JSON_API JsonBoolean   JsonEquals(const JsonValue* a, const JsonValue* b);
+JSON_API bool          JsonEquals(const JsonValue* a, const JsonValue* b);
 
 JSON_API int           JsonHash(const void* buffer, int length);
 
 JSON_API JsonValue*    JsonFind(const JsonValue* x, const char* name);
 JSON_API JsonValue*    JsonFindWithHash(const JsonValue* x, int hash);
 
-
-/**
- * JSON value
- */
 struct JsonValue
 {
     JsonType type;                      /* Type of value: number, boolean, string, array, object    */
@@ -92,7 +85,7 @@ struct JsonValue
     union
     {
         double              number;
-        JsonBoolean         boolean;
+        bool                boolean;
 
         const char*         string;
 

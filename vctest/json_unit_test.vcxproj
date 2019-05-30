@@ -180,6 +180,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\Json.c" />
+    <ClCompile Include="..\src\JsonEx.c" />
     <ClCompile Include="..\src\json_unit_test.c" />
   </ItemGroup>
   <ItemGroup>

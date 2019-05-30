@@ -94,7 +94,7 @@ int main(int argc, char* argv[])
 
             double dt = get_time();
             JsonState* state = NULL;
-            JsonValue* value = JsonParseEx(buffer, &settings, &state);
+            JsonValue* value = JsonParseEx(buffer, filesize, &settings, &state);
             if (JsonGetError(state) != JSON_ERROR_NONE || !value)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, JsonGetErrorString(state));

@@ -27,9 +27,9 @@ void JsonWrite(const JsonValue* value, FILE* out)
 
         case JSON_ARRAY:
             fprintf(out, "[");
-            for (i = 0, n = JsonLength(value); i < n; i++)
+            for (i = 0, n = value->length; i < n; i++)
             {
-                JsonWrite(value->array[i], out);
+                JsonWrite(&value->array[i], out);
                 if (i < n - 1)
                 {
                     fprintf(out, ",");
@@ -40,15 +40,10 @@ void JsonWrite(const JsonValue* value, FILE* out)
 
         case JSON_OBJECT:
             fprintf(out, "{");
-            for (i = 0, n = JsonLength(value); i < n; i++)
+            for (i = 0, n = value->length; i < n; i++)
             {
-#ifdef JSON_OBJECT_KEYNAME
                 fprintf(out, "\"%s\" : ", value->object[i].name);
-#else
-                fprintf(out, "\"<hash: %d>\" : ", value->object[i].hash);
-#endif
-
-                JsonWrite(value->object[i].value, out);
+                JsonWrite(&value->object[i].value, out);
                 if (i < n - 1)
                 {
                     fprintf(out, ",");
@@ -94,7 +89,7 @@ void JsonPrint(const JsonValue* value, FILE* out)
             fprintf(out, "[\n");
 
             indent++;
-            for (i = 0, n = JsonLength(value); i < n; i++)
+            for (i = 0, n = value->length; i < n; i++)
             {
                 int j, m;
                 for (j = 0, m = indent * 4; j < m; j++)
@@ -102,7 +97,7 @@ void JsonPrint(const JsonValue* value, FILE* out)
                     fputc(' ', out);
                 }
 
-                JsonPrint(value->array[i], out);
+                JsonPrint(&value->array[i], out);
                 if (i < n - 1)
                 {
                     fputc(',', out);
@@ -122,7 +117,7 @@ void JsonPrint(const JsonValue* value, FILE* out)
             fprintf(out, "{\n");
 
             indent++;
-            for (i = 0, n = JsonLength(value); i < n; i++)
+            for (i = 0, n = value->length; i < n; i++)
             {
                 int j, m;
                 for (j = 0, m = indent * 4; j < m; j++)
@@ -130,12 +125,8 @@ void JsonPrint(const JsonValue* value, FILE* out)
                     fputc(' ', out);
                 }
 
-#ifdef JSON_OBJECT_KEYNAME
                 fprintf(out, "\"%s\" : ", value->object[i].name);
-#else
-                fprintf(out, "\"<hash: %d>\" : ", value->object[i].hash);
-#endif
-                JsonPrint(value->object[i].value, out);
+                JsonPrint(&value->object[i].value, out);
                 if (i < n - 1)
                 {
                     fputc(',', out);
