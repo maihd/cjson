@@ -6,12 +6,7 @@
  * @copyright: MaiHD @ ${HOME}, 2018 - 2019
  ******************************************************/
 
-#ifndef __JSON_H__
-#define __JSON_H__
-
-#define JSON_LIBNAME "libjson"
-#define JSON_VERSION "v1.0.00"
-#define JSON_VERCODE 10000
+#pragma once
 
 #ifndef JSON_API
 #define JSON_API
@@ -135,7 +130,3 @@ struct JsonAllocator
 }
 #endif
 /* * */
-
-/* END OF __JSON_H__ */
-#endif /* __JSON_H__ */
-

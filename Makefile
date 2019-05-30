@@ -25,15 +25,18 @@ clean:
 lib:
 	@rm -f Json.h
 
-	@cat ./src/Json.h                >> Json.h
-	@echo ""                         >> Json.h
-	@echo "#ifdef JSON_IMPL"         >> Json.h
-	@echo ""                         >> Json.h	
-	@cat ./src/Json.c                >> Json.h
-	@echo ""                         >> Json.h
-	@echo ""                         >> Json.h
-	@echo "#endif /* JSON_IMPL */"   >> Json.h
-	@echo ""                         >> Json.h
+	@echo "#ifndef __JSON_H__"		>> Json.h
+	@echo "#define __JSON_H__"		>> Json.h
+	@cat ./src/Json.h               >> Json.h
+	@echo "#endif /* __JSON_H__ */" >> Json.h
+	@echo ""                        >> Json.h
+	@echo "#ifdef JSON_IMPL"        >> Json.h
+	@echo ""                        >> Json.h	
+	@cat ./src/Json.c               >> Json.h
+	@echo ""                        >> Json.h
+	@echo ""                        >> Json.h
+	@echo "#endif /* JSON_IMPL */"  >> Json.h
+	@echo ""                        >> Json.h
 
 	@gcc -o json_build_test.exe json_build_test.c && rm json_build_test.exe \
 		&& echo "Make single header library success." \
