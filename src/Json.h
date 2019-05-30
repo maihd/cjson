@@ -58,18 +58,17 @@ typedef enum JsonError
     JSON_ERROR_INTERNAL,
 } JsonError;
 
-typedef struct JsonState        JsonState;
 typedef struct JsonValue        JsonValue;
 typedef struct JsonAllocator    JsonAllocator;
 typedef struct JsonObjectEntry  JsonObjectEntry;
 
-JSON_API JsonValue*    JsonParse(const char* json, int jsonLength, JsonState** outState);
-JSON_API JsonValue*    JsonParseEx(const char* json, int jsonLength, const JsonAllocator* allocator, JsonState** outState);
+JSON_API JsonValue*    JsonParse(const char* json, int jsonLength);
+JSON_API JsonValue*    JsonParseEx(const char* json, int jsonLength, const JsonAllocator* allocator);
 
-JSON_API void          JsonRelease(JsonState* state);
+JSON_API void          JsonRelease(JsonValue* rootValue);
 
-JSON_API JsonError     JsonGetError(const JsonState* state);
-JSON_API const char*   JsonGetErrorString(const JsonState* state);
+JSON_API JsonError     JsonGetError(const JsonValue* rootValue);
+JSON_API const char*   JsonGetErrorString(const JsonValue* rootValue);
 
 JSON_API bool          JsonEquals(const JsonValue* a, const JsonValue* b);
 

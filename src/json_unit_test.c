@@ -98,11 +98,10 @@ int main(int argc, char* argv[])
             JsonTempAllocator_Init(&allocator, allocatorBuffer, 1024 * 1024);
 
             double dt = get_time();
-            JsonState* state = NULL;
-            JsonValue* value = JsonParseEx(buffer, filesize, &allocator.super, &state);
-            if (JsonGetError(state) != JSON_ERROR_NONE || !value)
+            JsonValue* value = JsonParseEx(buffer, filesize, &allocator.super);
+            if (JsonGetError(value) != JSON_ERROR_NONE || !value)
             {
-                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, JsonGetErrorString(state));
+                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, JsonGetErrorString(value));
                 return 1;
             }
             dt = get_time() - dt;

@@ -4,10 +4,13 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <setjmp.h>
+
+#define JSON_SUPEROF(ptr, T, member) (T*)((char*)ptr - offsetof(T, member))
 
 #ifndef JSON_INLINE
 #  if defined(_MSC_VER)
@@ -20,6 +23,9 @@
 #     define JSON_INLINE 
 #  endif
 #endif
+
+static const int JSON_REVERSED0 = 'JSON';
+static const int JSON_REVERSED1 = 'json';
 
 /*
 Utility
@@ -136,8 +142,12 @@ static JSON_INLINE void* JsonTempArray_ToBufferFunc(void* buffer, int count, voi
     return NULL;
 }
 
+typedef struct JsonState JsonState;
 struct JsonState
 {
+    int reversed0;
+    int reversed1;
+
     JsonValue           root;
     JsonState*          next;
 
@@ -155,8 +165,6 @@ struct JsonState
 
     JsonAllocator       allocator;      /* Runtime allocator */
 };
-
-static JsonState* rootState = NULL;
 
 /* @funcdef: Json_Alloc */
 static void* Json_Alloc(void* data, int size)
@@ -282,9 +290,12 @@ static void JsonValue_ReleaseMemory(JsonValue* value, JsonAllocator* allocator)
 /* @funcdef: JsonState_Make */
 static JsonState* JsonState_Make(const char* json, int jsonLength, const JsonAllocator* allocator)
 {
-    JsonState* state = (JsonState*)allocator->alloc(allocator->data, sizeof(JsonState));
+    JsonState* state = (JsonState*)JSON_ALLOC(allocator, sizeof(JsonState));
     if (state)
     {
+        state->reversed0    = JSON_REVERSED0;
+        state->reversed1    = JSON_REVERSED1;
+
 		state->next         = NULL;
 
 		state->line         = 1;
@@ -901,79 +912,60 @@ JsonValue* JsonParse(const char* json, int jsonLength, JsonState** outState)
 }
 
 /* @funcdef: JsonParseEx */
-JsonValue* JsonParseEx(const char* json, int jsonLength, const JsonAllocator* allocator, JsonState** outState)
+JsonValue* JsonParseEx(const char* json, int jsonLength, const JsonAllocator* allocator)
 {
     JsonState* state = JsonState_Make(json, jsonLength, allocator);
     JsonValue* value = Json_ParseTopLevel(state);
 
-    if (value)
+    if (!value)
     {
-        if (outState)
-        {
-            *outState = state;
-        }
-        else
-        {
-            if (state)
-            {
-                state->next = rootState;
-                rootState   = state;
-            }
-        }
-    }
-    else
-    {
-        if (outState)
-        {
-            *outState = state;
-        }
-        else
-        {
-            JsonState_Free(state);
-        }
+        JsonState_Free(state);
     }
 
     return value;
 }
 
 /* @funcdef: JsonRelease */
-void JsonRelease(JsonState* state)
+void JsonRelease(JsonValue* rootValue)
 {
-    if (state)
+    if (rootValue)
     {
-        JsonState_Free(state);
-    }
-    else
-    {
-        JsonState_Free(rootState);
-        rootState = NULL;
+        JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
+        if (state->reversed0 == JSON_REVERSED0 && state->reversed1)
+        {
+            JsonState_Free(state);
+        }
     }
 }
 
 /* @funcdef: JsonGetError */
-JsonError JsonGetError(const JsonState* state)
+JsonError JsonGetError(const JsonValue* rootValue)
 {
-    if (state)
+    if (rootValue)
     {
-        return state->errnum;
+        JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
+        if (state->reversed0 == JSON_REVERSED0 && state->reversed1 == JSON_REVERSED1)
+        {
+            return state->errnum;
+        }
     }
-    else
-    {
-        return JSON_ERROR_NONE;
-    }
+
+    return JSON_ERROR_NONE;
 }
 
 /* @funcdef: JsonGetErrorString */
-const char* JsonGetErrorString(const JsonState* state)
+const char* JsonGetErrorString(const JsonValue* rootValue)
 {
-    if (state)
+    if (rootValue)
     {
-        return state->errmsg;
+        JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
+        if (state->reversed0 == JSON_REVERSED0 && state->reversed1)
+        {
+            return state->errmsg;
+        }
     }
-    else
-    {
-        return NULL;
-    }
+
+    return JSON_ERROR_NONE;
 }
 
 /* @funcdef: JsonEquals */
