@@ -98,6 +98,7 @@ typedef struct JsonObjectEntry JsonObjectEntry;
 struct JsonValue
 {
     JsonType type;
+    int      length;    /* Faster than JsonLength() */
     union
     {
         double              number;

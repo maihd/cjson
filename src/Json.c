@@ -728,8 +728,9 @@ static int Json_ParseArray(JsonState* state, JsonValue* outValue)
 
         JsonValue* resultArray = (JsonValue*)JsonTempArray_ToArray(&values, &state->allocator);
 
-        outValue->type = JSON_ARRAY;
-        outValue->array = resultArray;
+        outValue->type   = JSON_ARRAY;
+        outValue->array  = resultArray;
+        outValue->length = JsonArray_GetCount(resultArray);
 
         JsonTempArray_Free(&values, &state->allocator);
 	    return 1;
@@ -776,19 +777,22 @@ static int Json_ParseSingle(JsonState* state, JsonValue* outValue)
 	        const char* token = state->buffer + state->cursor - length;
 	        if (length == 4 && strncmp(token, "true", 4) == 0)
 	        {
-                outValue->type = JSON_BOOLEAN;
-                outValue->boolean = JSON_TRUE;
+                outValue->type      = JSON_BOOLEAN;
+                outValue->length    = 1;
+                outValue->boolean   = JSON_TRUE;
                 return 1;
 	        }
 	        else if (length == 4 && strncmp(token, "null", 4) == 0)
             {
-                outValue->type = JSON_NULL;
+                outValue->type      = JSON_NULL;
+                outValue->length    = 1;
                 return 1;
             }
 	        else if (length == 5 && strncmp(token, "false", 5) == 0)
 	        {
-                outValue->type = JSON_BOOLEAN;
-                outValue->boolean = JSON_FALSE;
+                outValue->type      = JSON_BOOLEAN;
+                outValue->length    = 1;
+                outValue->boolean   = JSON_FALSE;
                 return 1;
 	        }
 	        else
@@ -947,7 +951,8 @@ static int Json_ParseString(JsonState* state, JsonValue* outValue)
     }
     else
     {
-        const char* string = Json_ParseStringNoToken(state, NULL);
+        int length;
+        const char* string = Json_ParseStringNoToken(state, &length);
         if (!string)
         {
 
@@ -956,6 +961,7 @@ static int Json_ParseString(JsonState* state, JsonValue* outValue)
 
         outValue->type   = JSON_STRING;
         outValue->string = string;
+        outValue->length = length;
         return 1;
     }
 }
@@ -1014,6 +1020,7 @@ static int Json_ParseObject(JsonState* state, JsonValue* outValue)
 
         outValue->type   = JSON_OBJECT;
         outValue->object = (JsonObjectEntry*)JsonTempArray_ToArray(&values, &state->allocator);
+        outValue->length = JsonArray_GetCount(outValue->object);
 
         JsonTempArray_Free(&values, &state->allocator);
         return 1;
