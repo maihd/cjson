@@ -148,7 +148,7 @@ struct JsonState
     int reversed0;
     int reversed1;
 
-    JsonValue           root;
+    Json           root;
     JsonState*          next;
 
     int                 line;
@@ -254,7 +254,7 @@ static void Json_Panic(JsonState* state, JsonType type, JsonError code, const ch
     longjmp(state->errjmp, code);
 }
 
-static void JsonValue_ReleaseMemory(JsonValue* value, JsonAllocator* allocator)
+static void JsonValue_ReleaseMemory(Json* value, JsonAllocator* allocator)
 {
     if (value)
     {
@@ -317,7 +317,7 @@ static void JsonState_Free(JsonState* state)
 {
     if (state)
     {
-        JsonValue* root = &state->root;
+        Json* root = &state->root;
         JsonValue_ReleaseMemory(root, &state->allocator);
 
 		JsonState* next = state->next;
@@ -393,14 +393,14 @@ static int Json_MatchChar(JsonState* state, JsonType type, int c)
 
 /* All parse functions declaration */
 
-static void Json_ParseArray(JsonState* state, JsonValue* outValue);
-static void Json_ParseSingle(JsonState* state, JsonValue* outValue);
-static void Json_ParseObject(JsonState* state, JsonValue* outValue);
-static void Json_ParseNumber(JsonState* state, JsonValue* outValue);
-static void Json_ParseString(JsonState* state, JsonValue* outValue);
+static void Json_ParseArray(JsonState* state, Json* outValue);
+static void Json_ParseSingle(JsonState* state, Json* outValue);
+static void Json_ParseObject(JsonState* state, Json* outValue);
+static void Json_ParseNumber(JsonState* state, Json* outValue);
+static void Json_ParseString(JsonState* state, Json* outValue);
 
 /* @funcdef: Json_ParseNumber */
-static void Json_ParseNumber(JsonState* state, JsonValue* outValue)
+static void Json_ParseNumber(JsonState* state, Json* outValue)
 {
     if (Json_SkipSpace(state) > 0)
     {
@@ -525,7 +525,7 @@ static void Json_ParseNumber(JsonState* state, JsonValue* outValue)
 		}
 		else
 		{
-            JsonValue value = { JSON_NUMBER };
+            Json value = { JSON_NUMBER };
             value.number = sign * number;
 
             if (exp)
@@ -553,13 +553,13 @@ static void Json_ParseNumber(JsonState* state, JsonValue* outValue)
 }
 
 /* @funcdef: Json_ParseArray */
-static void Json_ParseArray(JsonState* state, JsonValue* outValue)
+static void Json_ParseArray(JsonState* state, Json* outValue)
 {
     if (Json_SkipSpace(state) > 0)
     {
 	    Json_MatchChar(state, JSON_ARRAY, '[');
 
-        JsonTempArray(JsonValue, 64) values = JsonTempArray_Init(NULL);
+        JsonTempArray(Json, 64) values = JsonTempArray_Init(NULL);
 	    while (Json_SkipSpace(state) > 0 && Json_PeekChar(state) != ']')
 	    {
 	        if (values.count > 0)
@@ -567,7 +567,7 @@ static void Json_ParseArray(JsonState* state, JsonValue* outValue)
                 Json_MatchChar(state, JSON_ARRAY, ',');
 	        }
 	    
-            JsonValue value;
+            Json value;
             Json_ParseSingle(state, &value);
 
             JsonTempArray_Push(&values, value, &state->allocator);
@@ -578,14 +578,14 @@ static void Json_ParseArray(JsonState* state, JsonValue* outValue)
 
         outValue->type   = JSON_ARRAY;
         outValue->length = JsonTempArray_GetCount(&values);
-        outValue->array  = (JsonValue*)JsonTempArray_ToBuffer(&values, &state->allocator);
+        outValue->array  = (Json*)JsonTempArray_ToBuffer(&values, &state->allocator);
 
         JsonTempArray_Free(&values, &state->allocator);
     }
 }
 
 /* Json_ParseSingle */
-static void Json_ParseSingle(JsonState* state, JsonValue* outValue)
+static void Json_ParseSingle(JsonState* state, Json* outValue)
 {
     if (Json_SkipSpace(state) > 0)
     {
@@ -784,7 +784,7 @@ static char* Json_ParseStringNoToken(JsonState* state, int* outLength)
 }
 
 /* @funcdef: Json_ParseString */
-static void Json_ParseString(JsonState* state, JsonValue* outValue)
+static void Json_ParseString(JsonState* state, Json* outValue)
 {
     if (Json_SkipSpace(state) > 0)
     {
@@ -798,7 +798,7 @@ static void Json_ParseString(JsonState* state, JsonValue* outValue)
 }
 
 /* @funcdef: Json_ParseObject */
-static void Json_ParseObject(JsonState* state, JsonValue* outValue)
+static void Json_ParseObject(JsonState* state, Json* outValue)
 {
     if (Json_SkipSpace(state) > 0)
     {
@@ -823,7 +823,7 @@ static void Json_ParseObject(JsonState* state, JsonValue* outValue)
             Json_SkipSpace(state);
             Json_MatchChar(state, JSON_OBJECT, ':');
 
-            JsonValue value;
+            Json value;
             Json_ParseSingle(state, &value);
 
             /* Well done */
@@ -848,7 +848,7 @@ static void Json_ParseObject(JsonState* state, JsonValue* outValue)
          
 /* Internal parsing function
  */
-static JsonValue* Json_ParseTopLevel(JsonState* state)
+static Json* Json_ParseTopLevel(JsonState* state)
 {
     if (!state)
     {
@@ -901,7 +901,7 @@ static JsonValue* Json_ParseTopLevel(JsonState* state)
 }
 
 /* @funcdef: JsonParse */
-JsonValue* JsonParse(const char* json, int jsonLength, JsonState** outState)
+Json* JsonParse(const char* json, int jsonLength, JsonState** outState)
 {
     JsonAllocator allocator;
     allocator.data  = NULL;
@@ -912,10 +912,10 @@ JsonValue* JsonParse(const char* json, int jsonLength, JsonState** outState)
 }
 
 /* @funcdef: JsonParseEx */
-JsonValue* JsonParseEx(const char* json, int jsonLength, JsonAllocator allocator)
+Json* JsonParseEx(const char* json, int jsonLength, JsonAllocator allocator)
 {
     JsonState* state = JsonState_Make(json, jsonLength, allocator);
-    JsonValue* value = Json_ParseTopLevel(state);
+    Json* value = Json_ParseTopLevel(state);
 
     if (!value)
     {
@@ -926,7 +926,7 @@ JsonValue* JsonParseEx(const char* json, int jsonLength, JsonAllocator allocator
 }
 
 /* @funcdef: JsonRelease */
-void JsonRelease(JsonValue* rootValue)
+void JsonRelease(Json* rootValue)
 {
     if (rootValue)
     {
@@ -939,7 +939,7 @@ void JsonRelease(JsonValue* rootValue)
 }
 
 /* @funcdef: JsonGetError */
-JsonError JsonGetError(const JsonValue* rootValue)
+JsonError JsonGetError(const Json* rootValue)
 {
     if (rootValue)
     {
@@ -954,7 +954,7 @@ JsonError JsonGetError(const JsonValue* rootValue)
 }
 
 /* @funcdef: JsonGetErrorString */
-const char* JsonGetErrorString(const JsonValue* rootValue)
+const char* JsonGetErrorString(const Json* rootValue)
 {
     if (rootValue)
     {
@@ -969,7 +969,7 @@ const char* JsonGetErrorString(const JsonValue* rootValue)
 }
 
 /* @funcdef: JsonEquals */
-bool JsonEquals(const JsonValue* a, const JsonValue* b)
+bool JsonEquals(const Json* a, const Json* b)
 {
     int i, n;
 
@@ -1091,7 +1091,7 @@ int JsonHash(const void* buf, int len)
 }
 
 /* @funcdef: JsonFind */
-JsonValue* JsonFind(const JsonValue* obj, const char* name)
+Json* JsonFind(const Json* obj, const char* name)
 {
     if (obj && obj->type == JSON_OBJECT)
     {
@@ -1112,7 +1112,7 @@ JsonValue* JsonFind(const JsonValue* obj, const char* name)
 }
 
 /* @funcdef: JsonFindWithHash */
-JsonValue* JsonFindWithHash(const JsonValue* obj, int hash)
+Json* JsonFindWithHash(const Json* obj, int hash)
 {
     if (obj && obj->type == JSON_OBJECT)
     {

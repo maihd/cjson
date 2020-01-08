@@ -1,7 +1,7 @@
 #include "JsonEx.h"
 
 /* @funcdef: JsonWrite */
-void JsonWrite(const JsonValue* value, FILE* out)
+void JsonWrite(const Json* value, FILE* out)
 {
     if (value)
     {
@@ -60,7 +60,7 @@ void JsonWrite(const JsonValue* value, FILE* out)
 }          
 
 /* @funcdef: JsonPrint */
-void JsonPrint(const JsonValue* value, FILE* out)
+void JsonPrint(const Json* value, FILE* out)
 {
     if (value)
     {

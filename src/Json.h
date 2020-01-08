@@ -53,26 +53,26 @@ typedef enum JsonError
     JSON_ERROR_INTERNAL,
 } JsonError;
 
-typedef struct JsonValue        JsonValue;
+typedef struct Json             Json;
 typedef struct JsonAllocator    JsonAllocator;
 typedef struct JsonObjectEntry  JsonObjectEntry;
 
-JSON_API JsonValue*    JsonParse(const char* json, int jsonLength);
-JSON_API JsonValue*    JsonParseEx(const char* json, int jsonLength, JsonAllocator allocator);
+JSON_API Json*          JsonParse(const char* json, int jsonLength);
+JSON_API Json*          JsonParseEx(const char* json, int jsonLength, JsonAllocator allocator);
 
-JSON_API void          JsonRelease(JsonValue* rootValue);
+JSON_API void           JsonRelease(Json* rootValue);
 
-JSON_API JsonError     JsonGetError(const JsonValue* rootValue);
-JSON_API const char*   JsonGetErrorString(const JsonValue* rootValue);
+JSON_API JsonError      JsonGetError(const Json* rootValue);
+JSON_API const char*    JsonGetErrorString(const Json* rootValue);
 
-JSON_API bool          JsonEquals(const JsonValue* a, const JsonValue* b);
+JSON_API bool           JsonEquals(const Json* a, const Json* b);
 
-JSON_API int           JsonHash(const void* buffer, int length);
+JSON_API int            JsonHash(const void* buffer, int length);
 
-JSON_API JsonValue*    JsonFind(const JsonValue* x, const char* name);
-JSON_API JsonValue*    JsonFindWithHash(const JsonValue* x, int hash);
+JSON_API Json*          JsonFind(const Json* x, const char* name);
+JSON_API Json*          JsonFindWithHash(const Json* x, int hash);
 
-struct JsonValue
+struct Json
 {
     JsonType type;                      /* Type of value: number, boolean, string, array, object    */
     int      length;                    /* Length of value, should use for literal type only        */
@@ -83,7 +83,7 @@ struct JsonValue
 
         const char*         string;
 
-        JsonValue*          array;
+        Json*               array;
 
         JsonObjectEntry*    object;
     };
@@ -91,11 +91,11 @@ struct JsonValue
 
 struct JsonObjectEntry
 {
-    const char*       name;
-    int               nameLength;
+    const char*         name;
+    int                 nameLength;
 
-    int               hash;
-    struct JsonValue  value;
+    int                 hash;
+    struct Json         value;
 };
 
 struct JsonAllocator

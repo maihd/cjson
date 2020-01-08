@@ -58,7 +58,7 @@ typedef enum JsonError
 } JsonError;
 
 typedef struct JsonState     JsonState;
-typedef struct JsonValue     JsonValue;
+typedef struct Json     Json;
 typedef struct JsonAllocator JsonAllocator;
 
 /**
@@ -71,28 +71,28 @@ enum
     JSON_FALSE = 0,
 };
 
-JSON_API JsonValue*    JsonParse(const char* json, JsonState** outState);
-JSON_API JsonValue*    JsonParseEx(const char* json, const JsonAllocator* allocator, JsonState** outState);
+JSON_API Json*    JsonParse(const char* json, JsonState** outState);
+JSON_API Json*    JsonParseEx(const char* json, const JsonAllocator* allocator, JsonState** outState);
 
 JSON_API void          JsonRelease(JsonState* state);
 
 JSON_API JsonError     JsonGetError(const JsonState* state);
 JSON_API const char*   JsonGetErrorString(const JsonState* state);
 
-JSON_API int           JsonLength(const JsonValue* x);
-JSON_API JsonBoolean   JsonEquals(const JsonValue* a, const JsonValue* b);
+JSON_API int           JsonLength(const Json* x);
+JSON_API JsonBoolean   JsonEquals(const Json* a, const Json* b);
 
 JSON_API int           JsonHash(const void* buffer, int length);
 
-JSON_API JsonValue*    JsonFind(const JsonValue* x, const char* name);
-JSON_API JsonValue*    JsonFindWithHash(const JsonValue* x, int hash);
+JSON_API Json*    JsonFind(const Json* x, const char* name);
+JSON_API Json*    JsonFindWithHash(const Json* x, int hash);
 
 typedef struct JsonObjectEntry JsonObjectEntry;
 
 /**
  * JSON value
  */
-struct JsonValue
+struct Json
 {
     JsonType type;                      /* Type of value: number, boolean, string, array, object    */
     int      length;                    /* Length of value, should use for literal type only        */
@@ -103,7 +103,7 @@ struct JsonValue
 
         const char*         string;
 
-        JsonValue*          array;
+        Json*          array;
 
         JsonObjectEntry*    object;
     };
@@ -112,7 +112,7 @@ struct JsonValue
 struct JsonObjectEntry
 {
     int               hash;
-    struct JsonValue  value;
+    struct Json  value;
 
 #ifdef JSON_OBJECT_KEYNAME
     const char*       name;

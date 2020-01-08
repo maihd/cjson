@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
             JsonTempAllocator_Init(&allocator, allocatorBuffer, 1024 * 1024);
 
             double dt = get_time();
-            JsonValue* value = JsonParseEx(buffer, filesize, allocator.super);
+            Json* value = JsonParseEx(buffer, filesize, allocator.super);
             if (JsonGetError(value) != JSON_ERROR_NONE || !value)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, JsonGetErrorString(value));
@@ -107,9 +107,9 @@ int main(int argc, char* argv[])
             dt = get_time() - dt;
 
             int length = value->length;
-            JsonValue* firstObject = value && length > 0 ? &value->array[0] : NULL;
+            Json* firstObject = value && length > 0 ? &value->array[0] : NULL;
             //
-            JsonValue* idValue = JsonFind(firstObject, "_id");
+            Json* idValue = JsonFind(firstObject, "_id");
 
             // When use temp allocator, no need to release
             //JsonRelease(state);
