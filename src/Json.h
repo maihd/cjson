@@ -3,7 +3,7 @@
  *
  * @author: MaiHD
  * @license: Public domain
- * @copyright: MaiHD @ ${HOME}, 2018 - 2019
+ * @copyright: MaiHD @ ${HOME}, 2018 - 2020
  ******************************************************/
 
 #pragma once
