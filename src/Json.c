@@ -288,9 +288,9 @@ static void JsonValue_ReleaseMemory(JsonValue* value, JsonAllocator* allocator)
 }
 
 /* @funcdef: JsonState_Make */
-static JsonState* JsonState_Make(const char* json, int jsonLength, const JsonAllocator* allocator)
+static JsonState* JsonState_Make(const char* json, int jsonLength, JsonAllocator allocator)
 {
-    JsonState* state = (JsonState*)JSON_ALLOC(allocator, sizeof(JsonState));
+    JsonState* state = (JsonState*)JSON_ALLOC(&allocator, sizeof(JsonState));
     if (state)
     {
         state->reversed0    = JSON_REVERSED0;
@@ -307,7 +307,7 @@ static JsonState* JsonState_Make(const char* json, int jsonLength, const JsonAll
 		state->errmsg       = NULL;
 		state->errnum       = JSON_ERROR_NONE;
 
-        state->allocator    = *allocator;
+        state->allocator    = allocator;
     }
     return state;
 }
@@ -908,11 +908,11 @@ JsonValue* JsonParse(const char* json, int jsonLength, JsonState** outState)
     allocator.free  = Json_Free;
     allocator.alloc = Json_Alloc;
 
-    return JsonParseEx(json, jsonLength, &allocator, outState);
+    return JsonParseEx(json, jsonLength, allocator, outState);
 }
 
 /* @funcdef: JsonParseEx */
-JsonValue* JsonParseEx(const char* json, int jsonLength, const JsonAllocator* allocator)
+JsonValue* JsonParseEx(const char* json, int jsonLength, JsonAllocator allocator)
 {
     JsonState* state = JsonState_Make(json, jsonLength, allocator);
     JsonValue* value = Json_ParseTopLevel(state);

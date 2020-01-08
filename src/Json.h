@@ -15,12 +15,7 @@
 #ifdef __cplusplus
 extern "C" {
 #elif !defined(__bool_true_false_are_defined)
-typedef int bool;
-enum
-{
-    true  = 1,
-    false = 0,
-};
+typedef enum { false, true } bool;
 #endif
 
 /**
@@ -63,7 +58,7 @@ typedef struct JsonAllocator    JsonAllocator;
 typedef struct JsonObjectEntry  JsonObjectEntry;
 
 JSON_API JsonValue*    JsonParse(const char* json, int jsonLength);
-JSON_API JsonValue*    JsonParseEx(const char* json, int jsonLength, const JsonAllocator* allocator);
+JSON_API JsonValue*    JsonParseEx(const char* json, int jsonLength, JsonAllocator allocator);
 
 JSON_API void          JsonRelease(JsonValue* rootValue);
 
