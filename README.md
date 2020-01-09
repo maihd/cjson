@@ -110,15 +110,16 @@ struct Json
     };
 };
 
+// Memory alignment is always alignof(Json)
 struct JsonAllocator
 {
     void* data;                                 // Your memory buffer
-    void* (*malloc)(void* data, size_t size);   // Your memory allocate function
+    void* (*alloc)(void* data, int size);       // Your memory allocate function
     void  (*free)(void* data, void* pointer);   // Your memory deallocate function
 };
 
-Json* JsonParse(const char* json_code, int jsonCodeLength);
-Json* JsonParse(const char* json_code, int jsonCodeLength, JsonAllocator settings);
+Json* JsonParse(const char* jsonCode, int jsonCodeLength);
+Json* JsonParse(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator);
 // return root value, save to get root memory
 
 void JsonRelease(Json* root); // root = NULL to remove all leak memory
