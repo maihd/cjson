@@ -17,6 +17,7 @@
 #include <string.h>
 #include <assert.h>
 #include <setjmp.h>
+#include <stdint.h>
 
 #define JSON_SUPEROF(ptr, T, member) (T*)((char*)ptr - offsetof(T, member))
 
@@ -32,8 +33,7 @@
 #  endif
 #endif
 
-static const int JSON_REVERSED0 = 'JSON';
-static const int JSON_REVERSED1 = 'json';
+static const uint64_t JSON_REVERSED = (1246973774ULL << 31) | 1785950062ULL;
 
 /*
 Utility
@@ -153,8 +153,7 @@ static JSON_INLINE void* JsonTempArray_ToBufferFunc(void* buffer, int count, voi
 typedef struct JsonState JsonState;
 struct JsonState
 {
-    int reversed0;
-    int reversed1;
+    uint64_t            reversed;
 
     Json                root;
     JsonState*          next;
@@ -301,8 +300,7 @@ static JsonState* JsonState_Make(const char* json, int jsonLength, JsonAllocator
     JsonState* state = (JsonState*)JSON_ALLOC(&allocator, sizeof(JsonState));
     if (state)
     {
-        state->reversed0    = JSON_REVERSED0;
-        state->reversed1    = JSON_REVERSED1;
+        state->reversed     = JSON_REVERSED;
 
 		state->next         = NULL;
 
@@ -906,14 +904,14 @@ static Json* Json_ParseTopLevel(JsonState* state)
 }
 
 /* @funcdef: JsonParse */
-Json* JsonParse(const char* json, int jsonLength, JsonState** outState)
+Json* JsonParse(const char* json, int jsonLength)
 {
     JsonAllocator allocator;
     allocator.data  = NULL;
     allocator.free  = Json_Free;
     allocator.alloc = Json_Alloc;
 
-    return JsonParseEx(json, jsonLength, allocator, outState);
+    return JsonParseEx(json, jsonLength, allocator);
 }
 
 /* @funcdef: JsonParseEx */
@@ -936,7 +934,7 @@ void JsonRelease(Json* rootValue)
     if (rootValue)
     {
         JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
-        if (state->reversed0 == JSON_REVERSED0 && state->reversed1 == JSON_REVERSED1)
+        if (state->reversed == JSON_REVERSED)
         {
             JsonState_Free(state);
         }
@@ -949,7 +947,7 @@ JsonError JsonGetError(const Json* rootValue)
     if (rootValue)
     {
         JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
-        if (state->reversed0 == JSON_REVERSED0 && state->reversed1 == JSON_REVERSED1)
+        if (state->reversed == JSON_REVERSED)
         {
             return state->errnum;
         }
@@ -964,7 +962,7 @@ const char* JsonGetErrorMessage(const Json* rootValue)
     if (rootValue)
     {
         JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
-        if (state->reversed0 == JSON_REVERSED0 && state->reversed1 == JSON_REVERSED1)
+        if (state->reversed == JSON_REVERSED)
         {
             return state->errmsg;
         }

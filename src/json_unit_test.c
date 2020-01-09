@@ -110,6 +110,12 @@ int main(int argc, char* argv[])
             Json* firstObject = value && length > 0 ? &value->array[0] : NULL;
             //
             Json* idValue = JsonFind(firstObject, "_id");
+            if (idValue)
+            {
+                printf("idValue: ");
+                JsonPrint(idValue, stdout);
+                printf("\n");
+            }
 
             // When use temp allocator, no need to release
             //JsonRelease(state);

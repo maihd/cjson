@@ -20,7 +20,13 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\json_test.c">
+    <ClCompile Include="..\src\Json_TokenTest.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\Json.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\JsonEx.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -22,7 +22,9 @@
     <ClInclude Include="..\json.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\json_test.c" />
+    <ClCompile Include="..\src\Json.c" />
+    <ClCompile Include="..\src\JsonEx.c" />
+    <ClCompile Include="..\src\Json_TokenTest.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

@@ -1,3 +1,36 @@
+#ifndef __JSON_EX_H__
+#define __JSON_EX_H__
+/******************************************************
+ * Simple json state written in ANSI C
+ *
+ * @author: MaiHD
+ * @license: Public domain
+ * @copyright: MaiHD @ ${HOME}, 2018 - 2020
+ ******************************************************/
+
+#pragma once
+
+#include "Json.h"
+#include <stdio.h>
+
+//JSON_API int  JsonHash(const void* buffer, int length);
+
+JSON_API void JsonPrint(const Json* value, FILE* out);
+JSON_API void JsonWrite(const Json* value, FILE* out);
+
+typedef struct JsonTempAllocator
+{
+    JsonAllocator   super;
+    void*           buffer;
+    int             length;
+    int             marker;
+} JsonTempAllocator;
+
+JSON_API bool JsonTempAllocator_Init(JsonTempAllocator* allocator, void* buffer, int length);
+#endif /* __JSON_EX_H__ */
+
+#ifdef JSON_EX_IMPL
+
 /******************************************************
  * Simple json state written in ANSI C
  *
@@ -169,7 +202,7 @@ static void* Json_TempAlloc(JsonTempAllocator* data, int size)
     return NULL;
 }
 
-static void Json_TempFree(void* data, void* ptr)
+static void* Json_TempFree(void* data, void* ptr)
 {
     (void)data;
     (void)ptr;
@@ -180,7 +213,7 @@ bool JsonTempAllocator_Init(JsonTempAllocator* allocator, void* buffer, int leng
     if (buffer && length > 0)
     {
         allocator->super.data   = allocator;
-        allocator->super.free   = (void(*)(void*, void*))Json_TempFree;
+        allocator->super.free   = Json_TempFree;
         allocator->super.alloc  = (void*(*)(void*, int))Json_TempAlloc;
         allocator->buffer       = buffer;
         allocator->length       = length;
@@ -245,3 +278,7 @@ int JsonHash(const void* buf, int len)
     return h;
 }
 #endif
+
+
+#endif /* JSON_EX_IMPL */
+

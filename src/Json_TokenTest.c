@@ -1,12 +1,11 @@
+#include <ctype.h>
+#include <stdio.h>
 #include <signal.h>
 #include <setjmp.h>
 #include <string.h>
 
-#define JSON_IMPL
-#include "../Json.h"
-
-#define JSON_EX_IMPL
-#include "./JsonEx.h"
+#include "Json.h"
+#include "JsonEx.h"
 
 static jmp_buf jmpenv;
 
@@ -42,7 +41,6 @@ int main(int argc, char* argv[])
     printf("Type '.exit' to exit\n");
     
     char input[1024];
-    JsonParser* state = NULL;
     while (1)
     {
 	    if (setjmp(jmpenv) == 0)
@@ -57,23 +55,23 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                JsonValue* value = JsonParse(json, &state);
-	    
-                if (JsonGetError(state) != JSON_ERROR_NONE)
+                Json* value = JsonParse(json, strlen(json));
+                if (JsonGetError(value) != JSON_ERROR_NONE)
                 {
                     value = NULL;
-                    printf("[ERROR]: %s\n", JsonGetErrorString(state));
+                    printf("[ERROR]: %s\n", JsonGetErrorMessage(value));
                 }
                 else
                 {
                     JsonPrint(value, stdout); printf("\n");
                 }
+                JsonRelease(value);
 	        }
 	    }
     }
 
     /* JsonRelease(NULL) for release all memory if you don't catch the json_state_t */
-    JsonRelease(state);
+    JsonRelease(NULL);
     
     return 0;
 }
