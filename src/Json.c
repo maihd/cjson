@@ -156,7 +156,7 @@ struct JsonState
     int reversed0;
     int reversed1;
 
-    Json           root;
+    Json                root;
     JsonState*          next;
 
     int                 line;
@@ -668,8 +668,8 @@ static char* Json_ParseStringNoToken(JsonState* state, int* outLength)
 {
     Json_MatchChar(state, JSON_STRING, '"');
 
-    int   i;
-    int   c0, c1;
+    int i;
+    int c0, c1;
 
     JsonTempArray(char, 2048) buffer = JsonTempArray_Init(NULL);
     while (!Json_IsEOF(state) && (c0 = Json_PeekChar(state)) != '"')
@@ -825,8 +825,7 @@ static void Json_ParseObject(JsonState* state, Json* outValue)
                 Json_Panic(state, JSON_OBJECT, JSON_ERROR_UNEXPECTED, "Expected <string> for <member-key> of <object>");
             }
 
-            int         nameLength;
-            const char* name = Json_ParseStringNoToken(state, &nameLength);
+            const char* name = Json_ParseStringNoToken(state, 0);
 
             Json_SkipSpace(state);
             Json_MatchChar(state, JSON_OBJECT, ':');
@@ -836,10 +835,8 @@ static void Json_ParseObject(JsonState* state, Json* outValue)
 
             /* Well done */
             JsonObjectEntry entry;
-            entry.hash       = JsonHash(name, nameLength);
-            entry.name       = name;
-            entry.value      = value;
-            entry.nameLength = nameLength;
+            entry.name  = name;
+            entry.value = value;
             JsonTempArray_Push(&values, entry, &state->allocator);
         }
 
@@ -939,7 +936,7 @@ void JsonRelease(Json* rootValue)
     if (rootValue)
     {
         JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
-        if (state->reversed0 == JSON_REVERSED0 && state->reversed1)
+        if (state->reversed0 == JSON_REVERSED0 && state->reversed1 == JSON_REVERSED1)
         {
             JsonState_Free(state);
         }
@@ -958,22 +955,22 @@ JsonError JsonGetError(const Json* rootValue)
         }
     }
 
-    return JSON_ERROR_NONE;
+    return JSON_ERROR_NO_VALUE;
 }
 
-/* @funcdef: JsonGetErrorString */
-const char* JsonGetErrorString(const Json* rootValue)
+/* @funcdef: JsonGetErrorMessage */
+const char* JsonGetErrorMessage(const Json* rootValue)
 {
     if (rootValue)
     {
         JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
-        if (state->reversed0 == JSON_REVERSED0 && state->reversed1)
+        if (state->reversed0 == JSON_REVERSED0 && state->reversed1 == JSON_REVERSED1)
         {
             return state->errmsg;
         }
     }
 
-    return JSON_ERROR_NONE;
+    return "JSON_ERROR_NO_VALUE";
 }
 
 /* @funcdef: JsonEquals */
@@ -1026,7 +1023,7 @@ bool JsonEquals(const Json* a, const Json* b)
         {
             for (i = 0; i < n; i++)
             {
-                if (a->object[i].hash != b->object[i].hash || strncmp(a->object[i].name, b->object[i].name, n) != 0)
+                if (strncmp(a->object[i].name, b->object[i].name, n) != 0)
                 {
                     return false;
                 }
@@ -1046,58 +1043,6 @@ bool JsonEquals(const Json* a, const Json* b)
     return false;
 }
 
-/* @funcdef: JsonHash */
-int JsonHash(const void* buf, int len)
-{
-    int h = 0xdeadbeaf;
-
-    const char* key = (const char*)buf;
-    if (len > 3)
-    {
-        const int* key_x4 = (const int*)key;
-        int i = len >> 2;
-        do
-        {
-            int k = *key_x4++;
-
-            k *= 0xcc9e2d51;
-            k = (k << 15) | (k >> 17);
-            k *= 0x1b873593;
-            h ^= k;
-            h = (h << 13) | (h >> 19);
-            h = (h * 5) + 0xe6546b64;
-        } while (--i);
-
-        key = (const char*)(key_x4);
-    }
-
-    if (len & 3)
-    {
-        int i = len & 3;
-        int k = 0;
-
-        key = &key[i - 1];
-        do
-        {
-            k <<= 8;
-            k |= *key--;
-        } while (--i);
-
-        k *= 0xcc9e2d51;
-        k = (k << 15) | (k >> 17);
-        k *= 0x1b873593;
-        h ^= k;
-    }
-
-    h ^= len;
-    h ^= h >> 16;
-    h *= 0x85ebca6b;
-    h ^= h >> 13;
-    h *= 0xc2b2ae35;
-    h ^= h >> 16;
-    return h;
-}
-
 /* @funcdef: JsonFind */
 Json* JsonFind(const Json* obj, const char* name)
 {
@@ -1105,31 +1050,12 @@ Json* JsonFind(const Json* obj, const char* name)
     {
         int i, n;
         int len  = (int)strlen(name);
-        int hash = JsonHash(name, len);
         for (i = 0, n = obj->length; i < n; i++)
         {
             JsonObjectEntry* entry = &obj->object[i];
-            if (hash == entry->hash && strncmp(name, entry->name, len) == 0)
+            if (strncmp(name, entry->name, len) == 0)
             {
                 return &entry->value;
-            }
-        }
-    }
-
-    return NULL;
-}
-
-/* @funcdef: JsonFindWithHash */
-Json* JsonFindWithHash(const Json* obj, int hash)
-{
-    if (obj && obj->type == JSON_OBJECT)
-    {
-        int i, n;
-        for (i = 0, n = obj->length; i < n; i++)
-        {
-            if (hash == obj->object[i].hash)
-            {
-                return &obj->object[i].value;
             }
         }
     }

@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
     }
 
     int   i, n;
-    char* buffer = NULL;
+    char* fileBuffer = NULL;
     void* allocatorBuffer = malloc(1024 * 1024);
     for (i = 1, n = argc; i < n; i++)
     {
@@ -82,9 +82,9 @@ int main(int argc, char* argv[])
             filesize = (int)ftell(file);
             fseek(file, 0, SEEK_SET);
 
-            buffer = (char*)realloc(buffer, (filesize + 1) * sizeof(char));
-            buffer[filesize] = 0;
-            fread(buffer, filesize, sizeof(char), file);
+            fileBuffer = (char*)realloc(fileBuffer, (filesize + 1) * sizeof(char));
+            fileBuffer[filesize] = 0;
+            fread(fileBuffer, filesize, sizeof(char), file);
 
             //JsonDebugAllocator debug;
             //memset(&debug, 0, sizeof(debug));
@@ -98,10 +98,10 @@ int main(int argc, char* argv[])
             JsonTempAllocator_Init(&allocator, allocatorBuffer, 1024 * 1024);
 
             double dt = get_time();
-            Json* value = JsonParseEx(buffer, filesize, allocator.super);
-            if (JsonGetError(value) != JSON_ERROR_NONE || !value)
+            Json* value = JsonParseEx(fileBuffer, filesize, allocator.super);
+            if (JsonGetError(value) != JSON_ERROR_NONE)
             {
-                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, JsonGetErrorString(value));
+                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, JsonGetErrorMessage(value));
                 return 1;
             }
             dt = get_time() - dt;
@@ -115,11 +115,14 @@ int main(int argc, char* argv[])
             //JsonRelease(state);
             fclose(file);
 
-            //printf("Parsed file '%s'\n\t- file size:\t%dB\n\t- memory usage:\t%dB\n\t- times:\t%lfs\n\n", filename, filesize, debug.alloced, dt);
+            printf("Parsed file '%s'\n\t- file size:\t%dB\n\t- memory usage:\t%dB\n\t- times:\t%lfs\n\n", filename, filesize, allocator.marker, dt);
         }
     }
 
     printf("Unit testing succeed.\n");
+    free(allocatorBuffer);
+    free(fileBuffer);
+
 #if defined(_MSC_VER) && !defined(NDEBUG)
     getchar();
 #endif

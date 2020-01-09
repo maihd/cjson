@@ -39,6 +39,8 @@ typedef enum JsonError
 {
     JSON_ERROR_NONE,
 
+    JSON_ERROR_NO_VALUE,
+
     /* Parsing error */
 
     JSON_ERROR_FORMAT,
@@ -63,14 +65,11 @@ JSON_API Json*          JsonParseEx(const char* json, int jsonLength, JsonAlloca
 JSON_API void           JsonRelease(Json* rootValue);
 
 JSON_API JsonError      JsonGetError(const Json* rootValue);
-JSON_API const char*    JsonGetErrorString(const Json* rootValue);
+JSON_API const char*    JsonGetErrorMessage(const Json* rootValue);
 
 JSON_API bool           JsonEquals(const Json* a, const Json* b);
 
-JSON_API int            JsonHash(const void* buffer, int length);
-
 JSON_API Json*          JsonFind(const Json* x, const char* name);
-JSON_API Json*          JsonFindWithHash(const Json* x, int hash);
 
 struct Json
 {
@@ -92,9 +91,6 @@ struct Json
 struct JsonObjectEntry
 {
     const char*         name;
-    int                 nameLength;
-
-    int                 hash;
     struct Json         value;
 };
 
