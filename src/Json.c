@@ -187,7 +187,7 @@ static void Json_Free(void* data, void* pointer)
     free(pointer);
 }
 
-static void Json_SetErrorArgs(JsonState* state, JsonType type, JsonError code, const char* fmt, va_list valist)
+static void Json_SetErrorWithArgs(JsonState* state, JsonType type, JsonError code, const char* fmt, va_list valist)
 {
     const int errmsg_size = 1024;
 
@@ -246,7 +246,7 @@ static void Json_SetError(JsonState* state, JsonType type, JsonError code, const
 {
     va_list varg;
     va_start(varg, fmt);
-    Json_SetErrorArgs(state, type, code, fmt, varg);
+    Json_SetErrorWithArgs(state, type, code, fmt, varg);
     va_end(varg);
 }
 
@@ -255,13 +255,13 @@ static void Json_Panic(JsonState* state, JsonType type, JsonError code, const ch
 {
     va_list varg;
     va_start(varg, fmt);
-    Json_SetErrorArgs(state, type, code, fmt, varg);
+    Json_SetErrorWithArgs(state, type, code, fmt, varg);
     va_end(varg);
 
     longjmp(state->errjmp, code);
 }
 
-static void JsonValue_ReleaseMemory(Json* value, JsonAllocator* allocator)
+static void Json_ReleaseMemory(Json* value, JsonAllocator* allocator)
 {
     if (value)
     {
@@ -271,7 +271,7 @@ static void JsonValue_ReleaseMemory(Json* value, JsonAllocator* allocator)
         case JSON_ARRAY:
             for (i = 0, n = value->length; i < n; i++)
             {
-                JsonValue_ReleaseMemory(&value->array[i], allocator);
+                Json_ReleaseMemory(&value->array[i], allocator);
             }
             JSON_FREE(allocator, value->array);
             break;
@@ -279,7 +279,7 @@ static void JsonValue_ReleaseMemory(Json* value, JsonAllocator* allocator)
         case JSON_OBJECT:
             for (i = 0, n = value->length; i < n; i++)
             {
-                JsonValue_ReleaseMemory(&value->object[i].value, allocator);
+                Json_ReleaseMemory(&value->object[i].value, allocator);
             }
             JSON_FREE(allocator, value->object);
             break;
@@ -295,7 +295,7 @@ static void JsonValue_ReleaseMemory(Json* value, JsonAllocator* allocator)
 }
 
 /* @funcdef: JsonState_Make */
-static JsonState* JsonState_Make(const char* json, int jsonLength, JsonAllocator allocator)
+static JsonState* JsonState_Make(const char* jsonCode, int jsonLength, JsonAllocator allocator)
 {
     JsonState* state = (JsonState*)JSON_ALLOC(&allocator, sizeof(JsonState));
     if (state)
@@ -307,7 +307,7 @@ static JsonState* JsonState_Make(const char* json, int jsonLength, JsonAllocator
 		state->line         = 1;
 		state->column       = 1;
 		state->cursor       = 0;
-		state->buffer       = json;
+		state->buffer       = jsonCode;
 		state->length       = jsonLength;
 
 		state->errmsg       = NULL;
@@ -324,7 +324,7 @@ static void JsonState_Free(JsonState* state)
     if (state)
     {
         Json* root = &state->root;
-        JsonValue_ReleaseMemory(root, &state->allocator);
+        Json_ReleaseMemory(root, &state->allocator);
 
 		JsonState* next = state->next;
 

@@ -59,8 +59,8 @@ typedef struct Json             Json;
 typedef struct JsonAllocator    JsonAllocator;
 typedef struct JsonObjectEntry  JsonObjectEntry;
 
-JSON_API Json*          JsonParse(const char* json, int jsonLength);
-JSON_API Json*          JsonParseEx(const char* json, int jsonLength, JsonAllocator allocator);
+JSON_API Json*          JsonParse(const char* jsonCode, int jsonCodeLength);
+JSON_API Json*          JsonParseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator);
 
 JSON_API void           JsonRelease(Json* rootValue);
 
