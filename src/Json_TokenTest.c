@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
 	    }
     }
 
-    /* JsonRelease(NULL) for release all memory if you don't catch the json_state_t */
+    /* JsonRelease(NULL) for release all memory, if there is leak */
     JsonRelease(NULL);
     
     return 0;
