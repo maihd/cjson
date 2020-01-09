@@ -39,7 +39,7 @@ static void JsonDebug_Free(void* data, void* ptr)
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(__cygwin__) || defined(_WIN32)
 #include <Windows.h>
 
-double get_time(void)
+double gettime(void)
 {
     LARGE_INTEGER t, f;
     QueryPerformanceCounter(&t);
@@ -50,7 +50,7 @@ double get_time(void)
 #include <unistd.h>
 #include <sys/time.h>
 
-double get_time(void)
+double gettime(void)
 {
     struct timespec t;
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t);
@@ -97,14 +97,14 @@ int main(int argc, char* argv[])
             JsonTempAllocator allocator;
             JsonTempAllocator_Init(&allocator, allocatorBuffer, 1024 * 1024);
 
-            double dt = get_time();
+            double dt = gettime();
             Json* value = JsonParseEx(fileBuffer, filesize, allocator.super);
             if (JsonGetError(value) != JSON_ERROR_NONE)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, JsonGetErrorMessage(value));
                 return 1;
             }
-            dt = get_time() - dt;
+            dt = gettime() - dt;
 
             int length = value->length;
             Json* firstObject = value && length > 0 ? &value->array[0] : NULL;
