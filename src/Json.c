@@ -23,13 +23,13 @@
 
 #ifndef JSON_INLINE
 #  if defined(_MSC_VER)
-#     define JSON_INLINE __forceinline
+#     define JSON_INLINE static __forceinline
 #  elif defined(__GNUC__) || defined(__clang__)
-#     define JSON_INLINE __inline__ __attribute__((always_inline))
+#     define JSON_INLINE static __inline__ __attribute__((always_inline))
 #  elif defined(__cplusplus)
-#     define JSON_INLINE inline
+#     define JSON_INLINE static inline
 #  else
-#     define JSON_INLINE 
+#     define JSON_INLINE static 
 #  endif
 #endif
 
@@ -43,7 +43,7 @@ Utility
 #define JSON_FREE(a, ptr)   (a)->free((a)->data, ptr)
 
 /* Next power of two */
-static JSON_INLINE int Json_NextPOT(int x)
+JSON_INLINE int Json_NextPOT(int x)
 {
     x  = x - 1;
     x |= x >> 1;
@@ -78,7 +78,7 @@ typedef struct JsonArray
 #define JsonArray_Clear(a)              ((a) ? (void)(JsonArray_GetRaw(a)->count = 0) : (void)0)
 #define JsonArray_Clone(a, alloc)       ((a) ? memcpy(JsonArray_Grow(0, JsonArray_GetCount(a), sizeof((a)[0]), alloc), JsonArray_GetRaw(a), JsonArray_GetUsageMemory(a)) : NULL)
 
-static JSON_INLINE void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocator* allocator)
+JSON_INLINE void* JsonArray_Grow(void* array, int reqsize, int elemsize, JsonAllocator* allocator)
 {
     assert(elemsize > 0);
     assert(allocator != NULL);
@@ -131,7 +131,7 @@ JsonTempArray: memory-wise array for containing parsing value
 #define JsonTempArray_GetCount(a)         ((a)->count + JsonArray_GetCount((a)->array))
 #define JsonTempArray_ToBuffer(a, alloc)  JsonTempArray_ToBufferFunc((a)->buffer, (a)->count, (a)->array, (int)sizeof((a)->buffer[0]), alloc)
 
-static JSON_INLINE void* JsonTempArray_ToBufferFunc(void* buffer, int count, void* dynamicBuffer, int itemSize, JsonAllocator* allocator)
+JSON_INLINE void* JsonTempArray_ToBufferFunc(void* buffer, int count, void* dynamicBuffer, int itemSize, JsonAllocator* allocator)
 {
     int total = count + JsonArray_GetCount(dynamicBuffer);
     if (total > 0)

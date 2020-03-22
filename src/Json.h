@@ -12,10 +12,15 @@
 #define JSON_API
 #endif
 
+/* START OF EXTERN "C" */
 #ifdef __cplusplus
 extern "C" {
-#elif !defined(__bool_true_false_are_defined)
-typedef enum { false, true } bool;
+#endif
+
+/* Define boolean type if needed */
+#if !defined(__cplusplus) && !defined(__bool_true_false_are_defined)
+typedef char bool;
+enum { false = 0, true = 1 };
 #endif
 
 /**
@@ -74,7 +79,7 @@ JSON_API Json*          JsonFind(const Json* x, const char* name);
 struct Json
 {
     JsonType type;                      /* Type of value: number, boolean, string, array, object    */
-    int      length;                    /* Length of value, should use for literal type only        */
+    int      length;                    /* Length of value, always 1 on primitive types             */
     union
     {
         double              number;
@@ -90,8 +95,8 @@ struct Json
 
 struct JsonObjectEntry
 {
-    const char*         name;
-    struct Json         value;
+    const char* name;
+    Json        value;
 };
 
 struct JsonAllocator
