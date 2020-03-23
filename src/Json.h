@@ -43,8 +43,6 @@ typedef enum JsonError
 {
     JsonError_None,
 
-    JsonError_NoValue,
-
     /* Parsing error */
 
     JsonError_WrongFormat,
@@ -56,7 +54,9 @@ typedef enum JsonError
     /* Runtime error */
 
     JsonError_OutOfMemory,
+    JsonError_InvalidValue,
     JsonError_InternalFatal,
+
 } JsonError;
 
 typedef struct Json             Json;

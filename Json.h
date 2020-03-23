@@ -45,7 +45,7 @@ typedef enum JsonError
 {
     JsonError_None,
 
-    JsonError_NoValue,
+    JsonError_InvalidValue,
 
     /* Parsing error */
 
@@ -1072,7 +1072,7 @@ JsonError Json_getError(const Json* rootValue)
         }
     }
 
-    return JsonError_NoValue;
+    return JsonError_InvalidValue;
 }
 
 /* @funcdef: Json_getErrorMessage */

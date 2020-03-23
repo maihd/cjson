@@ -953,7 +953,7 @@ JsonError Json_getError(const Json* rootValue)
         }
     }
 
-    return JsonError_NoValue;
+    return JsonError_InvalidValue;
 }
 
 /* @funcdef: Json_getErrorMessage */
@@ -968,7 +968,7 @@ const char* Json_getErrorMessage(const Json* rootValue)
         }
     }
 
-    return "JSON_ERROR_NO_VALUE";
+    return "JsonError_InvalidValue";
 }
 
 /* @funcdef: Json_equals */
