@@ -14,11 +14,14 @@ make lib
 ```
 
 ## Examples
-Belove code from json_test.cc:
+Belove code from json_test.c:
 ```C
+#include "Json.h"
+#include "JsonEx.h" // for Json_print
+
 int main(int argc, char* argv[])
 {
-    signal(SIGINT, _sighandler);
+    //signal(SIGINT, _sighandler);
     
     printf("JSON token testing prompt\n");
     printf("Type '.exit' to exit\n");
@@ -38,23 +41,23 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                Json* value = JsonParse(json, strlen(json));
-                if (JsonGetError(value) != JSON_ERROR_NONE)
+                Json* value = Json_parse(json, strlen(json));
+                if (Json_getError(value) != JsonError_None)
                 {
                     value = NULL;
-                    printf("[ERROR]: %s\n", JsonGetErrorMessage(value));
+                    printf("[ERROR]: %s\n", Json_getErrorMessage(value));
                 }
                 else
                 {
-                    JsonPrint(value, stdout); printf("\n");
+                    Json_print(value, stdout); printf("\n");
                 }
-                JsonRelease(value);
+                Json_release(value);
 	        }
 	    }
     }
 
-    /* JsonRelease(NULL) for release all memory, if there is leak */
-    JsonRelease(NULL);
+    /* Json_release(NULL) for release all memory, if there is leak */
+    Json_release(NULL);
     
     return 0;
 }
@@ -64,33 +67,32 @@ int main(int argc, char* argv[])
 ```C
 enum JsonType
 {
-    JSON_NONE,
-    JSON_NULL,
-    JSON_ARRAY,
-    JSON_OBJECT,
-    JSON_NUMBER,
-    JSON_STRING,
-    JSON_BOOLEAN,
+    JsonType_Null,
+    JsonType_Array,
+    JsonType_Object,
+    JsonType_Number,
+    JsonType_String,
+    JsonType_Boolean,
 };
 
 enum JsonError
 {
-    JSON_ERROR_NONE,
+    JsonError_None,
 
-    JSON_ERROR_NO_VALUE,
+    JsonError_NoValue,
 
     /* Parsing error */
 
-    JSON_ERROR_FORMAT,
-    JSON_ERROR_UNMATCH,
-    JSON_ERROR_UNKNOWN,
-    JSON_ERROR_UNEXPECTED,
-    JSON_ERROR_UNSUPPORTED,
+    JsonError_WrongFormat,
+    JsonError_UnmatchToken,
+    JsonError_UnknownToken,
+    JsonError_UnexpectedToken,
+    JsonError_UnsupportedToken,
 
     /* Runtime error */
 
-    JSON_ERROR_MEMORY,
-    JSON_ERROR_INTERNAL,
+    JsonError_OutOfMemory,
+    JsonError_InternalFatal,
 };
 
 struct Json
@@ -118,14 +120,14 @@ struct JsonAllocator
     void  (*free)(void* data, void* pointer);   // Your memory deallocate function
 };
 
-Json* JsonParse(const char* jsonCode, int jsonCodeLength);
-Json* JsonParse(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator);
+Json* Json_parse(const char* jsonCode, int jsonCodeLength);
+Json* Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator);
 // return root value, save to get root memory
 
-void JsonRelease(Json* root); // root = NULL to remove all leak memory
+void Json_release(Json* root); // root = NULL to remove all leak memory
 
-JsonError   JsonGetError(const Json* root); // Get error number of [given state] or [last state] (when state = NULL) 
-const char* JsonGerErrorMessage(const Json* root); // Get error string of [given state] or [last state] (when state = NULL)
+JsonError   Json_getError(const Json* root); // Get error number of [given state] or [last state] (when state = NULL) 
+const char* Json_getErrorMessage(const Json* root); // Get error string of [given state] or [last state] (when state = NULL)
 
 ```
 

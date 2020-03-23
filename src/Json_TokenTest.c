@@ -55,23 +55,23 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                Json* value = JsonParse(json, strlen(json));
-                if (JsonGetError(value) != JSON_ERROR_NONE)
+                Json* value = Json_parse(json, strlen(json));
+                if (Json_getError(value) != JsonError_None)
                 {
                     value = NULL;
-                    printf("[ERROR]: %s\n", JsonGetErrorMessage(value));
+                    printf("[ERROR]: %s\n", Json_getErrorMessage(value));
                 }
                 else
                 {
-                    JsonPrint(value, stdout); printf("\n");
+                    Json_print(value, stdout); printf("\n");
                 }
-                JsonRelease(value);
+                Json_release(value);
 	        }
 	    }
     }
 
     /* JsonRelease(NULL) for release all memory, if there is leak */
-    JsonRelease(NULL);
+    Json_release(NULL);
     
     return 0;
 }

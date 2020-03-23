@@ -13,10 +13,10 @@
 #include "Json.h"
 #include <stdio.h>
 
-//JSON_API int  JsonHash(const void* buffer, int length);
+//JSON_API int  Json_hash(const void* buffer, int length);
 
-JSON_API void JsonPrint(const Json* value, FILE* out);
-JSON_API void JsonWrite(const Json* value, FILE* out);
+JSON_API void Json_print(const Json* value, FILE* out);
+JSON_API void Json_write(const Json* value, FILE* out);
 
 typedef struct JsonTempAllocator
 {
@@ -26,7 +26,7 @@ typedef struct JsonTempAllocator
     int             marker;
 } JsonTempAllocator;
 
-JSON_API bool JsonTempAllocator_Init(JsonTempAllocator* allocator, void* buffer, int length);
+JSON_API bool JsonTempAllocator_init(JsonTempAllocator* allocator, void* buffer, int length);
 #endif /* __JSON_EX_H__ */
 
 #ifdef JSON_EX_IMPL
@@ -42,7 +42,7 @@ JSON_API bool JsonTempAllocator_Init(JsonTempAllocator* allocator, void* buffer,
 #include "JsonEx.h"
 
 /* @funcdef: JsonWrite */
-void JsonWrite(const Json* value, FILE* out)
+void Json_write(const Json* value, FILE* out)
 {
     if (value)
     {
@@ -50,27 +50,27 @@ void JsonWrite(const Json* value, FILE* out)
 
         switch (value->type)
         {
-        case JSON_NULL:
+        case JsonType_Null:
             fprintf(out, "null");
             break;
 
-        case JSON_NUMBER:
+        case JsonType_Number:
             fprintf(out, "%lf", value->number);
             break;
 
-        case JSON_BOOLEAN:
+        case JsonType_Boolean:
             fprintf(out, "%s", value->boolean ? "true" : "false");
             break;
 
-        case JSON_STRING:
+        case JsonType_String:
             fprintf(out, "\"%s\"", value->string);
             break;
 
-        case JSON_ARRAY:
+        case JsonType_Array:
             fprintf(out, "[");
             for (i = 0, n = value->length; i < n; i++)
             {
-                JsonWrite(&value->array[i], out);
+                Json_write(&value->array[i], out);
                 if (i < n - 1)
                 {
                     fprintf(out, ",");
@@ -79,12 +79,12 @@ void JsonWrite(const Json* value, FILE* out)
             fprintf(out, "]");
             break;
 
-        case JSON_OBJECT:
+        case JsonType_Object:
             fprintf(out, "{");
             for (i = 0, n = value->length; i < n; i++)
             {
                 fprintf(out, "\"%s\" : ", value->object[i].name);
-                JsonWrite(&value->object[i].value, out);
+                Json_write(&value->object[i].value, out);
                 if (i < n - 1)
                 {
                     fprintf(out, ",");
@@ -93,7 +93,6 @@ void JsonWrite(const Json* value, FILE* out)
             fprintf(out, "}");
             break;
 
-        case JSON_NONE:
         default:
             break;
         }
@@ -101,7 +100,7 @@ void JsonWrite(const Json* value, FILE* out)
 }          
 
 /* @funcdef: JsonPrint */
-void JsonPrint(const Json* value, FILE* out)
+void Json_print(const Json* value, FILE* out)
 {
     if (value)
     {
@@ -110,23 +109,23 @@ void JsonPrint(const Json* value, FILE* out)
 
         switch (value->type)
         {
-        case JSON_NULL:
+        case JsonType_Null:
             fprintf(out, "null");
             break;
 
-        case JSON_NUMBER:
+        case JsonType_Number:
             fprintf(out, "%lf", value->number);
             break;
 
-        case JSON_BOOLEAN:
+        case JsonType_Boolean:
             fprintf(out, "%s", value->boolean ? "true" : "false");
             break;
 
-        case JSON_STRING:
+        case JsonType_String:
             fprintf(out, "\"%s\"", value->string);
             break;
 
-        case JSON_ARRAY:
+        case JsonType_Array:
             fprintf(out, "[\n");
 
             indent++;
@@ -138,7 +137,7 @@ void JsonPrint(const Json* value, FILE* out)
                     fputc(' ', out);
                 }
 
-                JsonPrint(&value->array[i], out);
+                Json_print(&value->array[i], out);
                 if (i < n - 1)
                 {
                     fputc(',', out);
@@ -154,7 +153,7 @@ void JsonPrint(const Json* value, FILE* out)
             fputc(']', out);
             break;
 
-        case JSON_OBJECT:
+        case JsonType_Object:
             fprintf(out, "{\n");
 
             indent++;
@@ -167,7 +166,7 @@ void JsonPrint(const Json* value, FILE* out)
                 }
 
                 fprintf(out, "\"%s\" : ", value->object[i].name);
-                JsonPrint(&value->object[i].value, out);
+                Json_print(&value->object[i].value, out);
                 if (i < n - 1)
                 {
                     fputc(',', out);
@@ -183,14 +182,13 @@ void JsonPrint(const Json* value, FILE* out)
             fputc('}', out);
             break;
 
-        case JSON_NONE:
         default:
             break;
         }
     }
 }
 
-static void* Json_TempAlloc(JsonTempAllocator* data, int size)
+static void* JsonTempAllocator_alloc(JsonTempAllocator* data, int size)
 {
     if (data->marker + size <= data->length)
     {
@@ -202,19 +200,19 @@ static void* Json_TempAlloc(JsonTempAllocator* data, int size)
     return NULL;
 }
 
-static void* Json_TempFree(void* data, void* ptr)
+static void JsonTempAllocator_free(void* data, void* ptr)
 {
     (void)data;
     (void)ptr;
 }
 
-bool JsonTempAllocator_Init(JsonTempAllocator* allocator, void* buffer, int length)
+bool JsonTempAllocator_init(JsonTempAllocator* allocator, void* buffer, int length)
 {
     if (buffer && length > 0)
     {
         allocator->super.data   = allocator;
-        allocator->super.free   = Json_TempFree;
-        allocator->super.alloc  = (void*(*)(void*, int))Json_TempAlloc;
+        allocator->super.free   = (void(*)(void*, void*))JsonTempAllocator_free;
+        allocator->super.alloc  = (void*(*)(void*, int))JsonTempAllocator_alloc;
         allocator->buffer       = buffer;
         allocator->length       = length;
         allocator->marker       = 0;
@@ -226,8 +224,8 @@ bool JsonTempAllocator_Init(JsonTempAllocator* allocator, void* buffer, int leng
 }
 
 #if 0
-/* @funcdef: JsonHash */
-int JsonHash(const void* buf, int len)
+/* @funcdef: Json_hash */
+int Json_hash(const void* buf, int len)
 {
     int h = 0xdeadbeaf;
 

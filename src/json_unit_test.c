@@ -14,7 +14,7 @@ typedef struct
     int alloced;
 } JsonDebugAllocator;
 
-static void* JsonDebug_Alloc(void* data, int size)
+static void* JsonDebugAllocator_alloc(void* data, int size)
 {
     assert(size > 0 && "Internal error: attempt alloc with size < 0");
 
@@ -26,7 +26,7 @@ static void* JsonDebug_Alloc(void* data, int size)
     return malloc((size_t)size);
 }
 
-static void JsonDebug_Free(void* data, void* ptr)
+static void JsonDebugAllocator_free(void* data, void* ptr)
 {
     //assert(ptr && "Internal error: attempt free with nullptr");
 
@@ -91,17 +91,17 @@ int main(int argc, char* argv[])
             //
             //JsonAllocator allocator;
             //allocator.data  = &debug;
-            //allocator.free  = JsonDebug_Free;
-            //allocator.alloc = JsonDebug_Alloc;
+            //allocator.free  = JsonDebugAllocator_free;
+            //allocator.alloc = JsonDebugAllocator_alloc;
 
             JsonTempAllocator allocator;
-            JsonTempAllocator_Init(&allocator, allocatorBuffer, 1024 * 1024);
+            JsonTempAllocator_init(&allocator, allocatorBuffer, 1024 * 1024);
 
             double dt = gettime();
-            Json* value = JsonParseEx(fileBuffer, filesize, allocator.super);
-            if (JsonGetError(value) != JSON_ERROR_NONE)
+            Json* value = Json_parseEx(fileBuffer, filesize, allocator.super);
+            if (Json_getError(value) != JsonError_None)
             {
-                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, JsonGetErrorMessage(value));
+                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, Json_getErrorMessage(value));
                 return 1;
             }
             dt = gettime() - dt;
@@ -109,16 +109,16 @@ int main(int argc, char* argv[])
             int length = value->length;
             Json* firstObject = value && length > 0 ? &value->array[0] : NULL;
             //
-            Json* idValue = JsonFind(firstObject, "_id");
+            Json* idValue = Json_find(firstObject, "_id");
             if (idValue)
             {
                 printf("idValue: ");
-                JsonPrint(idValue, stdout);
+                Json_print(idValue, stdout);
                 printf("\n");
             }
 
-            // When use temp allocator, no need to release
-            //JsonRelease(state);
+            // When use temp allocator, donot Json_release
+            //Json_release(state);
             fclose(file);
 
             printf("Parsed file '%s'\n\t- file size:\t%dB\n\t- memory usage:\t%dB\n\t- times:\t%lfs\n\n", filename, filesize, allocator.marker, dt);

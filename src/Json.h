@@ -28,13 +28,12 @@ enum { false = 0, true = 1 };
  */
 typedef enum JsonType
 {
-    JSON_NONE,
-    JSON_NULL,
-    JSON_ARRAY,
-    JSON_OBJECT,
-    JSON_NUMBER,
-    JSON_STRING,
-    JSON_BOOLEAN,
+    JsonType_Null,
+    JsonType_Array,
+    JsonType_Object,
+    JsonType_Number,
+    JsonType_String,
+    JsonType_Boolean,
 } JsonType;
 
 /**
@@ -42,39 +41,39 @@ typedef enum JsonType
  */
 typedef enum JsonError
 {
-    JSON_ERROR_NONE,
+    JsonError_None,
 
-    JSON_ERROR_NO_VALUE,
+    JsonError_NoValue,
 
     /* Parsing error */
 
-    JSON_ERROR_FORMAT,
-    JSON_ERROR_UNMATCH,
-    JSON_ERROR_UNKNOWN,
-    JSON_ERROR_UNEXPECTED,
-    JSON_ERROR_UNSUPPORTED,
+    JsonError_WrongFormat,
+    JsonError_UnmatchToken,
+    JsonError_UnknownToken,
+    JsonError_UnexpectedToken,
+    JsonError_UnsupportedToken,
 
     /* Runtime error */
 
-    JSON_ERROR_MEMORY,
-    JSON_ERROR_INTERNAL,
+    JsonError_OutOfMemory,
+    JsonError_InternalFatal,
 } JsonError;
 
 typedef struct Json             Json;
 typedef struct JsonAllocator    JsonAllocator;
 typedef struct JsonObjectEntry  JsonObjectEntry;
 
-JSON_API Json*          JsonParse(const char* jsonCode, int jsonCodeLength);
-JSON_API Json*          JsonParseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator);
+JSON_API Json*          Json_parse(const char* jsonCode, int jsonCodeLength);
+JSON_API Json*          Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator);
 
-JSON_API void           JsonRelease(Json* rootValue);
+JSON_API void           Json_release(Json* rootValue);
 
-JSON_API JsonError      JsonGetError(const Json* rootValue);
-JSON_API const char*    JsonGetErrorMessage(const Json* rootValue);
+JSON_API JsonError      Json_getError(const Json* rootValue);
+JSON_API const char*    Json_getErrorMessage(const Json* rootValue);
 
-JSON_API bool           JsonEquals(const Json* a, const Json* b);
+JSON_API bool           Json_equals(const Json* a, const Json* b);
 
-JSON_API Json*          JsonFind(const Json* x, const char* name);
+JSON_API Json*          Json_find(const Json* x, const char* name);
 
 struct Json
 {
