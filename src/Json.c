@@ -904,18 +904,18 @@ static Json* JsonState_parseTopLevel(JsonState* state)
 }
 
 /* @funcdef: Json_parse */
-Json* Json_parse(const char* json, int jsonLength)
+Json* Json_parse(const char* json, int jsonLength, JsonFlags flags)
 {
     JsonAllocator allocator;
     allocator.data  = NULL;
     allocator.free  = Json_free;
     allocator.alloc = Json_alloc;
 
-    return Json_parseEx(json, jsonLength, allocator);
+    return Json_parseEx(json, jsonLength, allocator, flags);
 }
 
 /* @funcdef: Json_parseEx */
-Json* Json_parseEx(const char* json, int jsonLength, JsonAllocator allocator)
+Json* Json_parseEx(const char* json, int jsonLength, JsonAllocator allocator, JsonFlags flags)
 {
     JsonState* state = JsonState_new(json, jsonLength, allocator);
     Json* value = JsonState_parseTopLevel(state);

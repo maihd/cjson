@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
             JsonTempAllocator_init(&allocator, allocatorBuffer, 1024 * 1024);
 
             double dt = gettime();
-            Json* value = Json_parseEx(fileBuffer, filesize, allocator.super);
+            Json* value = Json_parseEx(fileBuffer, filesize, allocator.super, JsonFlags_None);
             if (Json_getError(value) != JsonError_None)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, Json_getErrorMessage(value));

@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                Json* value = Json_parse(json, strlen(json));
+                Json* value = Json_parse(json, strlen(json), JsonFlags_None);
                 if (Json_getError(value) != JsonError_None)
                 {
                     value = NULL;

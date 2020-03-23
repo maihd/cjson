@@ -59,12 +59,21 @@ typedef enum JsonError
 
 } JsonError;
 
+/**
+ * Json parse flags
+ */
+typedef enum JsonFlags
+{
+    JsonFlags_None              = 0,
+    JsonFlags_SupportComment    = 1 << 0,
+} JsonFlags;
+
 typedef struct Json             Json;
 typedef struct JsonAllocator    JsonAllocator;
 typedef struct JsonObjectEntry  JsonObjectEntry;
 
-JSON_API Json*          Json_parse(const char* jsonCode, int jsonCodeLength);
-JSON_API Json*          Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator);
+JSON_API Json*          Json_parse(const char* jsonCode, int jsonCodeLength, JsonFlags flags);
+JSON_API Json*          Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator, JsonFlags flags);
 
 JSON_API void           Json_release(Json* rootValue);
 

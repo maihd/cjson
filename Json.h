@@ -45,8 +45,6 @@ typedef enum JsonError
 {
     JsonError_None,
 
-    JsonError_InvalidValue,
-
     /* Parsing error */
 
     JsonError_WrongFormat,
@@ -58,15 +56,26 @@ typedef enum JsonError
     /* Runtime error */
 
     JsonError_OutOfMemory,
+    JsonError_InvalidValue,
     JsonError_InternalFatal,
+
 } JsonError;
+
+/**
+ * Json parse flags
+ */
+typedef enum JsonFlags
+{
+    JsonFlags_None              = 0,
+    JsonFlags_SupportComment    = 1 << 0,
+} JsonFlags;
 
 typedef struct Json             Json;
 typedef struct JsonAllocator    JsonAllocator;
 typedef struct JsonObjectEntry  JsonObjectEntry;
 
-JSON_API Json*          Json_parse(const char* jsonCode, int jsonCodeLength);
-JSON_API Json*          Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator);
+JSON_API Json*          Json_parse(const char* jsonCode, int jsonCodeLength, JsonFlags flags);
+JSON_API Json*          Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator, JsonFlags flags);
 
 JSON_API void           Json_release(Json* rootValue);
 
@@ -1023,18 +1032,18 @@ static Json* JsonState_parseTopLevel(JsonState* state)
 }
 
 /* @funcdef: Json_parse */
-Json* Json_parse(const char* json, int jsonLength)
+Json* Json_parse(const char* json, int jsonLength, JsonFlags flags)
 {
     JsonAllocator allocator;
     allocator.data  = NULL;
     allocator.free  = Json_free;
     allocator.alloc = Json_alloc;
 
-    return Json_parseEx(json, jsonLength, allocator);
+    return Json_parseEx(json, jsonLength, allocator, flags);
 }
 
 /* @funcdef: Json_parseEx */
-Json* Json_parseEx(const char* json, int jsonLength, JsonAllocator allocator)
+Json* Json_parseEx(const char* json, int jsonLength, JsonAllocator allocator, JsonFlags flags)
 {
     JsonState* state = JsonState_new(json, jsonLength, allocator);
     Json* value = JsonState_parseTopLevel(state);
@@ -1087,7 +1096,7 @@ const char* Json_getErrorMessage(const Json* rootValue)
         }
     }
 
-    return "JSON_ERROR_NO_VALUE";
+    return "JsonError_InvalidValue";
 }
 
 /* @funcdef: Json_equals */
