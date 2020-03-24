@@ -158,6 +158,8 @@ struct JsonState
     Json                root;
     JsonState*          next;
 
+    JsonFlags           flags;
+
     int                 line;
     int                 column;
     int                 cursor;
@@ -295,7 +297,7 @@ static void Json_releaseMemory(Json* value, JsonAllocator* allocator)
 }
 
 /* @funcdef: JsonState_new */
-static JsonState* JsonState_new(const char* jsonCode, int jsonLength, JsonAllocator allocator)
+static JsonState* JsonState_new(const char* jsonCode, int jsonLength, JsonAllocator allocator, JsonFlags flags)
 {
     JsonState* state = (JsonState*)JSON_ALLOC(&allocator, sizeof(JsonState));
     if (state)
@@ -303,6 +305,7 @@ static JsonState* JsonState_new(const char* jsonCode, int jsonLength, JsonAlloca
         state->reversed     = JSON_REVERSED;
 
 		state->next         = NULL;
+        state->flags        = flags;
 
 		state->line         = 1;
 		state->column       = 1;
@@ -347,7 +350,7 @@ static int JsonState_peekChar(JsonState* state)
     return state->buffer[state->cursor];
 }
 
-/* @funcdef: JsonState_NextChar */
+/* @funcdef: JsonState_nextChar */
 static int JsonState_nextChar(JsonState* state)
 {
     if (JsonState_isEOF(state))
@@ -369,6 +372,28 @@ static int JsonState_nextChar(JsonState* state)
 		}
 		
 		return c;
+    }
+}
+
+/* @funcdef: JsonState_nextLine */
+static int JsonState_nextLine(JsonState* state)
+{
+    if (JsonState_isEOF(state))
+    {
+        return -1;
+    }
+    else
+    {
+        int c = state->buffer[state->cursor];
+        while (c != '\n')
+        {
+            c = state->buffer[++state->cursor];
+        }
+
+        c = state->buffer[++state->cursor];
+        state->line++;
+        state->column = 1;
+        return c;
     }
 }
 
@@ -395,6 +420,43 @@ static int JsonState_matchChar(JsonState* state, JsonType type, int c)
         Json_panic(state, type, JsonError_UnmatchToken, "Expected '%c'", (char)c);
 		return -1;
     }
+}
+
+/* @funcdef: JsonState_skipComments */
+static int JsonState_skipComments(JsonState* state)
+{
+    while (true)
+    {
+        int c = JsonState_nextChar(state);
+        if (c == '/')
+        {
+            c = JsonState_nextChar(state);
+            if (c == '/')
+            {
+                JsonState_nextLine(state);
+            }    
+            else if (c == '*')
+            {
+                int c0 = JsonState_nextChar(state);
+                int c1 = JsonState_nextChar(state);
+                while (c0 != '*' || c1 != '/')
+                {
+                    c0 = c1;
+                    c1 = JsonState_nextChar(state);
+                }
+            }
+            else
+            {
+                Json_panic(state, JsonType_Null, JsonError_UnexpectedToken, "Unexpected token '%c'", c);
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+    
+    return JsonState_peekChar(state);
 }
 
 /* All parse functions declaration */
@@ -616,6 +678,19 @@ static void JsonState_parseSingle(JsonState* state, Json* outValue)
         case '4': case '5': case '6': 
         case '7': case '8': case '9':
 	        JsonState_parseNumber(state, outValue);
+            break;
+
+
+        case '/':
+            if (state->flags & JsonFlags_SupportComment)
+            {
+                JsonState_skipComments(state);
+                JsonState_parseSingle(state, outValue);
+            }
+            else
+            {
+                Json_panic(state, JsonType_String, JsonError_UnknownToken, "Unknown token '%c'", c);
+            }
             break;
 	    
         default:
@@ -858,6 +933,14 @@ static Json* JsonState_parseTopLevel(JsonState* state)
         return NULL;
     }
 
+    // Skip meta comment in header of the file
+    if (state->flags & JsonFlags_SupportComment)
+    {
+        JsonState_skipSpace(state);
+        JsonState_skipComments(state);
+    }
+
+    // Make sure the toplevel is object or array
     if (JsonState_skipSpace(state) == '{')
     {
         if (setjmp(state->errjmp) == 0)
@@ -917,7 +1000,7 @@ Json* Json_parse(const char* json, int jsonLength, JsonFlags flags)
 /* @funcdef: Json_parseEx */
 Json* Json_parseEx(const char* json, int jsonLength, JsonAllocator allocator, JsonFlags flags)
 {
-    JsonState* state = JsonState_new(json, jsonLength, allocator);
+    JsonState* state = JsonState_new(json, jsonLength, allocator, flags);
     Json* value = JsonState_parseTopLevel(state);
 
     if (!value)
