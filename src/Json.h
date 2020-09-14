@@ -1,11 +1,3 @@
-/******************************************************
- * Simple json state written in ANSI C
- *
- * @author: MaiHD
- * @license: Public domain
- * @copyright: MaiHD @ ${HOME}, 2018 - 2020
- ******************************************************/
-
 #pragma once
 
 #ifndef JSON_API

@@ -130,9 +130,3 @@ JsonError   Json_getError(const Json* root); // Get error number of [given state
 const char* Json_getErrorMessage(const Json* root); // Get error string of [given state] or [last state] (when state = NULL)
 
 ```
-
-## Metadata
-1. Author: MaiHD
-2. License: Public domain
-3. Copyright: MaiHD 2018 - 2020
-3. Tools : Emacs, VSCode, GnuMake, Visual Studio 2017 Community
