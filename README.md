@@ -1,12 +1,13 @@
 # Introduction [![Build Status](https://travis-ci.org/maihd/json.svg?branch=master)](https://travis-ci.org/maihd/json) [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 Simple JSON parser written in C99
 
-> This projects is out-of-maintain, reasons:<br/>
-> 1. The problem with the API design, the functions Json_getErrorXXX required root value of json, but when parsing failed, the Json_parse return null.<br/>
-> 2. Internal parsing routines use many dynamic allocations, which should only use a simple linear allocator.<br/>
-> 3. In C, we just only need json parser only, but the beginning I thought this library use should dynamic create of json values, support JSON.stringify in C version. The JSON.stringify is easily implements with just some `sprintf` of a conrete target data structure.<br/>
-> 4. DevOps problems: Travis CI stop support open source, no static analytics, no FAGs, no TDD in the first place.<br/>
-> 5. Start new project: [cjson_parser](https://githut.com/maihd/cjson_parser). I development my new style to use C as an scripting language, tools, automation.
+> This projects is reaching the end of its life, reasons:<br/>
+> 1. The API should be more useful, the implement should be more simple, but now it's complicated and hard to changed.</br>
+> 2. The problem with the API design, the functions Json_getErrorXXX required root value of json, but when parsing failed, the Json_parse return null. (Fixed now)<br/>
+> 3. Internal parsing routines use many dynamic allocations, which should only use a simple linear allocator.<br/>
+> 4. In C, we just only need json parser only, but the beginning I thought this library use should dynamic create of json values, support JSON.stringify in C version. The JSON.stringify is easily implements with just some `sprintf` of a conrete target data structure.<br/>
+> 5. DevOps problems: Travis CI stop support open source, no static analytics, no FAGs, no TDD in the first place.<br/>
+> 6. Start new project: [cjson_parser](https://githut.com/maihd/cjson_parser). I development my new style to use C as an scripting language, tools, automation. This project is still useful when I development new project.
 
 ## Build
 ```
@@ -48,11 +49,12 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                Json* value = Json_parse(json, strlen(json));
-                if (Json_getError(value) != JsonError_None)
+                Json* value;
+                JsonError error = Json_parse(json, strlen(json));
+                if (error.code != JsonError_None)
                 {
                     value = NULL;
-                    printf("[ERROR]: %s\n", Json_getErrorMessage(value));
+                    printf("[ERROR]: %s\n", error.message);
                 }
                 else
                 {
@@ -82,13 +84,9 @@ enum JsonType
     JsonType_Boolean,
 };
 
-enum JsonError
+typedef enum JsonErrorCode
 {
     JsonError_None,
-
-    JsonError_NoValue,
-
-    /* Parsing error */
 
     JsonError_WrongFormat,
     JsonError_UnmatchToken,
@@ -96,27 +94,43 @@ enum JsonError
     JsonError_UnexpectedToken,
     JsonError_UnsupportedToken,
 
-    /* Runtime error */
-
     JsonError_OutOfMemory,
+    JsonError_InvalidValue,
     JsonError_InternalFatal,
-};
+} JsonErrorCode;
+
+typedef struct JsonError
+{
+    JsonErrorCode   code;
+    const char*     message;
+} JsonError;
+
+typedef enum JsonFlags
+{
+    JsonFlags_None              = 0,
+    JsonFlags_SupportComment    = 1 << 0,
+    JsonFlags_NoStrictTopLevel  = 1 << 1,
+} JsonFlags;
 
 struct Json
 {
-    JsonType type;
-    int      length;
+    JsonType                type;
+    int                     length;
     union 
     {
-        double          number;
-        bool            boolean;   
-        const char*     string;
-        Json*           array;  
-        struct {
-            const char* name;
-            Json        value;
-        } object;
+        double              number;
+        bool                boolean;   
+        const char*         string;
+        Json*               array;
+
+        JsonObjectMember*   object;
     };
+};
+
+struct JsonObjectMember
+{
+    const char* name;
+    Json        value;
 };
 
 // Memory alignment is always alignof(Json)
@@ -127,13 +141,12 @@ struct JsonAllocator
     void  (*free)(void* data, void* pointer);   // Your memory deallocate function
 };
 
-Json* Json_parse(const char* jsonCode, int jsonCodeLength);
-Json* Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator);
-// return root value, save to get root memory
+JsonError               Json_parse(const char* jsonCode, int jsonCodeLength, JsonFlags flags, Json** result);
+JsonError               Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator, JsonFlags flags, Json** result);
 
-void Json_release(Json* root); // root = NULL to remove all leak memory
+void                    Json_release(Json* root); // root = NULL to remove all leak memory
 
-JsonError   Json_getError(const Json* root); // Get error number of [given state] or [last state] (when state = NULL) 
-const char* Json_getErrorMessage(const Json* root); // Get error string of [given state] or [last state] (when state = NULL)
+JSON_API bool           Json_equals(const Json* a, const Json* b);
 
+JSON_API const Json*    Json_find(const Json* x, const char* name);
 ```

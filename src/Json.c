@@ -25,7 +25,7 @@
 #  endif
 #endif
 
-static const uint64_t JSON_REVERSED = (1246973774ULL << 31) | 1785950062ULL;
+static const uint64_t JSON_RESERVED_MARK = (1246973774ULL << 31) | 1785950062ULL;
 
 /*
 Utility
@@ -145,7 +145,7 @@ JSON_INLINE void* JsonTempArray_toBufferFunc(void* buffer, int count, void* dyna
 typedef struct JsonState JsonState;
 struct JsonState
 {
-    uint64_t            reversed;
+    uint64_t            reserved;
 
     Json                root;
     JsonState*          next;
@@ -160,7 +160,7 @@ struct JsonState
     int                 length;         /* Reference only */
     const char*         buffer;         /* Reference only */
     
-    JsonError           errnum;
+    JsonErrorCode       errnum;
     char*               errmsg;
     jmp_buf             errjmp;
 
@@ -181,7 +181,7 @@ static void Json_free(void* data, void* pointer)
     free(pointer);
 }
 
-static void Json_setErrorWithArgs(JsonState* state, JsonType type, JsonError code, const char* fmt, va_list valist)
+static void Json_setErrorWithArgs(JsonState* state, JsonType type, JsonErrorCode code, const char* fmt, va_list valist)
 {
     const int errmsg_size = 1024;
 
@@ -236,7 +236,7 @@ static void Json_setErrorWithArgs(JsonState* state, JsonType type, JsonError cod
 }
 
 /* @funcdef: Json_setError */
-static void Json_setError(JsonState* state, JsonType type, JsonError code, const char* fmt, ...)
+static void Json_setError(JsonState* state, JsonType type, JsonErrorCode code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
@@ -245,7 +245,7 @@ static void Json_setError(JsonState* state, JsonType type, JsonError code, const
 }
 
 /* funcdef: Json_panic */
-static void Json_panic(JsonState* state, JsonType type, JsonError code, const char* fmt, ...)
+static void Json_panic(JsonState* state, JsonType type, JsonErrorCode code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
@@ -294,7 +294,7 @@ static JsonState* JsonState_new(const char* jsonCode, int jsonLength, JsonAlloca
     JsonState* state = (JsonState*)JSON_ALLOC(&allocator, sizeof(JsonState));
     if (state)
     {
-        state->reversed     = JSON_REVERSED;
+        state->reserved     = JSON_RESERVED_MARK;
 
 		state->next         = NULL;
         state->flags        = flags;
@@ -877,7 +877,7 @@ static void JsonState_parseObject(JsonState* state, Json* outValue)
     {
         JsonState_matchChar(state, JsonType_Object, '{');
 
-        JsonTempArray(JsonObjectEntry, 32) values = JsonTempArray_init(NULL);
+        JsonTempArray(JsonObjectMember, 32) values = JsonTempArray_init(NULL);
         while (JsonState_skipSpace(state) > 0 && JsonState_peekChar(state) != '}')
         {
             if (values.count > 0)
@@ -899,10 +899,10 @@ static void JsonState_parseObject(JsonState* state, Json* outValue)
             JsonState_parseSingle(state, &value);
 
             /* Well done */
-            JsonObjectEntry entry;
-            entry.name  = name;
-            entry.value = value;
-            JsonTempArray_push(&values, entry, &state->allocator);
+            JsonObjectMember member;
+            member.name  = name;
+            member.value = value;
+            JsonTempArray_push(&values, member, &state->allocator);
         }
 
         JsonState_skipSpace(state);
@@ -910,7 +910,7 @@ static void JsonState_parseObject(JsonState* state, Json* outValue)
 
         outValue->type   = JsonType_Object;
         outValue->length = JsonTempArray_getCount(&values);
-        outValue->object = (JsonObjectEntry*)JsonTempArray_toBuffer(&values, &state->allocator);
+        outValue->object = (JsonObjectMember*)JsonTempArray_toBuffer(&values, &state->allocator);
 
         JsonTempArray_free(&values, &state->allocator);
     }
@@ -932,8 +932,21 @@ static Json* JsonState_parseTopLevel(JsonState* state)
         JsonState_skipComments(state);
     }
 
-    // Make sure the toplevel is object or array
-    if (JsonState_skipSpace(state) == '{')
+    // Just parse value from the top level
+    if (state->flags & JsonFlags_NoStrictTopLevel)
+    {
+        if (setjmp(state->errjmp) == 0)
+        {
+            JsonState_parseSingle(state, &state->root);
+            return &state->root;
+        }
+        else
+        {
+            return NULL;
+        }
+    }
+    // Make sure the toplevel is JsonType_Object
+    else if (JsonState_skipSpace(state) == '{')
     {
         if (setjmp(state->errjmp) == 0)
         {
@@ -952,6 +965,7 @@ static Json* JsonState_parseTopLevel(JsonState* state)
             return NULL;
         }
     }
+    // Make sure the toplevel is JsonType_Array
     else if (JsonState_skipSpace(state) == '[')
     {
         if (setjmp(state->errjmp) == 0)
@@ -979,28 +993,32 @@ static Json* JsonState_parseTopLevel(JsonState* state)
 }
 
 /* @funcdef: Json_parse */
-Json* Json_parse(const char* json, int jsonLength, JsonFlags flags)
+JsonError Json_parse(const char* jsonCode, int jsonCodeLength, JsonFlags flags, Json** result)
 {
     JsonAllocator allocator;
     allocator.data  = NULL;
     allocator.free  = Json_free;
     allocator.alloc = Json_alloc;
 
-    return Json_parseEx(json, jsonLength, allocator, flags);
+    return Json_parseEx(jsonCode, jsonCodeLength, allocator, flags, result);
 }
 
 /* @funcdef: Json_parseEx */
-Json* Json_parseEx(const char* json, int jsonLength, JsonAllocator allocator, JsonFlags flags)
+JsonError Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator, JsonFlags flags, Json** result)
 {
-    JsonState* state = JsonState_new(json, jsonLength, allocator, flags);
+    JsonState* state = JsonState_new(jsonCode, jsonCodeLength, allocator, flags);
     Json* value = JsonState_parseTopLevel(state);
-
+    
     if (!value)
     {
-        JsonState_free(state);
+        state->root.type = JsonType_Null;
+        value = &state->root;
     }
 
-    return value;
+    *result = value;
+
+    JsonError error = { state->errnum, state->errmsg ? state->errmsg : ""};
+    return error;
 }
 
 /* @funcdef: Json_release */
@@ -1009,41 +1027,11 @@ void Json_release(Json* rootValue)
     if (rootValue)
     {
         JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
-        if (state->reversed == JSON_REVERSED)
+        if (state->reserved == JSON_RESERVED_MARK)
         {
             JsonState_free(state);
         }
     }
-}
-
-/* @funcdef: Json_getError */
-JsonError Json_getError(const Json* rootValue)
-{
-    if (rootValue)
-    {
-        JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
-        if (state->reversed == JSON_REVERSED)
-        {
-            return state->errnum;
-        }
-    }
-
-    return JsonError_InvalidValue;
-}
-
-/* @funcdef: Json_getErrorMessage */
-const char* Json_getErrorMessage(const Json* rootValue)
-{
-    if (rootValue)
-    {
-        JsonState* state = JSON_SUPEROF(rootValue, JsonState, root);
-        if (state->reversed == JSON_REVERSED)
-        {
-            return state->errmsg;
-        }
-    }
-
-    return "JsonError_InvalidValue";
 }
 
 /* @funcdef: Json_equals */
@@ -1124,10 +1112,10 @@ Json* Json_find(const Json* obj, const char* name)
         int len  = (int)strlen(name);
         for (i = 0, n = obj->length; i < n; i++)
         {
-            JsonObjectEntry* entry = &obj->object[i];
-            if (strncmp(name, entry->name, len) == 0)
+            JsonObjectMember* member = &obj->object[i];
+            if (strncmp(name, member->name, len) == 0)
             {
-                return &entry->value;
+                return &member->value;
             }
         }
     }

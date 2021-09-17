@@ -1,6 +1,6 @@
 #include "JsonEx.h"
 
-/* @funcdef: JsonWrite */
+/* @funcdef: Json_write */
 void Json_write(const Json* value, FILE* out)
 {
     if (value)
@@ -58,7 +58,7 @@ void Json_write(const Json* value, FILE* out)
     }
 }          
 
-/* @funcdef: JsonPrint */
+/* @funcdef: Json_print */
 void Json_print(const Json* value, FILE* out)
 {
     if (value)

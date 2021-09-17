@@ -68,7 +68,8 @@ int main(int argc, char* argv[])
 
     int   i, n;
     char* fileBuffer = NULL;
-    void* allocatorBuffer = malloc(1024 * 1024);
+    int allocatorCapacity = 1024 * 1024; // 1MB temp buffer
+    void* allocatorBuffer = malloc(allocatorCapacity);
     for (i = 1, n = argc; i < n; i++)
     {
         const char* filename = argv[i];
@@ -85,6 +86,7 @@ int main(int argc, char* argv[])
             fileBuffer = (char*)realloc(fileBuffer, (filesize + 1) * sizeof(char));
             fileBuffer[filesize] = 0;
             fread(fileBuffer, filesize, sizeof(char), file);
+            fclose(file);
 
             //JsonDebugAllocator debug;
             //memset(&debug, 0, sizeof(debug));
@@ -95,19 +97,21 @@ int main(int argc, char* argv[])
             //allocator.alloc = JsonDebugAllocator_alloc;
 
             JsonTempAllocator allocator;
-            JsonTempAllocator_init(&allocator, allocatorBuffer, 1024 * 1024);
+            JsonTempAllocator_init(&allocator, allocatorBuffer, allocatorCapacity);
 
             double dt = gettime();
-            Json* value = Json_parseEx(fileBuffer, filesize, allocator.super, JsonFlags_None);
-            if (Json_getError(value) != JsonError_None)
+            Json* value;
+            JsonError error = Json_parseEx(fileBuffer, filesize, allocator.super, JsonFlags_None, &value);
+            if (error.code != JsonError_None)
             {
-                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, Json_getErrorMessage(value));
+                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, error.message);
                 return 1;
             }
             dt = gettime() - dt;
 
             int length = value->length;
             Json* firstObject = value && length > 0 ? &value->array[0] : NULL;
+
             //
             Json* idValue = Json_find(firstObject, "_id");
             if (idValue)
@@ -119,7 +123,6 @@ int main(int argc, char* argv[])
 
             // When use temp allocator, donot Json_release
             //Json_release(state);
-            fclose(file);
 
             printf("Parsed file '%s'\n\t- file size:\t%dB\n\t- memory usage:\t%dB\n\t- times:\t%lfs\n\n", filename, filesize, allocator.marker, dt);
         }
@@ -129,9 +132,6 @@ int main(int argc, char* argv[])
     free(allocatorBuffer);
     free(fileBuffer);
 
-#if defined(_MSC_VER) && !defined(NDEBUG)
-    getchar();
-#endif
     return 0;    
 }
 

@@ -55,11 +55,12 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                Json* value = Json_parse(json, strlen(json), JsonFlags_None);
-                if (Json_getError(value) != JsonError_None)
+                Json* value;
+                JsonError error = Json_parse(json, strlen(json), JsonFlags_None, &value);
+                if (error.code != JsonError_None)
                 {
                     value = NULL;
-                    printf("[ERROR]: %s\n", Json_getErrorMessage(value));
+                    printf("[ERROR]: %s\n", error.message);
                 }
                 else
                 {

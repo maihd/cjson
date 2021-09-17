@@ -53,6 +53,6 @@ lib:
 	@echo "#endif /* JSON_EX_IMPL */"  	>> JsonEx.h
 	@echo ""                        	>> JsonEx.h
 
-	@gcc -o json_build_test.exe json_build_test.c && rm json_build_test.exe \
-		&& echo "Make single header library success." \
+	@$(CC) -o json_build_test.exe json_build_test.c && rm json_build_test.exe 	\
+		&& echo "Make single header library success." 							\
 		|| echo "Make single header library failed."

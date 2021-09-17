@@ -10,9 +10,8 @@ extern "C" {
 #endif
 
 /* Define boolean type if needed */
-#if !defined(__cplusplus) && !defined(__bool_true_false_are_defined)
-typedef char bool;
-enum { false = 0, true = 1 };
+#if !defined(__cplusplus)
+#include <stdbool.h>
 #endif
 
 /**
@@ -31,7 +30,7 @@ typedef enum JsonType
 /**
  * JSON error code
  */
-typedef enum JsonError
+typedef enum JsonErrorCode
 {
     JsonError_None,
 
@@ -49,6 +48,12 @@ typedef enum JsonError
     JsonError_InvalidValue,
     JsonError_InternalFatal,
 
+} JsonErrorCode;
+
+typedef struct JsonError
+{
+    JsonErrorCode   code;
+    const char*     message;
 } JsonError;
 
 /**
@@ -58,19 +63,17 @@ typedef enum JsonFlags
 {
     JsonFlags_None              = 0,
     JsonFlags_SupportComment    = 1 << 0,
+    JsonFlags_NoStrictTopLevel  = 1 << 1,
 } JsonFlags;
 
 typedef struct Json             Json;
 typedef struct JsonAllocator    JsonAllocator;
-typedef struct JsonObjectEntry  JsonObjectEntry;
+typedef struct JsonObjectMember JsonObjectMember;
 
-JSON_API Json*          Json_parse(const char* jsonCode, int jsonCodeLength, JsonFlags flags);
-JSON_API Json*          Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator, JsonFlags flags);
+JSON_API JsonError      Json_parse(const char* jsonCode, int jsonCodeLength, JsonFlags flags, Json** result);
+JSON_API JsonError      Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator, JsonFlags flags, Json** result);
 
 JSON_API void           Json_release(Json* rootValue);
-
-JSON_API JsonError      Json_getError(const Json* rootValue);
-JSON_API const char*    Json_getErrorMessage(const Json* rootValue);
 
 JSON_API bool           Json_equals(const Json* a, const Json* b);
 
@@ -78,8 +81,8 @@ JSON_API Json*          Json_find(const Json* x, const char* name);
 
 struct Json
 {
-    JsonType type;                      /* Type of value: number, boolean, string, array, object    */
-    int      length;                    /* Length of value, always 1 on primitive types             */
+    JsonType                type;       /* Type of value: number, boolean, string, array, object    */
+    int                     length;     /* Length of value, always 1 on primitive types             */
     union
     {
         double              number;
@@ -89,11 +92,11 @@ struct Json
 
         Json*               array;
 
-        JsonObjectEntry*    object;
+        JsonObjectMember*   object;
     };
 };
 
-struct JsonObjectEntry
+struct JsonObjectMember
 {
     const char* name;
     Json        value;

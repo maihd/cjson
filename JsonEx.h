@@ -1,13 +1,5 @@
 #ifndef __JSON_EX_H__
 #define __JSON_EX_H__
-/******************************************************
- * Simple json state written in ANSI C
- *
- * @author: MaiHD
- * @license: Public domain
- * @copyright: MaiHD @ ${HOME}, 2018 - 2020
- ******************************************************/
-
 #pragma once
 
 #include "Json.h"
@@ -31,17 +23,9 @@ JSON_API bool JsonTempAllocator_init(JsonTempAllocator* allocator, void* buffer,
 
 #ifdef JSON_EX_IMPL
 
-/******************************************************
- * Simple json state written in ANSI C
- *
- * @author: MaiHD
- * @license: Public domain
- * @copyright: MaiHD @ ${HOME}, 2018 - 2020
- ******************************************************/
-
 #include "JsonEx.h"
 
-/* @funcdef: JsonWrite */
+/* @funcdef: Json_write */
 void Json_write(const Json* value, FILE* out)
 {
     if (value)
@@ -99,7 +83,7 @@ void Json_write(const Json* value, FILE* out)
     }
 }          
 
-/* @funcdef: JsonPrint */
+/* @funcdef: Json_print */
 void Json_print(const Json* value, FILE* out)
 {
     if (value)
