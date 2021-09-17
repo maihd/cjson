@@ -35,7 +35,7 @@ Utility
 #define JSON_FREE(a, ptr)   (a)->free((a)->data, ptr)
 
 /* Next power of two */
-JSON_INLINE int Json_nextPOT(int x)
+JSON_INLINE int32_t Json_nextPOT(int32_t x)
 {
     x  = x - 1;
     x |= x >> 1;
@@ -53,8 +53,8 @@ JsonArray: dynamic, scalable array
 */
 typedef struct JsonArray
 {
-    int     size;
-    int     count;
+    int32_t size;
+    int32_t count;
     Json    buffer[];
 } JsonArray;
 
@@ -70,14 +70,14 @@ typedef struct JsonArray
 #define JsonArray_clear(a)                  ((a) ? (void)(JsonArray_getHeader(a)->count = 0) : (void)0)
 #define JsonArray_clone(a, alloc)           ((a) ? memcpy(JsonArray_grow(0, JsonArray_getCount(a), sizeof((a)[0]), alloc), JsonArray_getHeader(a), JsonArray_getUsageMemory(a)) : NULL)
 
-JSON_INLINE void* JsonArray_grow(void* array, int reqsize, int elemsize, JsonAllocator* allocator)
+JSON_INLINE void* JsonArray_grow(void* array, int32_t reqsize, int32_t elemsize, JsonAllocator* allocator)
 {
     assert(elemsize > 0);
     assert(allocator != NULL);
 
     JsonArray*  raw   = array ? JsonArray_getHeader(array) : NULL;
-    int         size  = JsonArray_getSize(array);
-    int         count = JsonArray_getCount(array);
+    int32_t     size  = JsonArray_getSize(array);
+    int32_t     count = JsonArray_getCount(array);
 
     if (size >= reqsize)
     {
@@ -112,10 +112,12 @@ JSON_INLINE void* JsonArray_grow(void* array, int reqsize, int elemsize, JsonAll
 JsonTempArray: memory-wise array for containing parsing value
 @note: internal only 
 */
-#define JsonTempArray(T, CAPACITY)  struct {    \
-    T*  array;                                  \
-    int count;                                  \
-    T   buffer[CAPACITY]; }
+#define JsonTempArray(T, CAPACITY)                  \
+    struct {                                        \
+        T*      array;                              \
+        int32_t count;                              \
+        T       buffer[CAPACITY];                   \
+    }
 
 #define JsonTempArray_init(a)             { a, 0 }
 #define JsonTempArray_free(a, alloc)      JsonArray_free((a)->array, alloc)
@@ -123,7 +125,7 @@ JsonTempArray: memory-wise array for containing parsing value
 #define JsonTempArray_getCount(a)         ((a)->count + JsonArray_getCount((a)->array))
 #define JsonTempArray_toBuffer(a, alloc)  JsonTempArray_toBufferFunc((a)->buffer, (a)->count, (a)->array, (int)sizeof((a)->buffer[0]), alloc)
 
-JSON_INLINE void* JsonTempArray_toBufferFunc(void* buffer, int count, void* dynamicBuffer, int itemSize, JsonAllocator* allocator)
+JSON_INLINE void* JsonTempArray_toBufferFunc(void* buffer, int32_t count, void* dynamicBuffer, int32_t itemSize, JsonAllocator* allocator)
 {
     int total = count + JsonArray_getCount(dynamicBuffer);
     if (total > 0)
@@ -152,12 +154,12 @@ struct JsonState
 
     JsonFlags           flags;
 
-    int                 line;
-    int                 column;
-    int                 cursor;
+    int32_t             line;
+    int32_t             column;
+    int32_t             cursor;
     //JsonType            parsingType;
     
-    int                 length;         /* Reference only */
+    int32_t             length;         /* Reference only */
     const char*         buffer;         /* Reference only */
     
     JsonErrorCode       errnum;
@@ -168,7 +170,7 @@ struct JsonState
 };
 
 /* @funcdef: Json_alloc */
-static void* Json_alloc(void* data, int size)
+static void* Json_alloc(void* data, int32_t size)
 {
     (void)data;
     return malloc(size);
@@ -289,7 +291,7 @@ static void Json_releaseMemory(Json* value, JsonAllocator* allocator)
 }
 
 /* @funcdef: JsonState_new */
-static JsonState* JsonState_new(const char* jsonCode, int jsonLength, JsonAllocator allocator, JsonFlags flags)
+static JsonState* JsonState_new(const char* jsonCode, int32_t jsonLength, JsonAllocator allocator, JsonFlags flags)
 {
     JsonState* state = (JsonState*)JSON_ALLOC(&allocator, sizeof(JsonState));
     if (state)
@@ -993,7 +995,7 @@ static Json* JsonState_parseTopLevel(JsonState* state)
 }
 
 /* @funcdef: Json_parse */
-JsonError Json_parse(const char* jsonCode, int jsonCodeLength, JsonFlags flags, Json** result)
+JsonError Json_parse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, Json** result)
 {
     JsonAllocator allocator;
     allocator.data  = NULL;
@@ -1004,7 +1006,7 @@ JsonError Json_parse(const char* jsonCode, int jsonCodeLength, JsonFlags flags, 
 }
 
 /* @funcdef: Json_parseEx */
-JsonError Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator, JsonFlags flags, Json** result)
+JsonError Json_parseEx(const char* jsonCode, int32_t jsonCodeLength, JsonAllocator allocator, JsonFlags flags, Json** result)
 {
     JsonState* state = JsonState_new(jsonCode, jsonCodeLength, allocator, flags);
     Json* value = JsonState_parseTopLevel(state);
@@ -1121,4 +1123,48 @@ Json* Json_find(const Json* obj, const char* name)
     }
 
     return NULL;
+}
+
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
+
+static void* JsonTempAllocator_alloc(JsonTempAllocator* data, int size)
+{
+    if (data->marker + size <= data->length)
+    {
+        void* result  = (char*)data->buffer + data->marker;
+        data->marker += size;
+        return result;
+    }
+    
+    return NULL;
+}
+
+static void JsonTempAllocator_free(void* data, void* ptr)
+{
+    (void)data;
+    (void)ptr;
+}
+
+bool JsonTempAllocator_init(JsonTempAllocator* allocator, void* buffer, int32_t length)
+{
+    if (buffer && length > 0)
+    {
+        allocator->super.data   = allocator;
+        allocator->super.free   = (void(*)(void*, void*))JsonTempAllocator_free;
+        allocator->super.alloc  = (void*(*)(void*, int32_t))JsonTempAllocator_alloc;
+        allocator->buffer       = buffer;
+        allocator->length       = length;
+        allocator->marker       = 0;
+
+        return true;
+    }
+
+    return false;
+}
+
+void JsonTempAllocator_reset(JsonTempAllocator* allocator)
+{
+    allocator->marker = 0;
 }

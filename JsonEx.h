@@ -9,16 +9,6 @@
 
 JSON_API void Json_print(const Json* value, FILE* out);
 JSON_API void Json_write(const Json* value, FILE* out);
-
-typedef struct JsonTempAllocator
-{
-    JsonAllocator   super;
-    void*           buffer;
-    int             length;
-    int             marker;
-} JsonTempAllocator;
-
-JSON_API bool JsonTempAllocator_init(JsonTempAllocator* allocator, void* buffer, int length);
 #endif /* __JSON_EX_H__ */
 
 #ifdef JSON_EX_IMPL
@@ -170,41 +160,6 @@ void Json_print(const Json* value, FILE* out)
             break;
         }
     }
-}
-
-static void* JsonTempAllocator_alloc(JsonTempAllocator* data, int size)
-{
-    if (data->marker + size <= data->length)
-    {
-        void* result  = (char*)data->buffer + data->marker;
-        data->marker += size;
-        return result;
-    }
-    
-    return NULL;
-}
-
-static void JsonTempAllocator_free(void* data, void* ptr)
-{
-    (void)data;
-    (void)ptr;
-}
-
-bool JsonTempAllocator_init(JsonTempAllocator* allocator, void* buffer, int length)
-{
-    if (buffer && length > 0)
-    {
-        allocator->super.data   = allocator;
-        allocator->super.free   = (void(*)(void*, void*))JsonTempAllocator_free;
-        allocator->super.alloc  = (void*(*)(void*, int))JsonTempAllocator_alloc;
-        allocator->buffer       = buffer;
-        allocator->length       = length;
-        allocator->marker       = 0;
-
-        return true;
-    }
-
-    return false;
 }
 
 #if 0
