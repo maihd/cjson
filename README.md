@@ -8,6 +8,13 @@ Simple JSON parser written in C99
 > 4. In C, we just only need json parser only, but the beginning I thought this library use should dynamic create of json values, support JSON.stringify in C version. The JSON.stringify is easily implements with just some `sprintf` of a conrete target data structure.<br/>
 > 5. DevOps problems: Travis CI stop support open source, no static analytics, no FAGs, no TDD in the first place.
 
+## Features
+- Simple, small and easy to use, integration.
+- C99 for portability. 
+- Single responsibility: when work with json in C, we only need parse the json string to C value. Json stringify is easy to implement in C. 
+- No memory allocations, linear memory layout, cache friendly. 
+- Well-tested eith some real-world examples. 
+
 ## Build
 ```
 # Run REPL test
