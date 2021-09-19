@@ -1,4 +1,4 @@
-# Introduction [![Build Status](https://travis-ci.org/maihd/json.svg?branch=master)](https://travis-ci.org/maihd/json) [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
+# Introduction [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 Simple JSON parser written in C99
 
 > Problems:<br/>
@@ -10,10 +10,10 @@ Simple JSON parser written in C99
 
 ## Features
 - Simple, small and easy to use, integration.
-- C99 for portability. 
-- Single responsibility: when work with json in C, we only need parse the json string to C value. Json stringify is easy to implement in C. 
-- No memory allocations, linear memory layout, cache friendly. 
-- Well-tested eith some real-world examples. 
+- C99 for portability.
+- Single responsibility: when work with json in C, we only need parse the json string to C value. Json stringify is easy to implement in C.
+- No memory allocations, linear memory layout, cache friendly.
+- Well-tested eith some real-world examples.
 
 ## Build
 ```
