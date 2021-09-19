@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <setjmp.h>
 #include <string.h>
@@ -41,6 +42,9 @@ int main(int argc, char* argv[])
     printf("Type '.exit' to exit\n");
     
     char input[1024];
+    int allocatorCapacity = 1024 * 1024; // 1MB temp buffer
+    void* allocatorBuffer = malloc(allocatorCapacity);
+
     while (1)
     {
 	    if (setjmp(jmpenv) == 0)
@@ -56,7 +60,7 @@ int main(int argc, char* argv[])
 	        else
             {
                 Json* value;
-                JsonError error = Json_parse(json, strlen(json), JsonFlags_None, &value);
+                JsonError error = Json_parse(json, strlen(json), JsonFlags_NoStrictTopLevel, allocatorBuffer, allocatorCapacity, &value);
                 if (error.code != JsonError_None)
                 {
                     value = NULL;
@@ -66,13 +70,10 @@ int main(int argc, char* argv[])
                 {
                     Json_print(value, stdout); printf("\n");
                 }
-                Json_release(value);
 	        }
 	    }
     }
 
-    /* JsonRelease(NULL) for release all memory, if there is leak */
-    Json_release(NULL);
-    
+    free(allocatorBuffer);
     return 0;
 }

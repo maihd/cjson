@@ -9,33 +9,6 @@
 #include "Json.h"
 #include "JsonEx.h"
 
-typedef struct
-{
-    int alloced;
-} JsonDebugAllocator;
-
-static void* JsonDebugAllocator_alloc(void* data, int size)
-{
-    assert(size > 0 && "Internal error: attempt alloc with size < 0");
-
-    JsonDebugAllocator* debug = (JsonDebugAllocator*)data;
-    debug->alloced += size;
-
-    //printf("Allocate: %d - %d\n", size, debug->alloced);
-
-    return malloc((size_t)size);
-}
-
-static void JsonDebugAllocator_free(void* data, void* ptr)
-{
-    //assert(ptr && "Internal error: attempt free with nullptr");
-
-    //JsonDebugAllocator* debug = (JsonDebugAllocator*)data;
-    //debug->alloced -= size;
-    (void)data;
-    free(ptr);
-}
-
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(__cygwin__) || defined(_WIN32)
 #include <Windows.h>
 
@@ -88,20 +61,9 @@ int main(int argc, char* argv[])
             fread(fileBuffer, filesize, sizeof(char), file);
             fclose(file);
 
-            //JsonDebugAllocator debug;
-            //memset(&debug, 0, sizeof(debug));
-            //
-            //JsonAllocator allocator;
-            //allocator.data  = &debug;
-            //allocator.free  = JsonDebugAllocator_free;
-            //allocator.alloc = JsonDebugAllocator_alloc;
-
-            JsonTempAllocator allocator;
-            JsonTempAllocator_init(&allocator, allocatorBuffer, allocatorCapacity);
-
             double dt = gettime();
             Json* value;
-            JsonError error = Json_parseEx(fileBuffer, filesize, allocator.super, JsonFlags_None, &value);
+            JsonError error = Json_parse(fileBuffer, filesize, JsonFlags_None, allocatorBuffer, allocatorCapacity, &value);
             if (error.code != JsonError_None)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, error.message);
@@ -124,7 +86,10 @@ int main(int argc, char* argv[])
             // When use temp allocator, donot Json_release
             //Json_release(state);
 
-            printf("Parsed file '%s'\n\t- file size:\t%dB\n\t- memory usage:\t%dB\n\t- times:\t%lfs\n\n", filename, filesize, allocator.marker, dt);
+            printf(
+                "Parsed file '%s'\n"
+                "\t- file size:\t%dB\n"
+                "\t- times:\t%lfs\n\n", filename, filesize, dt);
         }
     }
 

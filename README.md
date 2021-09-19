@@ -4,7 +4,7 @@ Simple JSON parser written in C99
 > Problems:<br/>
 > 1. The API should be more useful, the implement should be more simple, but now it's complicated and hard to changed.</br>
 > 2. The problem with the API design, the functions Json_getErrorXXX required root value of json, but when parsing failed, the Json_parse return null. (Fixed now)<br/>
-> 3. Internal parsing routines use many dynamic allocations, which should only use a simple linear allocator.<br/>
+> 3. Internal parsing routines use many dynamic allocations, which should only use a simple linear allocator. (Fixed now)<br/>
 > 4. In C, we just only need json parser only, but the beginning I thought this library use should dynamic create of json values, support JSON.stringify in C version. The JSON.stringify is easily implements with just some `sprintf` of a conrete target data structure.<br/>
 > 5. DevOps problems: Travis CI stop support open source, no static analytics, no FAGs, no TDD in the first place.
 
@@ -28,19 +28,22 @@ make lib
 ```
 
 ## Examples
-Belove code from json_test.c:
+Belove code from Json_TokenTest.c:
 ```C
 #include "Json.h"
 #include "JsonEx.h" // for Json_print
 
 int main(int argc, char* argv[])
 {
-    //signal(SIGINT, _sighandler);
+    signal(SIGINT, _sighandler);
     
     printf("JSON token testing prompt\n");
     printf("Type '.exit' to exit\n");
     
     char input[1024];
+    int allocatorCapacity = 1024 * 1024; // 1MB temp buffer
+    void* allocatorBuffer = malloc(allocatorCapacity);
+
     while (1)
     {
 	    if (setjmp(jmpenv) == 0)
@@ -56,7 +59,7 @@ int main(int argc, char* argv[])
 	        else
             {
                 Json* value;
-                JsonError error = Json_parse(json, strlen(json));
+                JsonError error = Json_parse(json, strlen(json), JsonFlags_NoStrictTopLevel, allocatorBuffer, allocatorCapacity, &value);
                 if (error.code != JsonError_None)
                 {
                     value = NULL;
@@ -66,14 +69,11 @@ int main(int argc, char* argv[])
                 {
                     Json_print(value, stdout); printf("\n");
                 }
-                Json_release(value);
 	        }
 	    }
     }
 
-    /* Json_release(NULL) for release all memory, if there is leak */
-    Json_release(NULL);
-    
+    free(allocatorBuffer);
     return 0;
 }
 ```
@@ -139,20 +139,7 @@ struct JsonObjectMember
     Json        value;
 };
 
-// Memory alignment is always alignof(Json)
-struct JsonAllocator
-{
-    void* data;                                 // Your memory buffer
-    void* (*alloc)(void* data, int size);       // Your memory allocate function
-    void  (*free)(void* data, void* pointer);   // Your memory deallocate function
-};
-
-JsonError               Json_parse(const char* jsonCode, int jsonCodeLength, JsonFlags flags, Json** result);
-JsonError               Json_parseEx(const char* jsonCode, int jsonCodeLength, JsonAllocator allocator, JsonFlags flags, Json** result);
-
-void                    Json_release(Json* root); // root = NULL to remove all leak memory
-
-JSON_API bool           Json_equals(const Json* a, const Json* b);
-
-JSON_API const Json*    Json_find(const Json* x, const char* name);
+JSON_API JsonError  Json_parse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result);
+JSON_API bool       Json_equals(const Json* a, const Json* b);
+JSON_API Json*      Json_find(const Json* x, const char* name);
 ```

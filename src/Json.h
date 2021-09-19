@@ -11,14 +11,12 @@ extern "C" {
 
 #include <stdint.h>
 
-/* Define boolean type if needed */
+// Define boolean type
 #if !defined(__cplusplus)
 #include <stdbool.h>
 #endif
 
-/**
- * JSON type of json value
- */
+/// JSON type of json value
 typedef enum JsonType
 {
     JsonType_Null,
@@ -29,9 +27,7 @@ typedef enum JsonType
     JsonType_Boolean,
 } JsonType;
 
-/**
- * JSON error code
- */
+/// JSON error code
 typedef enum JsonErrorCode
 {
     JsonError_None,
@@ -52,15 +48,14 @@ typedef enum JsonErrorCode
 
 } JsonErrorCode;
 
+/// JSON error information
 typedef struct JsonError
 {
     JsonErrorCode   code;
     const char*     message;
 } JsonError;
 
-/**
- * Json parse flags
- */
+/// Json parse flags
 typedef enum JsonFlags
 {
     JsonFlags_None              = 0,
@@ -69,13 +64,12 @@ typedef enum JsonFlags
 } JsonFlags;
 
 typedef struct Json             Json;
-typedef struct JsonAllocator    JsonAllocator;
 typedef struct JsonObjectMember JsonObjectMember;
 
 struct Json
 {
-    JsonType                type;       /* Type of value: number, boolean, string, array, object    */
-    int32_t                 length;     /* Length of value, always 1 on primitive types             */
+    JsonType                type;       // Type of value: number, boolean, string, array, object
+    int32_t                 length;     // Length of value, always 1 on primitive types
     union
     {
         double              number;
@@ -95,36 +89,9 @@ struct JsonObjectMember
     Json                    value;
 };
 
-struct JsonAllocator
-{
-    void*                   data;
-    void                    (*free)(void* data, void* ptr);
-    void*                   (*alloc)(void* data, int32_t size);
-};
-
-JSON_API JsonError      Json_parse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, Json** result);
-JSON_API JsonError      Json_parseEx(const char* jsonCode, int32_t jsonCodeLength, JsonAllocator allocator, JsonFlags flags, Json** result);
-
-JSON_API void           Json_release(Json* rootValue);
-
-JSON_API bool           Json_equals(const Json* a, const Json* b);
-
-JSON_API Json*          Json_find(const Json* x, const char* name);
-
-// -----------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------
-
-typedef struct JsonTempAllocator
-{
-    JsonAllocator   super;
-    void*           buffer;
-    int32_t         length;
-    int32_t         marker;
-} JsonTempAllocator;
-
-JSON_API bool           JsonTempAllocator_init(JsonTempAllocator* allocator, void* buffer, int32_t length);
-JSON_API void           JsonTempAllocator_reset(JsonTempAllocator* allocator);
+JSON_API JsonError  Json_parse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result);
+JSON_API bool       Json_equals(const Json* a, const Json* b);
+JSON_API Json*      Json_find(const Json* x, const char* name);
 
 /* END OF EXTERN "C" */
 #ifdef __cplusplus
