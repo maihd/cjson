@@ -13,7 +13,7 @@ extern "C" {
 
 #include <stdint.h>
 
-/* Define boolean type if needed */
+// Define boolean type
 #if !defined(__cplusplus)
 #include <stdbool.h>
 #endif
@@ -70,8 +70,8 @@ typedef struct JsonObjectMember JsonObjectMember;
 
 struct Json
 {
-    JsonType                type;       /* Type of value: number, boolean, string, array, object    */
-    int32_t                 length;     /* Length of value, always 1 on primitive types             */
+    JsonType                type;       // Type of value: number, boolean, string, array, object
+    int32_t                 length;     // Length of value, always 1 on primitive types
     union
     {
         double              number;
@@ -91,9 +91,9 @@ struct JsonObjectMember
     Json                    value;
 };
 
-JSON_API JsonError  Json_parse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result);
-JSON_API bool       Json_equals(const Json* a, const Json* b);
-JSON_API Json*      Json_find(const Json* x, const char* name);
+JSON_API JsonError      JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result);
+JSON_API bool           JsonEquals(const Json* a, const Json* b);
+JSON_API const Json*    JsonFind(const Json* x, const char* name);
 
 /* END OF EXTERN "C" */
 #ifdef __cplusplus
@@ -104,7 +104,9 @@ JSON_API Json*      Json_find(const Json* x, const char* name);
 
 #ifdef JSON_IMPL
 
+#ifndef __JSON_H__
 #include "Json.h"
+#endif // __JSON_H__
 
 #include <math.h>
 #include <ctype.h>
@@ -1072,8 +1074,8 @@ static Json* JsonState_parseTopLevel(JsonState* state)
     }
 }
 
-/* @funcdef: Json_parse */
-JsonError Json_parse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result)
+/* @funcdef: JsonParse */
+JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result)
 {
     JsonAllocator tempAllocator;
     JsonAllocator_init(&tempAllocator, buffer, bufferSize);
@@ -1093,8 +1095,8 @@ JsonError Json_parse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags fla
     return error;
 }
 
-/* @funcdef: Json_equals */
-bool Json_equals(const Json* a, const Json* b)
+/* @funcdef: JsonEquals */
+bool JsonEquals(const Json* a, const Json* b)
 {
     int i, n;
 
@@ -1129,7 +1131,7 @@ bool Json_equals(const Json* a, const Json* b)
         {
             for (i = 0; i < n; i++)
             {
-                if (!Json_equals(&a->array[i], &b->array[i]))
+                if (!JsonEquals(&a->array[i], &b->array[i]))
                 {
                     return false;
                 }
@@ -1147,7 +1149,7 @@ bool Json_equals(const Json* a, const Json* b)
                     return false;
                 }
 
-                if (!Json_equals(&a->object[i].value, &b->object[i].value))
+                if (!JsonEquals(&a->object[i].value, &b->object[i].value))
                 {
                     return false;
                 }
@@ -1162,8 +1164,8 @@ bool Json_equals(const Json* a, const Json* b)
     return false;
 }
 
-/* @funcdef: Json_find */
-Json* Json_find(const Json* obj, const char* name)
+/* @funcdef: JsonFind */
+const Json* JsonFind(const Json* obj, const char* name)
 {
     if (obj && obj->type == JsonType_Object)
     {
