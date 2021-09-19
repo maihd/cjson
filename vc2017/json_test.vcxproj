@@ -19,12 +19,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\json.h" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\src\Json.c" />
     <ClCompile Include="..\src\JsonUtils.c" />
     <ClCompile Include="..\src\Json_TokenTest.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\Json.h" />
+    <ClInclude Include="..\src\JsonUtils.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

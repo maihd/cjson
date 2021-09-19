@@ -13,8 +13,6 @@
 #include <setjmp.h>
 #include <stdint.h>
 
-#define JSON_SUPEROF(ptr, T, member) (T*)((char*)ptr - offsetof(T, member))
-
 #ifndef JSON_INLINE
 #  if defined(_MSC_VER)
 #     define JSON_INLINE static __forceinline
@@ -26,8 +24,6 @@
 #     define JSON_INLINE static 
 #  endif
 #endif
-
-static const uint64_t JSON_RESERVED_MARK = (1246973774ULL << 31) | 1785950062ULL;
 
 // -----------------------------------------------------------------------
 // Utility
@@ -184,10 +180,7 @@ JSON_INLINE void* JsonTempArray_toBufferFunc(void* buffer, int32_t count, void* 
 typedef struct JsonState JsonState;
 struct JsonState
 {
-    uint64_t            reserved;
-
     Json                root;
-    JsonState*          next;
 
     JsonFlags           flags;
 
@@ -286,9 +279,6 @@ static JsonState* JsonState_new(const char* jsonCode, int32_t jsonLength, JsonAl
     JsonState* state = (JsonState*)JsonAllocator_alloc(&allocator, sizeof(JsonState));
     if (state)
     {
-        state->reserved     = JSON_RESERVED_MARK;
-
-		state->next         = NULL;
         state->flags        = flags;
 
 		state->line         = 1;

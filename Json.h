@@ -68,7 +68,15 @@ typedef enum JsonFlags
 typedef struct Json             Json;
 typedef struct JsonObjectMember JsonObjectMember;
 
-struct Json
+/// Member of JsonObject
+struct JsonObjectMember
+{
+    const char*             name;
+    Json                    value;
+};
+
+/// Json value
+typedef struct Json
 {
     JsonType                type;       // Type of value: number, boolean, string, array, object
     int32_t                 length;     // Length of value, always 1 on primitive types
@@ -83,12 +91,6 @@ struct Json
 
         JsonObjectMember*   object;
     };
-};
-
-struct JsonObjectMember
-{
-    const char*             name;
-    Json                    value;
 };
 
 JSON_API JsonError      JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result);
