@@ -6,7 +6,7 @@
 #include <string.h>
 
 #include "Json.h"
-#include "JsonEx.h"
+#include "JsonUtils.h"
 
 static jmp_buf jmpenv;
 
@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
 	        else
             {
                 Json* value;
-                JsonError error = Json_parse(json, strlen(json), JsonFlags_NoStrictTopLevel, allocatorBuffer, allocatorCapacity, &value);
+                JsonError error = JsonParse(json, strlen(json), JsonFlags_NoStrictTopLevel, allocatorBuffer, allocatorCapacity, &value);
                 if (error.code != JsonError_None)
                 {
                     value = NULL;
@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    Json_print(value, stdout); printf("\n");
+                    JsonPrint(value, stdout); printf("\n");
                 }
 	        }
 	    }

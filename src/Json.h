@@ -89,9 +89,9 @@ struct JsonObjectMember
     Json                    value;
 };
 
-JSON_API JsonError  Json_parse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result);
-JSON_API bool       Json_equals(const Json* a, const Json* b);
-JSON_API Json*      Json_find(const Json* x, const char* name);
+JSON_API JsonError      JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result);
+JSON_API bool           JsonEquals(const Json* a, const Json* b);
+JSON_API const Json*    JsonFind(const Json* x, const char* name);
 
 /* END OF EXTERN "C" */
 #ifdef __cplusplus

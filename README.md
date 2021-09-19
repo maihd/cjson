@@ -24,7 +24,7 @@ make lib
 Belove code from Json_TokenTest.c:
 ```C
 #include "Json.h"
-#include "JsonEx.h" // for Json_print
+#include "JsonUtils.h" // for JsonPrint
 
 int main(int argc, char* argv[])
 {
@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
 	        else
             {
                 Json* value;
-                JsonError error = Json_parse(json, strlen(json), JsonFlags_NoStrictTopLevel, allocatorBuffer, allocatorCapacity, &value);
+                JsonError error = JsonParse(json, strlen(json), JsonFlags_NoStrictTopLevel, allocatorBuffer, allocatorCapacity, &value);
                 if (error.code != JsonError_None)
                 {
                     value = NULL;
@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    Json_print(value, stdout); printf("\n");
+                    JsonPrint(value, stdout); printf("\n");
                 }
 	        }
 	    }
@@ -132,7 +132,7 @@ struct JsonObjectMember
     Json        value;
 };
 
-JSON_API JsonError  Json_parse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result);
-JSON_API bool       Json_equals(const Json* a, const Json* b);
-JSON_API Json*      Json_find(const Json* x, const char* name);
+JSON_API JsonError      JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result);
+JSON_API bool           JsonEquals(const Json* a, const Json* b);
+JSON_API const Json*    JsonFind(const Json* x, const char* name);
 ```

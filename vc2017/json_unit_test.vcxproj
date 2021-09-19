@@ -180,12 +180,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\Json.c" />
-    <ClCompile Include="..\src\JsonEx.c" />
+    <ClCompile Include="..\src\JsonUtils.c" />
     <ClCompile Include="..\src\json_unit_test.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\Json.h" />
-    <ClInclude Include="..\src\JsonEx.h" />
+    <ClInclude Include="..\src\JsonUtils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

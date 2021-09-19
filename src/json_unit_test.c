@@ -7,7 +7,7 @@
 #include <assert.h>
 
 #include "Json.h"
-#include "JsonEx.h"
+#include "JsonUtils.h"
 
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(__cygwin__) || defined(_WIN32)
 #include <Windows.h>
@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
 
             double dt = gettime();
             Json* value;
-            JsonError error = Json_parse(fileBuffer, filesize, JsonFlags_None, allocatorBuffer, allocatorCapacity, &value);
+            JsonError error = JsonParse(fileBuffer, filesize, JsonFlags_None, allocatorBuffer, allocatorCapacity, &value);
             if (error.code != JsonError_None)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, error.message);
@@ -72,14 +72,14 @@ int main(int argc, char* argv[])
             dt = gettime() - dt;
 
             int length = value->length;
-            Json* firstObject = value && length > 0 ? &value->array[0] : NULL;
+            const Json* firstObject = value && length > 0 ? &value->array[0] : NULL;
 
             //
-            Json* idValue = Json_find(firstObject, "_id");
+            const Json* idValue = JsonFind(firstObject, "_id");
             if (idValue)
             {
                 printf("idValue: ");
-                Json_print(idValue, stdout);
+                JsonPrint(idValue, stdout);
                 printf("\n");
             }
 

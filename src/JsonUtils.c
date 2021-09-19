@@ -1,7 +1,9 @@
-#include "JsonEx.h"
+#ifndef __JSON_UTILS_H__
+#include "JsonUtils.h"
+#endif // __JSON_UTILS_H__
 
 /* @funcdef: Json_write */
-void Json_write(const Json* value, FILE* out)
+void JsonWrite(const Json* value, FILE* out)
 {
     if (value)
     {
@@ -29,7 +31,7 @@ void Json_write(const Json* value, FILE* out)
             fprintf(out, "[");
             for (i = 0, n = value->length; i < n; i++)
             {
-                Json_write(&value->array[i], out);
+                JsonWrite(&value->array[i], out);
                 if (i < n - 1)
                 {
                     fprintf(out, ",");
@@ -43,7 +45,7 @@ void Json_write(const Json* value, FILE* out)
             for (i = 0, n = value->length; i < n; i++)
             {
                 fprintf(out, "\"%s\" : ", value->object[i].name);
-                Json_write(&value->object[i].value, out);
+                JsonWrite(&value->object[i].value, out);
                 if (i < n - 1)
                 {
                     fprintf(out, ",");
@@ -58,8 +60,8 @@ void Json_write(const Json* value, FILE* out)
     }
 }          
 
-/* @funcdef: Json_print */
-void Json_print(const Json* value, FILE* out)
+/* @funcdef: JsonPrint */
+void JsonPrint(const Json* value, FILE* out)
 {
     if (value)
     {
@@ -96,7 +98,7 @@ void Json_print(const Json* value, FILE* out)
                     fputc(' ', out);
                 }
 
-                Json_print(&value->array[i], out);
+                JsonPrint(&value->array[i], out);
                 if (i < n - 1)
                 {
                     fputc(',', out);
@@ -125,7 +127,7 @@ void Json_print(const Json* value, FILE* out)
                 }
 
                 fprintf(out, "\"%s\" : ", value->object[i].name);
-                Json_print(&value->object[i].value, out);
+                JsonPrint(&value->object[i].value, out);
                 if (i < n - 1)
                 {
                     fputc(',', out);
