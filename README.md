@@ -1,4 +1,4 @@
-# Introduction [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
+# Introduction ![Build Status](https://github.com/maihd/cjson/actions/workflows/unit-tests.yml/badge.svg) [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 Simple JSON parser written in C99
 
 ## Features
