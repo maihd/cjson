@@ -13,5 +13,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Get testdb
+      run: git submodule update --init --recursive
     - name: Unit tests
       run: make unit_test
