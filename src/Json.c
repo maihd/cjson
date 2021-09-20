@@ -70,33 +70,24 @@ static void* JsonAllocator_AllocHead(JsonAllocator* allocator, int32_t size)
     return NULL;
 }
 
-static void* JsonAllocator_AllocTail(JsonAllocator* allocator, int32_t size)
+static void* JsonAllocator_AllocTail(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t newSize)
 {
-    if (JsonAllocator_CanAlloc(allocator, size))
+    if (oldBuffer && oldSize)
     {
-        allocator->tailMarker += size;
+        void* lastBuffer = (allocator->buffer + allocator->length - allocator->tailMarker);
+        if (lastBuffer == oldBuffer)
+        {
+            allocator->tailMarker -= oldSize;
+        }
+    }
+
+    if (JsonAllocator_CanAlloc(allocator, newSize))
+    {
+        allocator->tailMarker += newSize;
         return (allocator->buffer + allocator->length - allocator->tailMarker);
     }
 
     return NULL;
-}
-
-//static void JsonAllocator_reset(JsonAllocator* allocator)
-//{
-//    allocator->marker = 0;
-//}
-
-/* Next power of two */
-JSON_INLINE int32_t Json_nextPOT(int32_t x)
-{
-    x  = x - 1;
-    x |= x >> 1;
-    x |= x >> 2;
-    x |= x >> 4;
-    x |= x >> 8;
-    x |= x >> 16;
-    x++;
-    return x;
 }
 
 /* 
@@ -118,11 +109,11 @@ typedef struct JsonArray
 #define JsonArray_getUsageMemory(a)         (sizeof(JsonArray) + JsonArray_getCount(a) * sizeof(*(a)))
 #define JsonArray_push(a, v, alloc)         (JsonArray_ensureSize(a, JsonArray_getCount(a) + 1, alloc) ? ((void)((a)[JsonArray_getHeader(a)->count++] = v), 1) : 0)
 #define JsonArray_pop(a, v, alloc)          ((a)[--JsonArray_getHeader(a)->count]);
-#define JsonArray_ensureSize(a, n, alloc)   ((!(a) || JsonArray_getSize(a) < (n)) ? (*((void**)&(a))=JsonArray_grow(a, Json_nextPOT(n), sizeof((a)[0]), alloc)) != NULL : 1)
+#define JsonArray_ensureSize(a, n, alloc)   ((!(a) || JsonArray_getSize(a) < (n)) ? (*((void**)&(a))=JsonArray_Grow(a, n + 1, sizeof((a)[0]), alloc)) != NULL : 1)
 #define JsonArray_clear(a)                  ((a) ? (void)(JsonArray_getHeader(a)->count = 0) : (void)0)
-#define JsonArray_clone(a, alloc)           ((a) ? memcpy(JsonArray_grow(0, JsonArray_getCount(a), sizeof((a)[0]), alloc), JsonArray_getHeader(a), JsonArray_getUsageMemory(a)) : NULL)
+#define JsonArray_clone(a, alloc)           ((a) ? memcpy(JsonArray_Grow(0, JsonArray_getCount(a), sizeof((a)[0]), alloc), JsonArray_getHeader(a), JsonArray_getUsageMemory(a)) : NULL)
 
-JSON_INLINE void* JsonArray_grow(void* array, int32_t reqsize, int32_t elemsize, JsonAllocator* allocator)
+JSON_INLINE void* JsonArray_Grow(void* array, int32_t reqsize, int32_t elemsize, JsonAllocator* allocator)
 {
     assert(elemsize > 0);
     assert(allocator != NULL);
@@ -135,12 +126,14 @@ JSON_INLINE void* JsonArray_grow(void* array, int32_t reqsize, int32_t elemsize,
     {
         return array;
     }
-    else
+
+    int32_t newSize = size;
+    while (newSize < reqsize)
     {
-        size = reqsize;
+        newSize += 32;
     }
 
-    JsonArray* newArray = (JsonArray*)JsonAllocator_AllocTail(allocator, sizeof(JsonArray) + size * elemsize);
+    JsonArray* newArray = (JsonArray*)JsonAllocator_AllocTail(allocator, raw, sizeof(JsonArray) + size * elemsize, sizeof(JsonArray) + newSize * elemsize);
     if (newArray)
     {
         newArray->size  = size;
@@ -149,7 +142,6 @@ JSON_INLINE void* JsonArray_grow(void* array, int32_t reqsize, int32_t elemsize,
         if (raw && count > 0)
         {
             memcpy(newArray->buffer, raw->buffer, count * elemsize);
-            //JSON_FREE(allocator, raw);
         }
 
         return newArray->buffer;
@@ -257,7 +249,7 @@ static void Json_setErrorWithArgs(JsonState* state, JsonType type, JsonErrorCode
     state->errnum = code;
     if (state->errmsg == NULL)
     {
-        state->errmsg = (char*)JsonAllocator_AllocTail(&state->allocator, errmsg_size);
+        state->errmsg = (char*)JsonAllocator_AllocTail(&state->allocator, NULL, 0, errmsg_size);
     }
 
     char final_format[1024];
@@ -295,7 +287,7 @@ static void Json_panic(JsonState* state, JsonType type, JsonErrorCode code, cons
 /* @funcdef: JsonState_new */
 static JsonState* JsonState_new(const char* jsonCode, int32_t jsonLength, JsonAllocator allocator, JsonFlags flags)
 {
-    JsonState* state = (JsonState*)JsonAllocator_AllocTail(&allocator, sizeof(JsonState));
+    JsonState* state = (JsonState*)JsonAllocator_AllocTail(&allocator, NULL, 0, sizeof(JsonState));
     if (state)
     {
         state->flags        = flags;
