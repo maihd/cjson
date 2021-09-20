@@ -9,6 +9,13 @@
 /vc2017/*.suo
 /vc2017/Debug
 /vc2017/Release
+/vc2017/**/.vs
+/vc2017/**/x64
+/vc2017/**/obj
+/vc2017/**/*.sdf
+/vc2017/**/*.suo
+/vc2017/**/Debug
+/vc2017/**/Release
 
 *.o
 *.exe
