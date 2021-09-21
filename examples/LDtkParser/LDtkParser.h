@@ -94,3 +94,16 @@ typedef struct LDtkWorld
     LDtkEntity*     entities;
 } LDtkWorld;
 
+typedef enum LDtkErrorCode
+{
+    LDtkErrorCode_None,
+    LDtkErrorCode_ParseJsonFailed,
+} LDtkErrorCode;
+
+typedef struct LDtkError
+{
+    LDtkErrorCode   code;
+    const char*     message;
+} LDtkError;
+
+LDtkError LDtkParse(const char* json, int32_t jsonLength, void* buffer, int32_t bufferSize, LDtkWorld* world);

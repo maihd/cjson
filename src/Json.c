@@ -984,6 +984,12 @@ static Json* JsonState_parseTopLevel(JsonState* state)
 /* @funcdef: JsonParse */
 JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result)
 {
+    if (!buffer || bufferSize < sizeof(JsonState))
+    {
+        JsonError error = { JsonError_OutOfMemory, "Buffer is too small" };
+        return error;
+    }
+
     JsonAllocator tempAllocator;
     JsonAllocator_Init(&tempAllocator, buffer, bufferSize);
 
