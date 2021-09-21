@@ -90,6 +90,18 @@ static void* JsonAllocator_AllocTail(JsonAllocator* allocator, void* oldBuffer, 
     return NULL;
 }
 
+static void JsonAllocator_FreeTail(JsonAllocator* allocator, void* buffer, int32_t size)
+{
+    if (buffer && size)
+    {
+        void* lastBuffer = (allocator->buffer + allocator->length - allocator->tailMarker);
+        if (lastBuffer == buffer)
+        {
+            allocator->tailMarker -= size;
+        }
+    }
+}
+
 /* 
 JsonArray: dynamic, scalable array
 @note: internal only
@@ -103,7 +115,7 @@ typedef struct JsonArray
 
 #define JsonArray_getHeader(a)              ((JsonArray*)(a) - 1)
 #define JsonArray_init()                    0
-#define JsonArray_free(a, alloc)            ((alloc)->tailMarker -= JsonArray_getCount(a) * sizeof((a)[0]))
+#define JsonArray_free(a, alloc)            JsonAllocator_FreeTail(alloc, a ? JsonArray_getHeader(a) : NULL, JsonArray_getSize(a) * sizeof((a)[0]))
 #define JsonArray_getSize(a)                ((a) ? JsonArray_getHeader(a)->size  : 0)
 #define JsonArray_getCount(a)               ((a) ? JsonArray_getHeader(a)->count : 0)
 #define JsonArray_getUsageMemory(a)         (sizeof(JsonArray) + JsonArray_getCount(a) * sizeof(*(a)))
