@@ -26,11 +26,11 @@ int main(void)
 
     char* json = (char*)malloc(fileSize + 1);
     fread(json, 1, fileSize, file);
-    json[fileSize + 1] = 0;
+    json[fileSize] = 0;
 
     fclose(file);
 
-    int32_t tempBufferSize = 1024 * 1024;
+    int32_t tempBufferSize = 100 * 1024 * 1024;
     void* tempBuffer = malloc((size_t)tempBufferSize);
 
     LDtkWorld world;
@@ -41,11 +41,19 @@ int main(void)
         return -1;
     }
 
+    free(tempBuffer);
+    free(json);
+
+    Texture texture = LoadTexture("../../examples/LDtkParser/assets/N2D - SpaceWallpaper1280x448.png");
+    SetWindowSize(texture.width * 2, texture.height * 2);
+
     while (!WindowShouldClose())
     {
         BeginDrawing();
         {
             ClearBackground(BLACK);
+
+            DrawTextureEx(texture, (Vector2){0, 0}, 0.0f, 2.0f, WHITE);
         }
         EndDrawing();
     }
