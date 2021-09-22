@@ -25,6 +25,10 @@
 #  endif
 #endif
 
+#ifndef JSON_ASSERT
+#define JSON_ASSERT(cond, msg, ...) assert((cond) && (msg))
+#endif
+
 // -----------------------------------------------------------------------
 // Utility
 // -----------------------------------------------------------------------
@@ -904,15 +908,12 @@ static void JsonState_parseObject(JsonState* state, Json* outValue)
          
 /* Internal parsing function
  */
-static Json* JsonState_parseTopLevel(JsonState* state)
+static Json* JsonState_ParseTopLevel(JsonState* state)
 {
+    JSON_ASSERT(state, "state mustnot be null");
+
     Json* value = (Json*)JsonAllocator_AllocLower(&state->allocator, NULL, 0, sizeof(Json));
     value->type = JsonType_Null;
-
-    if (!state)
-    {
-        return NULL;
-    }
 
     // Skip meta comment in header of the file
     if (state->flags & JsonFlags_SupportComment)
@@ -921,23 +922,16 @@ static Json* JsonState_parseTopLevel(JsonState* state)
         JsonState_skipComments(state);
     }
 
-    // Just parse value from the top level
-    if (state->flags & JsonFlags_NoStrictTopLevel)
+    // Use setjmp for quick exit when parse error happend
+    if (setjmp(state->errjmp) == 0)
     {
-        if (setjmp(state->errjmp) == 0)
+        // Just parse value from the top level
+        if (state->flags & JsonFlags_NoStrictTopLevel)
         {
             JsonState_parseSingle(state, value);
-            return value;
         }
-        else
-        {
-            return NULL;
-        }
-    }
-    // Make sure the toplevel is JsonType_Object
-    else if (JsonState_skipSpace(state) == '{')
-    {
-        if (setjmp(state->errjmp) == 0)
+        // Make sure the toplevel is JsonType_Object
+        else if (JsonState_skipSpace(state) == '{')
         {
             JsonState_parseObject(state, value);
 
@@ -946,18 +940,9 @@ static Json* JsonState_parseTopLevel(JsonState* state)
             {
                 Json_panic(state, JsonType_Null, JsonError_WrongFormat, "JSON is not well-formed. JSON is start with <object>.");
             }
-
-            return value;
         }
-        else
-        {
-            return NULL;
-        }
-    }
-    // Make sure the toplevel is JsonType_Array
-    else if (JsonState_skipSpace(state) == '[')
-    {
-        if (setjmp(state->errjmp) == 0)
+        // Make sure the toplevel is JsonType_Array
+        else if (JsonState_skipSpace(state) == '[')
         {
             JsonState_parseArray(state, value);
 
@@ -966,24 +951,25 @@ static Json* JsonState_parseTopLevel(JsonState* state)
             {
                 Json_panic(state, JsonType_Null, JsonError_WrongFormat, "JSON is not well-formed. JSON is start with <array>.");
             }
-
-            return value;
         }
         else
         {
-            return NULL;
+            Json_setError(state, JsonType_Null, JsonError_WrongFormat, "JSON must be starting with '{' or '[', first character is '%c'", JsonState_peekChar(state));
         }
     }
-    else
-    {
-        Json_setError(state, JsonType_Null, JsonError_WrongFormat, "JSON must be starting with '{' or '[', first character is '%c'", JsonState_peekChar(state));
-        return NULL;
-    }
+
+    return value;
 }
 
 /* @funcdef: JsonParse */
 JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result)
 {
+    if (!jsonCode || jsonCodeLength <= 0)
+    {
+        JsonError error = { JsonError_WrongFormat, "Json code is not valid" };
+        return error;
+    }
+
     if (!buffer || bufferSize < sizeof(JsonState))
     {
         JsonError error = { JsonError_OutOfMemory, "Buffer is too small" };
@@ -996,7 +982,7 @@ JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flag
     JsonState state;
     JsonState_Init(&state, jsonCode, jsonCodeLength, tempAllocator, flags);
 
-    Json* value = JsonState_parseTopLevel(&state);
+    Json* value = JsonState_ParseTopLevel(&state);
 
     *result = value;
 

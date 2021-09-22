@@ -131,6 +131,10 @@ JSON_API const Json*    JsonFind(const Json* x, const char* name);
 #  endif
 #endif
 
+#ifndef JSON_ASSERT
+#define JSON_ASSERT(cond, msg, ...) assert((cond) && (msg))
+#endif
+
 // -----------------------------------------------------------------------
 // Utility
 // -----------------------------------------------------------------------
@@ -140,8 +144,8 @@ typedef struct JsonAllocator
     uint8_t*        buffer;
     int32_t         length;
 
-    int32_t         headMarker;
-    int32_t         tailMarker;
+    uint8_t*        lowerMarker;
+    uint8_t*        upperMarker;
 } JsonAllocator;
 
 static bool JsonAllocator_Init(JsonAllocator* allocator, void* buffer, int32_t length)
@@ -150,8 +154,8 @@ static bool JsonAllocator_Init(JsonAllocator* allocator, void* buffer, int32_t l
     {
         allocator->buffer       = (uint8_t*)buffer;
         allocator->length       = length;
-        allocator->headMarker   = 0;
-        allocator->tailMarker   = 0;
+        allocator->lowerMarker  = (uint8_t*)buffer;
+        allocator->upperMarker  = (uint8_t*)buffer + length;
 
         return true;
     }
@@ -161,51 +165,53 @@ static bool JsonAllocator_Init(JsonAllocator* allocator, void* buffer, int32_t l
 
 static bool JsonAllocator_CanAlloc(JsonAllocator* allocator, int32_t size)
 {
-    return (allocator->headMarker + allocator->tailMarker + size) <= allocator->length;
+    int32_t remain = (int32_t)(allocator->upperMarker - allocator->lowerMarker);
+    return  remain >= size;
 }
 
-static void* JsonAllocator_AllocHead(JsonAllocator* allocator, int32_t size)
+static void JsonAllocator_FreeLower(JsonAllocator* allocator, void* buffer, int32_t size)
 {
+    void* lastBuffer = allocator->lowerMarker;
+    if (lastBuffer == buffer)
+    {
+        allocator->lowerMarker -= size;
+    }
+}
+
+static void* JsonAllocator_AllocLower(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t size)
+{
+    JsonAllocator_FreeLower(allocator, oldBuffer, oldSize);
+
     if (JsonAllocator_CanAlloc(allocator, size))
     {
-        void* result = allocator->buffer + allocator->headMarker;
-        allocator->headMarker += size;
+        void* result = allocator->lowerMarker;
+        allocator->lowerMarker += size;
         return result;
     }
 
     return NULL;
 }
 
-static void* JsonAllocator_AllocTail(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t newSize)
+static void JsonAllocator_FreeUpper(JsonAllocator* allocator, void* buffer, int32_t size)
 {
-    if (oldBuffer && oldSize)
+    void* lastBuffer = allocator->upperMarker;
+    if (lastBuffer == buffer)
     {
-        void* lastBuffer = (allocator->buffer + allocator->length - allocator->tailMarker);
-        if (lastBuffer == oldBuffer)
-        {
-            allocator->tailMarker -= oldSize;
-        }
+        allocator->upperMarker += size;
     }
+}
+
+static void* JsonAllocator_AllocUpper(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t newSize)
+{
+    JsonAllocator_FreeUpper(allocator, oldBuffer, oldSize);
 
     if (JsonAllocator_CanAlloc(allocator, newSize))
     {
-        allocator->tailMarker += newSize;
-        return (allocator->buffer + allocator->length - allocator->tailMarker);
+        allocator->upperMarker -= newSize;
+        return allocator->upperMarker;
     }
 
     return NULL;
-}
-
-static void JsonAllocator_FreeTail(JsonAllocator* allocator, void* buffer, int32_t size)
-{
-    if (buffer && size)
-    {
-        void* lastBuffer = (allocator->buffer + allocator->length - allocator->tailMarker);
-        if (lastBuffer == buffer)
-        {
-            allocator->tailMarker -= size;
-        }
-    }
 }
 
 /* 
@@ -221,7 +227,7 @@ typedef struct JsonArray
 
 #define JsonArray_getHeader(a)              ((JsonArray*)(a) - 1)
 #define JsonArray_init()                    0
-#define JsonArray_free(a, alloc)            JsonAllocator_FreeTail(alloc, a ? JsonArray_getHeader(a) : NULL, JsonArray_getSize(a) * sizeof((a)[0]))
+#define JsonArray_free(a, alloc)            JsonAllocator_FreeUpper(alloc, a ? JsonArray_getHeader(a) : NULL, JsonArray_getSize(a) * sizeof((a)[0]))
 #define JsonArray_getSize(a)                ((a) ? JsonArray_getHeader(a)->size  : 0)
 #define JsonArray_getCount(a)               ((a) ? JsonArray_getHeader(a)->count : 0)
 #define JsonArray_getUsageMemory(a)         (sizeof(JsonArray) + JsonArray_getCount(a) * sizeof(*(a)))
@@ -251,7 +257,7 @@ JSON_INLINE void* JsonArray_Grow(void* array, int32_t reqsize, int32_t elemsize,
         newSize += 32;
     }
 
-    JsonArray* newArray = (JsonArray*)JsonAllocator_AllocTail(allocator, raw, sizeof(JsonArray) + size * elemsize, sizeof(JsonArray) + newSize * elemsize);
+    JsonArray* newArray = (JsonArray*)JsonAllocator_AllocUpper(allocator, raw, sizeof(JsonArray) + size * elemsize, sizeof(JsonArray) + newSize * elemsize);
     if (newArray)
     {
         newArray->size  = size;
@@ -292,7 +298,7 @@ JSON_INLINE void* JsonTempArray_toBufferFunc(void* buffer, int32_t count, void* 
     int total = count + JsonArray_getCount(dynamicBuffer);
     if (total > 0)
     {
-        void* array = (JsonArray*)JsonAllocator_AllocHead(allocator, total * itemSize);
+        void* array = (JsonArray*)JsonAllocator_AllocLower(allocator, NULL, 0, total * itemSize);
         if (array)
         {
             memcpy(array, buffer, count * itemSize);
@@ -309,8 +315,6 @@ JSON_INLINE void* JsonTempArray_toBufferFunc(void* buffer, int32_t count, void* 
 typedef struct JsonState JsonState;
 struct JsonState
 {
-    Json                root;
-
     JsonFlags           flags;
 
     int32_t             line;
@@ -367,7 +371,7 @@ static void Json_setErrorWithArgs(JsonState* state, JsonType type, JsonErrorCode
     state->errnum = code;
     if (state->errmsg == NULL)
     {
-        state->errmsg = (char*)JsonAllocator_AllocTail(&state->allocator, NULL, 0, errmsg_size);
+        state->errmsg = (char*)JsonAllocator_AllocUpper(&state->allocator, NULL, 0, errmsg_size);
     }
 
     char final_format[1024];
@@ -402,10 +406,9 @@ static void Json_panic(JsonState* state, JsonType type, JsonErrorCode code, cons
     longjmp(state->errjmp, code);
 }
 
-/* @funcdef: JsonState_new */
-static JsonState* JsonState_new(const char* jsonCode, int32_t jsonLength, JsonAllocator allocator, JsonFlags flags)
+/* @funcdef: JsonState_Init */
+static void JsonState_Init(JsonState* state, const char* jsonCode, int32_t jsonLength, JsonAllocator allocator, JsonFlags flags)
 {
-    JsonState* state = (JsonState*)JsonAllocator_AllocTail(&allocator, NULL, 0, sizeof(JsonState));
     if (state)
     {
         state->flags        = flags;
@@ -421,18 +424,16 @@ static JsonState* JsonState_new(const char* jsonCode, int32_t jsonLength, JsonAl
 
         state->allocator    = allocator;
     }
-
-    return state;
 }
 
 /* @funcdef: JsonState_isEOF */
-static int JsonState_isEOF(JsonState* state)
+static int JsonState_isEOF(const JsonState* state)
 {
     return state->cursor >= state->length || state->buffer[state->cursor] <= 0;
 }
 
 /* @funcdef: JsonState_peekChar */
-static int JsonState_peekChar(JsonState* state)
+static int JsonState_peekChar(const JsonState* state)
 {
     return state->buffer[state->cursor];
 }
@@ -1013,12 +1014,12 @@ static void JsonState_parseObject(JsonState* state, Json* outValue)
          
 /* Internal parsing function
  */
-static Json* JsonState_parseTopLevel(JsonState* state)
+static Json* JsonState_ParseTopLevel(JsonState* state)
 {
-    if (!state)
-    {
-        return NULL;
-    }
+    JSON_ASSERT(state, "state mustnot be null");
+
+    Json* value = (Json*)JsonAllocator_AllocLower(&state->allocator, NULL, 0, sizeof(Json));
+    value->type = JsonType_Null;
 
     // Skip meta comment in header of the file
     if (state->flags & JsonFlags_SupportComment)
@@ -1027,84 +1028,71 @@ static Json* JsonState_parseTopLevel(JsonState* state)
         JsonState_skipComments(state);
     }
 
-    // Just parse value from the top level
-    if (state->flags & JsonFlags_NoStrictTopLevel)
+    // Use setjmp for quick exit when parse error happend
+    if (setjmp(state->errjmp) == 0)
     {
-        if (setjmp(state->errjmp) == 0)
+        // Just parse value from the top level
+        if (state->flags & JsonFlags_NoStrictTopLevel)
         {
-            JsonState_parseSingle(state, &state->root);
-            return &state->root;
+            JsonState_parseSingle(state, value);
         }
-        else
+        // Make sure the toplevel is JsonType_Object
+        else if (JsonState_skipSpace(state) == '{')
         {
-            return NULL;
-        }
-    }
-    // Make sure the toplevel is JsonType_Object
-    else if (JsonState_skipSpace(state) == '{')
-    {
-        if (setjmp(state->errjmp) == 0)
-        {
-            JsonState_parseObject(state, &state->root);
+            JsonState_parseObject(state, value);
 
             JsonState_skipSpace(state);
             if (!JsonState_isEOF(state))
             {
                 Json_panic(state, JsonType_Null, JsonError_WrongFormat, "JSON is not well-formed. JSON is start with <object>.");
             }
-
-            return &state->root;
         }
-        else
+        // Make sure the toplevel is JsonType_Array
+        else if (JsonState_skipSpace(state) == '[')
         {
-            return NULL;
-        }
-    }
-    // Make sure the toplevel is JsonType_Array
-    else if (JsonState_skipSpace(state) == '[')
-    {
-        if (setjmp(state->errjmp) == 0)
-        {
-            JsonState_parseArray(state, &state->root);
+            JsonState_parseArray(state, value);
 
             JsonState_skipSpace(state);
             if (!JsonState_isEOF(state))
             {
                 Json_panic(state, JsonType_Null, JsonError_WrongFormat, "JSON is not well-formed. JSON is start with <array>.");
             }
-
-            return &state->root;
         }
         else
         {
-            return NULL;
+            Json_setError(state, JsonType_Null, JsonError_WrongFormat, "JSON must be starting with '{' or '[', first character is '%c'", JsonState_peekChar(state));
         }
     }
-    else
-    {
-        Json_setError(state, JsonType_Null, JsonError_WrongFormat, "JSON must be starting with '{' or '[', first character is '%c'", JsonState_peekChar(state));
-        return NULL;
-    }
+
+    return value;
 }
 
 /* @funcdef: JsonParse */
 JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result)
 {
+    if (!jsonCode || jsonCodeLength <= 0)
+    {
+        JsonError error = { JsonError_WrongFormat, "Json code is not valid" };
+        return error;
+    }
+
+    if (!buffer || bufferSize < sizeof(JsonState))
+    {
+        JsonError error = { JsonError_OutOfMemory, "Buffer is too small" };
+        return error;
+    }
+
     JsonAllocator tempAllocator;
     JsonAllocator_Init(&tempAllocator, buffer, bufferSize);
 
-    JsonState* state = JsonState_new(jsonCode, jsonCodeLength, tempAllocator, flags);
-    Json* value = JsonState_parseTopLevel(state);
-    
-    if (!value)
-    {
-        state->root.type = JsonType_Null;
-        value = &state->root;
-    }
+    JsonState state;
+    JsonState_Init(&state, jsonCode, jsonCodeLength, tempAllocator, flags);
+
+    Json* value = JsonState_ParseTopLevel(&state);
 
     *result = value;
 
-    JsonError error = { state->errnum, state->errmsg ? state->errmsg : ""};
+    JsonError error = { state.errnum, state.errmsg };
     return error;
 }
 

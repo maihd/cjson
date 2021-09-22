@@ -30,7 +30,7 @@ int main(void)
 
     fclose(file);
 
-    int32_t tempBufferSize = 100 * 1024 * 1024;
+    int32_t tempBufferSize = 1024 * 1024;
     void* tempBuffer = malloc((size_t)tempBufferSize);
 
     LDtkWorld world;
