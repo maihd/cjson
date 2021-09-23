@@ -6,14 +6,6 @@
 #include <stdbool.h>
 #endif
 
-typedef enum LDtkLayerType
-{
-    LDtkLayerType_IntGrid,
-    LDtkLayerType_Entities,
-    LDtkLayerType_Tiles,
-    LDtkLayerType_AutoLayer
-} LDtkLayerType;
-
 typedef enum LDtkDirection
 {
     LDtkDirection_None,
@@ -70,28 +62,61 @@ typedef struct LDtkTile
 
 typedef struct LDtkTileset
 {
-    const char* name;
-    const char* path;
+    const char* name;   // Name of tileset
+    const char* path;   // Relative path to image file
 } LDtkTileset;
 
 typedef struct LDtkLayer
 {
+    const char* name;
+
+    int32_t     order;
+
     LDtkTileset tileset;
 } LDtkLayer;
 
 typedef struct LDtkIntGrid
 {
-    int cols;
-    int rows;
-    int data[];
+    const char* name;
+
+    int32_t     order;
+
+    int32_t     cols;
+    int32_t     rows;
+    int32_t     data[];
 } LDtkIntGrid;
+
+typedef struct LDtkEntityGroup
+{
+    const char* name;
+
+    int32_t     order;
+
+    int32_t     entityCount;
+    LDtkEntity* entities;
+} LDtkEntityGroup;
+
+typedef struct LDtkLevel
+{
+    const char*         name;
+
+    int32_t             layerCount;
+    LDtkLayer*          layers;
+
+    int32_t             gridCount;
+    LDtkIntGrid*        grids;
+
+    int32_t             entityGroupCount;
+    LDtkEntityGroup*    entityGroups;
+} LDtkLevel;
 
 typedef struct LDtkWorld
 {
+    int32_t         tilesetCount;
     LDtkTileset*    tilesets;
-    LDtkLayer*      layers;
-    LDtkIntGrid*    grids;
-    LDtkEntity*     entities;
+
+    int32_t         levelCount;
+    LDtkLevel*      levels;
 } LDtkWorld;
 
 typedef enum LDtkErrorCode
