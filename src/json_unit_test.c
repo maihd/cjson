@@ -62,8 +62,8 @@ int main(int argc, char* argv[])
             fclose(file);
 
             double dt = gettime();
-            Json* value;
-            JsonError error = JsonParse(fileBuffer, filesize, JsonFlags_None, allocatorBuffer, allocatorCapacity, &value);
+            const Json value;
+            const JsonError error = JsonParse(fileBuffer, filesize, JsonFlags_None, allocatorBuffer, allocatorCapacity, (Json*)&value);
             if (error.code != JsonError_None)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, error.message);
@@ -71,20 +71,19 @@ int main(int argc, char* argv[])
             }
             dt = gettime() - dt;
 
-            int length = value->length;
-            const Json* firstObject = value && length > 0 ? &value->array[0] : NULL;
-
-            //
-            const Json* idValue = JsonFind(firstObject, "_id");
-            if (idValue)
+            if (value.type == JsonType_Array)
             {
-                printf("idValue: ");
-                JsonPrint(idValue, stdout);
-                printf("\n");
-            }
+                const Json firstObject = value.length > 0 ? value.array[0] : JSON_NULL;
 
-            // When use temp allocator, donot Json_release
-            //Json_release(state);
+                //
+                const Json idValue;
+                if (JsonFind(firstObject, "_id", (Json*)&idValue))
+                {
+                    printf("idValue: ");
+                    JsonPrint(idValue, stdout);
+                    printf("\n");
+                }
+            }
 
             printf(
                 "Parsed file '%s'\n"

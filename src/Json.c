@@ -452,9 +452,9 @@ static void JsonState_parseString(JsonState* state, Json* outValue);
 /* @funcdef: JsonState_parseNumber */
 static void JsonState_parseNumber(JsonState* state, Json* outValue)
 {
-    if (JsonState_skipSpace(state) > 0)
+    int c = JsonState_skipSpace(state);
+    if (c > 0)
     {
-		int c = JsonState_peekChar(state);
 		int sign = 1;
 		
 		if (c == '+')
@@ -575,9 +575,6 @@ static void JsonState_parseNumber(JsonState* state, Json* outValue)
 		}
 		else
 		{
-            Json value = { JsonType_Number };
-            value.number = sign * number;
-
             if (exp)
             {
                 int i;
@@ -589,16 +586,21 @@ static void JsonState_parseNumber(JsonState* state, Json* outValue)
                 
                 if (expsgn < 0)
                 {
-                    value.number /= tmp;
+                    number /= tmp;
                 }
                 else
                 {
-                    value.number *= tmp;
+                    number *= tmp;
                 }
             }
 
+            const Json value = { .type = JsonType_Number, .length = 0, .number = number };
             *outValue = value;
 		}
+    }
+    else
+    {
+        Json_panic(state, JsonType_Number, JsonError_UnexpectedToken, "Reached the end of json!");
     }
 }
 
@@ -685,22 +687,17 @@ static void JsonState_parseSingle(JsonState* state, Json* outValue)
 	        }
 
 	        const char* token = state->buffer + state->cursor - length;
-	        if (length == 4 && strncmp(token, "true", 4) == 0)
-	        {
-                outValue->type      = JsonType_Boolean;
-                outValue->length    = 1;
-                outValue->boolean   = true;
-	        }
-	        else if (length == 4 && strncmp(token, "null", 4) == 0)
+            if (length == 4 && strncmp(token, "null", length) == 0)
             {
-                outValue->type      = JsonType_Null;
-                outValue->length    = 1;
+                *outValue = JSON_NULL;
             }
-	        else if (length == 5 && strncmp(token, "false", 5) == 0)
+            else if (length == 4 && strncmp(token, "true", length) == 0)
 	        {
-                outValue->type      = JsonType_Boolean;
-                outValue->length    = 1;
-                outValue->boolean   = false;
+                *outValue = JSON_TRUE;
+	        }
+	        else if (length == 5 && strncmp(token, "false", length) == 0)
+	        {
+                *outValue = JSON_FALSE;
 	        }
 	        else
 	        {
@@ -962,7 +959,7 @@ static Json* JsonState_ParseTopLevel(JsonState* state)
 }
 
 /* @funcdef: JsonParse */
-JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json** result)
+JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json* result)
 {
     if (!jsonCode || jsonCodeLength <= 0)
     {
@@ -984,49 +981,39 @@ JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flag
 
     Json* value = JsonState_ParseTopLevel(&state);
 
-    *result = value;
+    *result = *value;
 
     JsonError error = { state.errnum, state.errmsg };
     return error;
 }
 
 /* @funcdef: JsonEquals */
-bool JsonEquals(const Json* a, const Json* b)
+bool JsonEquals(const Json a, const Json b)
 {
     int i, n;
 
-    if (a == b)
-    {
-        return true;
-    }
-
-    if (!a || !b)
+    if (a.type != b.type)
     {
         return false;
     }
 
-    if (a->type != b->type)
-    {
-        return false;
-    }
-
-    switch (a->type)
+    switch (a.type)
     {
     case JsonType_Null:
         return true;
 
     case JsonType_Number:
-        return a->number == b->number;
+        return a.number == b.number;
 
     case JsonType_Boolean:
-        return a->boolean == b->boolean;
+        return a.boolean == b.boolean;
 
     case JsonType_Array:
-        if ((n = a->length) == a->length)
+        if ((n = a.length) == a.length)
         {
             for (i = 0; i < n; i++)
             {
-                if (!JsonEquals(&a->array[i], &b->array[i]))
+                if (!JsonEquals(a.array[i], b.array[i]))
                 {
                     return false;
                 }
@@ -1035,16 +1022,16 @@ bool JsonEquals(const Json* a, const Json* b)
         return true;
 
     case JsonType_Object:
-        if ((n = a->length) == b->length)
+        if ((n = a.length) == b.length)
         {
             for (i = 0; i < n; i++)
             {
-                if (strncmp(a->object[i].name, b->object[i].name, n) != 0)
+                if (strncmp(a.object[i].name, b.object[i].name, n) != 0)
                 {
                     return false;
                 }
 
-                if (!JsonEquals(&a->object[i].value, &b->object[i].value))
+                if (!JsonEquals(a.object[i].value, b.object[i].value))
                 {
                     return false;
                 }
@@ -1053,28 +1040,30 @@ bool JsonEquals(const Json* a, const Json* b)
         return true;
 
     case JsonType_String:
-        return a->length == b->length && strncmp(a->string, b->string, a->length) == 0;
+        return a.length == b.length && strncmp(a.string, b.string, a.length) == 0;
     }
 
     return false;
 }
 
 /* @funcdef: JsonFind */
-const Json* JsonFind(const Json* obj, const char* name)
+bool JsonFind(const Json parent, const char* name, Json* result)
 {
-    if (obj && obj->type == JsonType_Object)
+    if (parent.type == JsonType_Object)
     {
         int i, n;
         int len  = (int)strlen(name);
-        for (i = 0, n = obj->length; i < n; i++)
+        for (i = 0, n = parent.length; i < n; i++)
         {
-            JsonObjectMember* member = &obj->object[i];
+            const JsonObjectMember* member = &parent.object[i];
             if (strncmp(name, member->name, len) == 0)
             {
-                return &member->value;
+                *result = member->value;
+                return true;
             }
         }
     }
 
-    return NULL;
+    *result = JSON_NULL;
+    return false;
 }

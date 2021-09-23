@@ -59,11 +59,10 @@ int main(int argc, char* argv[])
 	        }
 	        else
             {
-                Json* value;
-                JsonError error = JsonParse(json, strlen(json), JsonFlags_NoStrictTopLevel, allocatorBuffer, allocatorCapacity, &value);
+                const Json value;
+                const JsonError error = JsonParse(json, strlen(json), JsonFlags_NoStrictTopLevel, allocatorBuffer, allocatorCapacity, (Json*)&value);
                 if (error.code != JsonError_None)
                 {
-                    value = NULL;
                     printf("[ERROR]: %s\n", error.message);
                 }
                 else
