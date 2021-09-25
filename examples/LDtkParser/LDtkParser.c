@@ -11,6 +11,13 @@ LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, in
         return error;
     }
 
+    const Json jsonLevel;
+    if (!JsonFind(json, "levels", (Json*)&jsonLevel))
+    {
+        const LDtkError error = { LDtkErrorCode_MissingLevels, "'levels' is not found" };
+        return error;
+    }
+
     const LDtkError error = { LDtkErrorCode_None, "" };
     return error;
 }

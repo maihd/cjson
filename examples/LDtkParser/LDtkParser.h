@@ -123,6 +123,7 @@ typedef enum LDtkErrorCode
 {
     LDtkErrorCode_None,
     LDtkErrorCode_ParseJsonFailed,
+    LDtkErrorCode_MissingLevels,
 } LDtkErrorCode;
 
 typedef struct LDtkError
