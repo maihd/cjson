@@ -48,4 +48,9 @@
       <Filter>Source Files\json</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\..\src\Json.natvis">
+      <Filter>Source Files\json</Filter>
+    </Natvis>
+  </ItemGroup>
 </Project>

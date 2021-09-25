@@ -187,6 +187,9 @@
     <ClInclude Include="..\src\Json.h" />
     <ClInclude Include="..\src\JsonUtils.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\src\Json.natvis" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

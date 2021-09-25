@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="Json">
+    <DisplayString Condition="type == JsonType_Null">[Null]</DisplayString>
+    <DisplayString Condition="type == JsonType_Boolean">[Boolean] {boolean}</DisplayString>
+    <DisplayString Condition="type == JsonType_Number">[Number] {number}</DisplayString>
+    <DisplayString Condition="type == JsonType_String">[String] {string}</DisplayString>
+    <DisplayString Condition="type == JsonType_Array">[Array] [{length}]</DisplayString>
+    <DisplayString Condition="type == JsonType_Object">[Object] [{length}] </DisplayString>
+    <Expand>
+      <Item Name="[type]">type</Item>
+      <Item Name="[length]">length</Item>
+      
+      <ArrayItems Condition="type == JsonType_Array">
+        <Size>length</Size>
+        <ValuePointer>array</ValuePointer>
+      </ArrayItems>
+      
+      <ArrayItems Condition="type == JsonType_Object">
+        <Size>length</Size>
+        <ValuePointer>object</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>

@@ -31,6 +31,9 @@
     <ClInclude Include="..\..\src\Json.h" />
     <ClInclude Include="..\..\src\JsonUtils.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\..\src\Json.natvis" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{09687788-A5F3-4825-BE81-F47BD1F8B124}</ProjectGuid>

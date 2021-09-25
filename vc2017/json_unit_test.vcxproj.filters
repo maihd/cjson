@@ -33,4 +33,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\src\Json.natvis">
+      <Filter>Source Files</Filter>
+    </Natvis>
+  </ItemGroup>
 </Project>
