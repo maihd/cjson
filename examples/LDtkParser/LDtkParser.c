@@ -18,6 +18,8 @@ LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, in
         return error;
     }
 
+    
+
     const LDtkError error = { LDtkErrorCode_None, "" };
     return error;
 }

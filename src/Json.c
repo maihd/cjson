@@ -313,7 +313,7 @@ static void JsonState_Init(JsonState* state, const char* jsonCode, int32_t jsonL
 		state->buffer       = jsonCode;
 		state->length       = jsonLength;
 
-		state->errmsg       = NULL;
+		state->errmsg       = "";
 		state->errnum       = JsonError_None;
 
         state->allocator    = allocator;
