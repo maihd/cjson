@@ -53,6 +53,8 @@ lib:
 	@echo "#endif /* JSON_UTILS_IMPL */"	>> JsonUtils.h
 	@echo ""                        		>> JsonUtils.h
 
+	@cat ./src/Json.natvis					>> Json.natvis
+
 	@$(CC) -o json_build_test.exe json_build_test.c && rm json_build_test.exe 	\
 		&& echo "Make single header library success." 							\
 		|| echo "Make single header library failed."
