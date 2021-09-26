@@ -2,10 +2,10 @@
 Simple JSON parser written in C99
 
 ## Category
-1. [Features](#features)
-2. [Build Instructions](#build)
-3. [Examples](#examples)
-4. [API](#api)
+- [Features](#features)
+- [Build Instructions](#build)
+- [Examples](#examples)
+- [API](#api)
 
 ## Features
 - Simple, small and easy to use, integration.
