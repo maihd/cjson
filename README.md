@@ -3,9 +3,9 @@ Simple JSON parser written in C99
 
 ## Category
 - [Features](#features)
-- [Build Instructions](#build)
 - [Examples](#examples)
 - [API](#api)
+- [Build Instructions](#build-instructions)
 
 ## Features
 - Simple, small and easy to use, integration.
@@ -13,18 +13,6 @@ Simple JSON parser written in C99
 - Single responsibility: when work with json in C, we only need parse the json string to C value. Json stringify is easy to implement in C.
 - No memory allocations, linear memory layout, cache friendly.
 - Well-tested eith some real-world examples.
-
-## Build
-```
-# Run REPL test
-make test
-
-# Run unit tests
-make unit_test
-
-# Make single header libary (when you want to make sure Json.h/JsonEx.h is the newest version)
-make lib
-```
 
 ## Examples
 Belove code from Json_TokenTest.c:
@@ -145,4 +133,17 @@ static const Json JSON_FALSE    = { JsonType_Boolean, 0, false };
 JSON_API JsonError  JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json* result);
 JSON_API bool       JsonEquals(const Json a, const Json b);
 JSON_API bool       JsonFind(const Json parent, const char* name, Json* result);
+```
+
+## Build Instructions
+This project is a single-header-only library, user is free to choose build system. This instructions are for development only.
+```
+# Run REPL test
+make test
+
+# Run unit tests
+make unit_test
+
+# Make single header libary (when you want to make sure Json.h/JsonEx.h is the newest version)
+make lib
 ```
