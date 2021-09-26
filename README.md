@@ -1,6 +1,12 @@
 # Introduction ![Build Status](https://github.com/maihd/cjson/actions/workflows/unit-tests.yml/badge.svg) [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 Simple JSON parser written in C99
 
+## Category
+1. [Features](#features)
+2. [Build Instructions](#build)
+3. [Examples](#examples)
+4. [API](#api)
+
 ## Features
 - Simple, small and easy to use, integration.
 - C99 for portability.
