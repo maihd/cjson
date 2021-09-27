@@ -4,7 +4,7 @@
 LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, int32_t bufferSize, LDtkWorld* world)
 {
     const Json json;
-    const JsonError jsonError = JsonParse(content, contentLength, JsonFlags_None, buffer, bufferSize, (Json*)&json);
+    const JsonError jsonError = JsonParse(content, contentLength, JsonParseFlags_Default, buffer, bufferSize, (Json*)&json);
     if (jsonError.code != JsonError_None)
     {
         const LDtkError error = { LDtkErrorCode_ParseJsonFailed, jsonError.message };

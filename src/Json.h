@@ -56,12 +56,14 @@ typedef struct JsonError
 } JsonError;
 
 /// Json parse flags
-typedef enum JsonFlags
+typedef enum JsonParseFlags
 {
-    JsonFlags_None              = 0,
-    JsonFlags_SupportComment    = 1 << 0,
-    JsonFlags_NoStrictTopLevel  = 1 << 1,
-} JsonFlags;
+    JsonParseFlags_None             = 0,
+    JsonParseFlags_SupportComment   = 1 << 0,
+    JsonParseFlags_NoStrictTopLevel = 1 << 1,
+
+    JsonParseFlags_Default          = JsonParseFlags_None,
+} JsonParseFlags;
 
 typedef struct Json             Json;
 typedef struct JsonObjectMember JsonObjectMember;
@@ -93,7 +95,7 @@ static const Json JSON_NULL     = { JsonType_Null   , 0             };
 static const Json JSON_TRUE     = { JsonType_Boolean, 0, { true  }  };
 static const Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
 
-JSON_API JsonError  JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonFlags flags, void* buffer, int32_t bufferSize, Json* result);
+JSON_API JsonError  JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* result);
 JSON_API bool       JsonEquals(const Json a, const Json b);
 JSON_API bool       JsonFind(const Json parent, const char* name, Json* result);
 

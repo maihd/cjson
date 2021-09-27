@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
 
             double dt = gettime();
             const Json value;
-            const JsonError error = JsonParse(fileBuffer, filesize, JsonFlags_None, allocatorBuffer, allocatorCapacity, (Json*)&value);
+            const JsonError error = JsonParse(fileBuffer, filesize, JsonParseFlags_Default, allocatorBuffer, allocatorCapacity, (Json*)&value);
             if (error.code != JsonError_None)
             {
                 fprintf(stderr, "Parsing file '%s' error: %s\n", filename, error.message);
