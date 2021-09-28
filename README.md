@@ -8,6 +8,7 @@ Simple JSON parser written in C99
 - [Examples](#examples)
 - [API](#api)
 - [Build Instructions](#build-instructions)
+- [FAQs](#faqs)
 
 ## Features
 - Simple, small and easy to use, integration.
@@ -149,3 +150,10 @@ make unit_test
 # Make single header libary (when you want to make sure Json.h/JsonEx.h is the newest version)
 make lib
 ```
+
+## FAQs
+Q. Why another json parser?
+A. When I first read an article about common mistake of c libraries are do much dynamic allocations and have no custom allocators. So I create this projects to learn to make good library in C.
+
+Q. You said custom allocators, but I donot find one?
+A. First version there is a custom allocator interface. But after the long run, I found the memory of Json was throw away, so dynamic allocators are expensive for that. Now we just given a temporary buffer to parser, and there is a linear allocator in internal. So no dynamic allocations.
