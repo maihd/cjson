@@ -34,7 +34,9 @@ typedef struct LDtkColor
 typedef struct LDtkEnum
 {
     const char* name;
+    const char* value;
     LDtkColor   color;
+    int32_t     index;
 } LDtkEnum;
 
 typedef struct LDtkEntity
@@ -121,6 +123,15 @@ typedef struct LDtkWorld
 
     int32_t         tilesetCount;
     LDtkTileset*    tilesets;
+
+    int32_t         enumCount;
+    LDtkEnum*       enums;
+
+    int32_t         layerCount;
+    LDtkLayer*      layers;
+
+    int32_t         enityCount;
+    LDtkEntity*     entities;
 
     int32_t         levelCount;
     LDtkLevel*      levels;
