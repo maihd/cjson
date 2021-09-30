@@ -112,6 +112,13 @@ typedef struct LDtkLevel
 
 typedef struct LDtkWorld
 {
+    LDtkWorldLayout layout;
+    LDtkColor       backgroundColor;
+
+    float           defaultPivotX;
+    float           defaultPivotY;
+    int32_t         defaultGridSize;
+
     int32_t         tilesetCount;
     LDtkTileset*    tilesets;
 
@@ -123,6 +130,7 @@ typedef enum LDtkErrorCode
 {
     LDtkErrorCode_None,
     LDtkErrorCode_ParseJsonFailed,
+    LDtkErrorCode_MissingSettings,
     LDtkErrorCode_MissingLevels,
 } LDtkErrorCode;
 
