@@ -32,12 +32,12 @@ static LDtkColor LDtkColorFromString(const char* value)
     return color;
 }
 
-static LDtkError LDtkReadSettings(const Json json, LDtkWorld* world)
+static LDtkError LDtkReadWorldProperties(const Json json, LDtkWorld* world)
 {
     const Json jsonDefaultPivotX;
     if (!JsonFind(json, "defaultPivotX", (Json*)&jsonDefaultPivotX))
     {
-        const LDtkError error = { LDtkErrorCode_MissingSettings, "'defaultPivotX' is not found" };
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'defaultPivotX' is not found" };
         return error;
     }
     world->defaultPivotX = (float)jsonDefaultPivotX.number;
@@ -45,7 +45,7 @@ static LDtkError LDtkReadSettings(const Json json, LDtkWorld* world)
     const Json jsonDefaultPivotY;
     if (!JsonFind(json, "defaultPivotY", (Json*)&jsonDefaultPivotY))
     {
-        const LDtkError error = { LDtkErrorCode_MissingSettings, "'defaultPivotY' is not found" };
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'defaultPivotY' is not found" };
         return error;
     }
     world->defaultPivotY = (float)jsonDefaultPivotY.number;
@@ -53,7 +53,7 @@ static LDtkError LDtkReadSettings(const Json json, LDtkWorld* world)
     const Json jsonDefaultGridSize;
     if (!JsonFind(json, "defaultGridSize", (Json*)&jsonDefaultGridSize))
     {
-        const LDtkError error = { LDtkErrorCode_MissingSettings, "'defaultGridSize' is not found" };
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'defaultGridSize' is not found" };
         return error;
     }
     world->defaultGridSize = (int32_t)jsonDefaultGridSize.number;
@@ -61,7 +61,7 @@ static LDtkError LDtkReadSettings(const Json json, LDtkWorld* world)
     const Json jsonBackgroundColor;
     if (!JsonFind(json, "bgColor", (Json*)&jsonBackgroundColor))
     {
-        const LDtkError error = { LDtkErrorCode_MissingSettings, "'bgColor' is not found" };
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'bgColor' is not found" };
         return error;
     }
     world->backgroundColor = LDtkColorFromString(jsonBackgroundColor.string);
@@ -69,7 +69,7 @@ static LDtkError LDtkReadSettings(const Json json, LDtkWorld* world)
     const Json jsonWorldLayoutName;
     if (!JsonFind(json, "worldLayout", (Json*)&jsonWorldLayoutName))
     {
-        const LDtkError error = { LDtkErrorCode_MissingSettings, "'worldLayout' is not found" };
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'worldLayout' is not found" };
         return error;
     }
     const char* worldLayoutName = jsonWorldLayoutName.string;
@@ -104,10 +104,10 @@ LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, in
         return error;
     }
 
-    const LDtkError readSettingsError = LDtkReadSettings(json, world);
-    if (readSettingsError.code != LDtkErrorCode_None)
+    const LDtkError readPropertiesError = LDtkReadWorldProperties(json, world);
+    if (readPropertiesError.code != LDtkErrorCode_None)
     {
-        return readSettingsError;
+        return readPropertiesError;
     }
 
     const Json jsonLevel;

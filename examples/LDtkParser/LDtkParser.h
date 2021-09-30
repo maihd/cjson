@@ -130,7 +130,7 @@ typedef enum LDtkErrorCode
 {
     LDtkErrorCode_None,
     LDtkErrorCode_ParseJsonFailed,
-    LDtkErrorCode_MissingSettings,
+    LDtkErrorCode_MissingWorldProperties,
     LDtkErrorCode_MissingLevels,
 } LDtkErrorCode;
 
