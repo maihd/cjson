@@ -157,3 +157,6 @@ When I first read an article about common mistake of c libraries are do much dyn
 
 ### You said custom allocators, but I donot find one?
 In the first version there is a custom allocator interface. But after the long run, I found the memory of Json was throw away at one, so dynamic allocators are expensive for that. Now we just given a temporary buffer to parser, and there is a linear allocator in internal. So no dynamic allocations.
+
+### Where stringify/serialize functions?
+It easy to write an JsonStringify version, but the real problem in C is not that simple. You need to create Json value, create Json may need memory, so we need to care about memory allocation. That headache! Fortunately, C is static type language, so we can easily convert out data structure/object to json easily base on its types.
