@@ -160,3 +160,6 @@ In the first version there is a custom allocator interface. But after the long r
 
 ### Where stringify/serialize functions?
 It easy to write an JsonStringify version, but the real problem in C is not that simple. You need to create Json value, create Json may need memory, so we need to care about memory allocation. That headache! Fortunately, C is static type language, so we can easily convert out data structure/object to json easily base on its types.
+
+### I don't like CamelCase!!!
+Just rename, update, change what you not like with your code editor.
