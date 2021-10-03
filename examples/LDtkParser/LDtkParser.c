@@ -115,6 +115,13 @@ LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, in
         return readPropertiesError;
     }
 
+    const Json jsonDefs;
+    if (!JsonFind(json, "defs", (Json*)&jsonDefs))
+    {
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'defs' is not found" };
+        return error;
+    }
+
     const Json jsonLevel;
     if (!JsonFind(json, "levels", (Json*)&jsonLevel))
     {
