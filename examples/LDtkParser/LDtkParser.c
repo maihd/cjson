@@ -89,6 +89,11 @@ static LDtkError LDtkReadWorldProperties(const Json json, LDtkWorld* world)
     {
         world->layout = LDtkWorldLayout_LinearVertical;
     }
+    else
+    {
+        const LDtkError error = { LDtkErrorCode_InvalidWorldProperties, "Unknown GridLayout" };
+        return error;
+    }
 
     const LDtkError error = { LDtkErrorCode_None, "" };
     return error;

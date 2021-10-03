@@ -141,8 +141,10 @@ typedef enum LDtkErrorCode
 {
     LDtkErrorCode_None,
     LDtkErrorCode_ParseJsonFailed,
-    LDtkErrorCode_MissingWorldProperties,
     LDtkErrorCode_MissingLevels,
+
+    LDtkErrorCode_MissingWorldProperties,
+    LDtkErrorCode_InvalidWorldProperties,
 } LDtkErrorCode;
 
 typedef struct LDtkError
