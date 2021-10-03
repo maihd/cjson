@@ -305,7 +305,11 @@ JSON_INLINE void* JsonTempArray_ToBufferFunc(void* buffer, int32_t count, void* 
     int total = count + JsonArray_GetCount(dynamicBuffer);
     if (total > 0)
     {
-        void* array = (JsonArray*)JsonAllocator_AllocLower(allocator, NULL, 0, total * itemSize);
+        // Aligned total
+        const int32_t mod = (total * itemSize) & (sizeof(Json) - 1);
+        const int32_t size = total * itemSize + (mod != 0) * (sizeof(Json) - mod);
+
+        void* array = (JsonArray*)JsonAllocator_AllocLower(allocator, NULL, 0, size);
         if (array)
         {
             memcpy(array, buffer, count * itemSize);
@@ -1086,8 +1090,12 @@ JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags
         return error;
     }
 
+    // Aligned buffer for cache-friendly processing
+    void* alignedBuffer = (uint8_t*)buffer + (((uint64_t)buffer) & (sizeof(Json) - 1));
+    int32_t alignedBufferSize = bufferSize - ((uint8_t*)alignedBuffer - (uint8_t*)buffer);
+
     JsonAllocator tempAllocator;
-    JsonAllocator_Init(&tempAllocator, buffer, bufferSize);
+    JsonAllocator_Init(&tempAllocator, alignedBuffer, alignedBufferSize);
 
     JsonParser parser;
     JsonParser_Init(&parser, jsonCode, jsonCodeLength, tempAllocator, flags);
