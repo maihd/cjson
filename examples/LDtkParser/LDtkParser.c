@@ -99,13 +99,68 @@ static LDtkError LDtkReadWorldProperties(const Json json, LDtkWorld* world)
     return error;
 }
 
+static LDtkError LDtkReadEnums(const Json jsonDefs, LDtkWorld* world)
+{
+    const Json jsonEnumDefs;
+    if (!JsonFind(jsonDefs, "enums", (Json*)&jsonEnumDefs))
+    {
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'defs.enums' is not found" };
+        return error;
+    }
+
+    const LDtkError error = { LDtkErrorCode_None, "" };
+    return error;
+}
+
+static LDtkError LDtkReadTilesets(const Json jsonDefs, LDtkWorld* world)
+{
+    const Json jsonTilesets;
+    if (!JsonFind(jsonDefs, "tilesets", (Json*)&jsonTilesets))
+    {
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'defs.tilesets' is not found" };
+        return error;
+    }
+
+    const LDtkError error = { LDtkErrorCode_None, "" };
+    return error;
+}
+
+static LDtkError LDtkReadLayerDefs(const Json jsonDefs, LDtkWorld* world)
+{
+    const Json jsonLayerDefs;
+    if (!JsonFind(jsonDefs, "layers", (Json*)&jsonLayerDefs))
+    {
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'defs.layers' is not found" };
+        return error;
+    }
+
+    const int32_t layerDefCount = jsonLayerDefs.length;
+    LDtkLayerDef* layerDefs = malloc();
+
+    const LDtkError error = { LDtkErrorCode_None, "" };
+    return error;
+}
+
+static LDtkError LDtkReadEntityDefs(const Json jsonDefs, LDtkWorld* world)
+{
+    const Json jsonEntityDefs;
+    if (!JsonFind(jsonDefs, "entities", (Json*)&jsonEntityDefs))
+    {
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'defs.entities' is not found" };
+        return error;
+    }
+
+    const LDtkError error = { LDtkErrorCode_None, "" };
+    return error;
+}
+
 LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, int32_t bufferSize, LDtkWorld* world)
 {
     const Json json;
-    const JsonError jsonError = JsonParse(content, contentLength, JsonParseFlags_Default, buffer, bufferSize, (Json*)&json);
-    if (jsonError.code != JsonError_None)
+    const JsonResult jsonResult = JsonParse(content, contentLength, JsonParseFlags_Default, buffer, bufferSize, (Json*)&json);
+    if (jsonResult.error != JsonError_None)
     {
-        const LDtkError error = { LDtkErrorCode_ParseJsonFailed, jsonError.message };
+        const LDtkError error = { LDtkErrorCode_ParseJsonFailed, jsonResult.message };
         return error;
     }
 
@@ -120,6 +175,32 @@ LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, in
     {
         const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'defs' is not found" };
         return error;
+    }
+
+    LDtkError readDefsError;
+
+    readDefsError = LDtkReadEnums(jsonDefs, world);
+    if (readDefsError.code != LDtkErrorCode_None)
+    {
+        return readDefsError;
+    }
+
+    readDefsError = LDtkReadTilesets(jsonDefs, world);
+    if (readDefsError.code != LDtkErrorCode_None)
+    {
+        return readDefsError;
+    }
+
+    readDefsError = LDtkReadLayerDefs(jsonDefs, world);
+    if (readDefsError.code != LDtkErrorCode_None)
+    {
+        return readDefsError;
+    }
+
+    readDefsError = LDtkReadEntityDefs(jsonDefs, world);
+    if (readDefsError.code != LDtkErrorCode_None)
+    {
+        return readDefsError;
     }
 
     const Json jsonLevel;

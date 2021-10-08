@@ -28,7 +28,7 @@ typedef enum JsonType
 } JsonType;
 
 /// JSON error code
-typedef enum JsonErrorCode
+typedef enum JsonError
 {
     JsonError_None,
 
@@ -46,14 +46,15 @@ typedef enum JsonErrorCode
     JsonError_InvalidValue,
     JsonError_InternalFatal,
 
-} JsonErrorCode;
+} JsonError;
 
 /// JSON error information
-typedef struct JsonError
+typedef struct JsonResult
 {
-    JsonErrorCode   code;
+    JsonError       error;
     const char*     message;
-} JsonError;
+    int32_t         memoryUsage;
+} JsonResult;
 
 /// Json parse flags
 typedef enum JsonParseFlags
@@ -95,9 +96,14 @@ static const Json JSON_NULL     = { JsonType_Null   , 0             };
 static const Json JSON_TRUE     = { JsonType_Boolean, 0, { true  }  };
 static const Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
 
-JSON_API JsonError  JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* result);
+JSON_API JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* outValue);
 JSON_API bool       JsonEquals(const Json a, const Json b);
 JSON_API bool       JsonFind(const Json parent, const char* name, Json* result);
+
+static inline bool JsonValidType(const Json json)
+{
+    return json.type >= JsonType_Null && json.type <= JsonType_Boolean;
+}
 
 /* END OF EXTERN "C" */
 #ifdef __cplusplus

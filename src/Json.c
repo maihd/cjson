@@ -224,14 +224,14 @@ struct JsonParser
     int32_t             length;         /* Reference only */
     const char*         buffer;         /* Reference only */
     
-    JsonErrorCode       errnum;
+    JsonError           errnum;
     char*               errmsg;
     jmp_buf             errjmp;
 
     JsonAllocator       allocator;      /* Runtime allocator */
 };
 
-static void JsonParser_SetErrorWithArgs(JsonParser* parser, JsonType type, JsonErrorCode code, const char* fmt, va_list valist)
+static void JsonParser_SetErrorWithArgs(JsonParser* parser, JsonType type, JsonError code, const char* fmt, va_list valist)
 {
     const int errmsg_size = 1024;
 
@@ -286,7 +286,7 @@ static void JsonParser_SetErrorWithArgs(JsonParser* parser, JsonType type, JsonE
 }
 
 /* @funcdef: JsonParser_SetError */
-static void JsonParser_SetError(JsonParser* parser, JsonType type, JsonErrorCode code, const char* fmt, ...)
+static void JsonParser_SetError(JsonParser* parser, JsonType type, JsonError code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
@@ -295,7 +295,7 @@ static void JsonParser_SetError(JsonParser* parser, JsonType type, JsonErrorCode
 }
 
 /* funcdef: JsonParser_Panic */
-static void JsonParser_Panic(JsonParser* parser, JsonType type, JsonErrorCode code, const char* fmt, ...)
+static void JsonParser_Panic(JsonParser* parser, JsonType type, JsonError code, const char* fmt, ...)
 {
     va_list varg;
     va_start(varg, fmt);
@@ -318,7 +318,7 @@ static void JsonParser_Init(JsonParser* parser, const char* jsonCode, int32_t js
 		parser->buffer       = jsonCode;
 		parser->length       = jsonLength;
 
-		parser->errmsg       = "";
+		parser->errmsg       = "Success!";
 		parser->errnum       = JsonError_None;
 
         parser->allocator    = allocator;
@@ -964,18 +964,20 @@ static Json* JsonState_ParseTopLevel(JsonParser* parser)
 }
 
 /* @funcdef: JsonParse */
-JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* result)
+JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* outValue)
 {
+    JSON_ASSERT(outValue, "outValue mustnot be null");
+
     if (!jsonCode || jsonCodeLength <= 0)
     {
-        JsonError error = { JsonError_WrongFormat, "Json code is not valid" };
-        return error;
+        const JsonResult result = { JsonError_WrongFormat, "Json code is not valid", 0 };
+        return result;
     }
 
     if (!buffer || bufferSize < sizeof(JsonParser))
     {
-        JsonError error = { JsonError_OutOfMemory, "Buffer is too small" };
-        return error;
+        const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", 0 };
+        return result;
     }
 
     // Aligned buffer for cache-friendly processing
@@ -990,17 +992,15 @@ JsonError JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags
 
     Json* value = JsonState_ParseTopLevel(&parser);
 
-    *result = *value;
+    *outValue = *value;
 
-    JsonError error = { parser.errnum, parser.errmsg };
-    return error;
+    const JsonResult result = { parser.errnum, parser.errmsg, (int32_t)(parser.allocator.lowerMarker - parser.allocator.buffer) };
+    return result;
 }
 
 /* @funcdef: JsonEquals */
 bool JsonEquals(const Json a, const Json b)
 {
-    int i, n;
-
     if (a.type != b.type)
     {
         return false;
@@ -1017,10 +1017,11 @@ bool JsonEquals(const Json a, const Json b)
     case JsonType_Boolean:
         return a.boolean == b.boolean;
 
-    case JsonType_Array:
+    case JsonType_Array: {
+        int32_t n;
         if ((n = a.length) == a.length)
         {
-            for (i = 0; i < n; i++)
+            for (int32_t i = 0; i < n; i++)
             {
                 if (!JsonEquals(a.array[i], b.array[i]))
                 {
@@ -1028,12 +1029,15 @@ bool JsonEquals(const Json a, const Json b)
                 }
             }
         }
-        return true;
 
-    case JsonType_Object:
+        return true;
+    }
+
+    case JsonType_Object: {
+        int32_t n;
         if ((n = a.length) == b.length)
         {
-            for (i = 0; i < n; i++)
+            for (int32_t i = 0; i < n; i++)
             {
                 if (strncmp(a.object[i].name, b.object[i].name, n) != 0)
                 {
@@ -1046,10 +1050,16 @@ bool JsonEquals(const Json a, const Json b)
                 }
             }
         }
+
         return true;
+    }
 
     case JsonType_String:
         return a.length == b.length && strncmp(a.string, b.string, a.length) == 0;
+
+    default:
+        JSON_ASSERT(false, "invalid json type");
+        break;
     }
 
     return false;
@@ -1058,13 +1068,18 @@ bool JsonEquals(const Json a, const Json b)
 /* @funcdef: JsonFind */
 bool JsonFind(const Json parent, const char* name, Json* result)
 {
+    JSON_ASSERT(result, "result mustnot be null");
+    JSON_ASSERT(JsonValidType(parent), "invalid json type");
+    JSON_ASSERT(name, "Attempt using nullptr as string");
+
     if (parent.type == JsonType_Object)
     {
-        int i, n;
-        int len  = (int)strlen(name);
-        for (i = 0, n = parent.length; i < n; i++)
+        const int32_t len = (int32_t)strlen(name);
+        for (int32_t i = 0, n = parent.length; i < n; i++)
         {
             const JsonObjectMember* member = &parent.object[i];
+            JSON_ASSERT(JsonValidType(member->value), "invalid json type");
+
             if (strncmp(name, member->name, len) == 0)
             {
                 *result = member->value;

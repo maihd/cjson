@@ -63,10 +63,10 @@ int main(int argc, char* argv[])
 
             double dt = gettime();
             const Json value;
-            const JsonError error = JsonParse(fileBuffer, filesize, JsonParseFlags_Default, allocatorBuffer, allocatorCapacity, (Json*)&value);
-            if (error.code != JsonError_None)
+            const JsonResult result = JsonParse(fileBuffer, filesize, JsonParseFlags_Default, allocatorBuffer, allocatorCapacity, (Json*)&value);
+            if (result.error != JsonError_None)
             {
-                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, error.message);
+                fprintf(stderr, "Parsing file '%s' error: %s\n", filename, result.message);
                 return 1;
             }
             dt = gettime() - dt;
@@ -88,7 +88,8 @@ int main(int argc, char* argv[])
             printf(
                 "Parsed file '%s'\n"
                 "\t- file size:\t%dB\n"
-                "\t- times:\t%lfs\n\n", filename, filesize, dt);
+                "\t- memory:\t%dB\n"
+                "\t- times:\t%lfs\n\n", filename, filesize, result.memoryUsage, dt);
         }
     }
 
