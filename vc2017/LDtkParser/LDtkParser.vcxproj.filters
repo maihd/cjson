@@ -52,5 +52,6 @@
     <Natvis Include="..\..\src\Json.natvis">
       <Filter>Source Files\json</Filter>
     </Natvis>
+    <Natvis Include="..\..\examples\LDtkParser\LDtkParser.natvis" />
   </ItemGroup>
 </Project>

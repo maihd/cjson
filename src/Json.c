@@ -306,23 +306,24 @@ static void JsonParser_Panic(JsonParser* parser, JsonType type, JsonError code, 
 }
 
 /* @funcdef: JsonParser_Init */
-static void JsonParser_Init(JsonParser* parser, const char* jsonCode, int32_t jsonLength, JsonAllocator allocator, JsonParseFlags flags)
+static bool JsonParser_Init(JsonParser* parser, const char* jsonCode, int32_t jsonLength, JsonAllocator allocator, JsonParseFlags flags)
 {
-    if (parser)
-    {
-        parser->flags        = flags;
+    JSON_ASSERT(parser, "parser mustnot be null");
 
-		parser->line         = 1;
-		parser->column       = 1;
-		parser->cursor       = 0;
-		parser->buffer       = jsonCode;
-		parser->length       = jsonLength;
+    parser->flags        = flags;
 
-		parser->errmsg       = "Success!";
-		parser->errnum       = JsonError_None;
+	parser->line         = 1;
+	parser->column       = 1;
+	parser->cursor       = 0;
+	parser->buffer       = jsonCode;
+	parser->length       = jsonLength;
 
-        parser->allocator    = allocator;
-    }
+	parser->errmsg       = "Success!";
+	parser->errnum       = JsonError_None;
+
+    parser->allocator    = allocator;
+
+    return true;
 }
 
 /* @funcdef: JsonParser_IsAtEnd */
@@ -968,32 +969,39 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
 {
     JSON_ASSERT(outValue, "outValue mustnot be null");
 
+    // Validate json input
     if (!jsonCode || jsonCodeLength <= 0)
     {
-        const JsonResult result = { JsonError_WrongFormat, "Json code is not valid", 0 };
-        return result;
-    }
-
-    if (!buffer || bufferSize < sizeof(JsonParser))
-    {
-        const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", 0 };
+        const JsonResult result = { JsonError_WrongFormat, "Json code is empty", 0 };
         return result;
     }
 
     // Aligned buffer for cache-friendly processing
     void* alignedBuffer = (uint8_t*)buffer + (((uint64_t)buffer) & (sizeof(Json) - 1));
     int32_t alignedBufferSize = bufferSize - ((uint8_t*)alignedBuffer - (uint8_t*)buffer);
+    
+    // Create new allocator
+    JsonAllocator allocator;
+    if (!JsonAllocator_Init(&allocator, alignedBuffer, alignedBufferSize))
+    {
+        const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", 0 };
+        return result;
+    }
 
-    JsonAllocator tempAllocator;
-    JsonAllocator_Init(&tempAllocator, alignedBuffer, alignedBufferSize);
-
+    // Create parser
     JsonParser parser;
-    JsonParser_Init(&parser, jsonCode, jsonCodeLength, tempAllocator, flags);
-
+    if (!JsonParser_Init(&parser, jsonCode, jsonCodeLength, allocator, flags))
+    {
+        const JsonResult result = { JsonError_InternalFatal, "Wrong behaviour when create new parser", 0 };
+        return result;
+    }
+    
+    // Parse the top level
     Json* value = JsonState_ParseTopLevel(&parser);
-
+    JSON_ASSERT(value, "value mustnot be null");
     *outValue = *value;
 
+    // Done!
     const JsonResult result = { parser.errnum, parser.errmsg, (int32_t)(parser.allocator.lowerMarker - parser.allocator.buffer) };
     return result;
 }

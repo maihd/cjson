@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="LDtkWorld">
+    <Expand>
+      <!-- LayerDef -->
+      <Item Name="layerDefsCount">layerDefCount</Item>
+      <Synthetic Name="layerDefs">
+        <DisplayString>{layerDefCount} LayerDefs</DisplayString>
+        <Expand>
+          <ArrayItems>
+            <Size>layerDefCount</Size>
+            <ValuePointer>layerDefs</ValuePointer>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+    </Expand>
+  </Type>
+</AutoVisualizer>

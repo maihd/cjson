@@ -10,11 +10,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-
-// Define boolean type
-#if !defined(__cplusplus)
 #include <stdbool.h>
-#endif
 
 /// JSON type of json value
 typedef enum JsonType

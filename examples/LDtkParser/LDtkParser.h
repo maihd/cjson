@@ -185,7 +185,7 @@ typedef struct LDtkLayerDef
 
     LDtkLayerType       type;
 
-    int32_t             cellSize;
+    int32_t             gridSize;
     float               opacity;
 
     int32_t             offsetX;
@@ -193,7 +193,7 @@ typedef struct LDtkLayerDef
 
     float               tilePivotX;
     float               tilePivotY;
-    LDtkTileset*        tileset;
+    int32_t             tilesetDefId;
 
     int32_t             intGridValueCount;
     LDtkIntGridValue*   intGridValues;
@@ -252,6 +252,11 @@ typedef enum LDtkErrorCode
 
     LDtkErrorCode_MissingWorldProperties,
     LDtkErrorCode_InvalidWorldProperties,
+
+    LDtkErrorCode_MissingLayerDefProperties,
+    LDtkErrorCode_InvalidLayerDefProperties,
+
+    LDtkErrorCode_OutOfMemory
 } LDtkErrorCode;
 
 typedef struct LDtkError
