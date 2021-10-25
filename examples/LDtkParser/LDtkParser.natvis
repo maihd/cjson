@@ -2,17 +2,32 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
   <Type Name="LDtkWorld">
     <Expand>
+      <Item Name="layout">layout</Item>
+      <Item Name="backgroundColor">backgroundColor</Item>
+
+      <Item Name="defaultPivotX">defaultPivotX</Item>
+      <Item Name="defaultPivotY">defaultPivotY</Item>
+      <Item Name="defaultGridSize">defaultGridSize</Item>
+
+      <!-- LDtkTileset -->
+      <Item Name="tilesetCount">tilesetCount</Item>
+      <Item Name="tilesets">tilesets,[tilesetCount]</Item>
+
+      <!-- LDtkEnum -->
+      <Item Name="enumCount">enumCount</Item>
+      <Item Name="enums">enums,[enumCount]</Item>
+
+      <!-- LDtkEntityDef -->
+      <Item Name="entityDefCount">entityDefCount</Item>
+      <Item Name="entityDefs">entityDefs,[entityDefCount]</Item>
+      
       <!-- LayerDef -->
       <Item Name="layerDefsCount">layerDefCount</Item>
-      <Synthetic Name="layerDefs">
-        <DisplayString>{layerDefCount} LayerDefs</DisplayString>
-        <Expand>
-          <ArrayItems>
-            <Size>layerDefCount</Size>
-            <ValuePointer>layerDefs</ValuePointer>
-          </ArrayItems>
-        </Expand>
-      </Synthetic>
+      <Item Name="layerDefs">layerDefs,[layerDefCount]</Item>
+
+      <!-- LDtkLevel -->
+      <Item Name="levelCount">levelCount</Item>
+      <Item Name="levels">levels,[levelCount]</Item>
     </Expand>
   </Type>
 </AutoVisualizer>

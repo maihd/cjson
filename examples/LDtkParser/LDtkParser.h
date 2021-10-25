@@ -30,12 +30,24 @@ typedef struct LDtkColor
     uint8_t a;
 } LDtkColor;
 
+typedef struct LDtkEnumValue
+{
+    const char*     name;
+    LDtkColor       color;
+    int32_t         tileId;
+} LDtkEnumValue;
+
 typedef struct LDtkEnum
 {
-    const char* name;
-    const char* value;
-    LDtkColor   color;
-    int32_t     index;
+    int32_t         id;
+    const char*     name;
+    int32_t         tilesetId;
+
+    const char*     externalPath;
+    const char*     externalChecksum;
+
+    int32_t         valueCount;
+    LDtkEnumValue*  values;
 } LDtkEnum;
 
 typedef struct LDtkEntity
@@ -70,8 +82,19 @@ typedef struct LDtkIntGridValue
 
 typedef struct LDtkTileset
 {
+    int32_t     id;
+
     const char* name;   // Name of tileset
     const char* path;   // Relative path to image file
+
+    int32_t     width;
+    int32_t     height;
+
+    int32_t     tileSize;
+    int32_t     spacing;
+    int32_t     padding;
+
+    int32_t     tagsEnumId;
 } LDtkTileset;
 
 typedef struct LDtkTileLayer
@@ -81,7 +104,7 @@ typedef struct LDtkTileLayer
 
     int32_t     cols;
     int32_t     rows;
-    int32_t     cellSize;
+    int32_t     tileSize;
 
     int32_t     offsetX;
     int32_t     offsetY;
@@ -204,8 +227,8 @@ typedef struct LDtkEntityDef
     int32_t         id;
     const char*     name;
     
-    int32_t         rows;
-    int32_t         cols;
+    int32_t         width;
+    int32_t         height;
 
     LDtkColor       color;
     
@@ -213,7 +236,7 @@ typedef struct LDtkEntityDef
     float           pivotY;
     
     int32_t         tileId;
-    LDtkTileset*    tileset;
+    int32_t         tilesetId;
 
     int32_t         tagCount;
     const char**    tags;

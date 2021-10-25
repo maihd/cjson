@@ -72,14 +72,19 @@ static void JsonAllocator_FreeLower(JsonAllocator* allocator, void* buffer, int3
     }
 }
 
-static void* JsonAllocator_AllocLower(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t size)
+static void* JsonAllocator_AllocLower(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t newSize)
 {
     JsonAllocator_FreeLower(allocator, oldBuffer, oldSize);
 
-    if (JsonAllocator_CanAlloc(allocator, size))
+    if (newSize <= 0)
+    {
+        return NULL;
+    }
+
+    if (JsonAllocator_CanAlloc(allocator, newSize))
     {
         void* result = allocator->lowerMarker;
-        allocator->lowerMarker += size;
+        allocator->lowerMarker += newSize;
         return result;
     }
 
@@ -98,6 +103,11 @@ static void JsonAllocator_FreeUpper(JsonAllocator* allocator, void* buffer, int3
 static void* JsonAllocator_AllocUpper(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t newSize)
 {
     JsonAllocator_FreeUpper(allocator, oldBuffer, oldSize);
+
+    if (newSize <= 0)
+    {
+        return NULL;
+    }
 
     if (JsonAllocator_CanAlloc(allocator, newSize))
     {
