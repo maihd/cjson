@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __JSON_H__
+#define __JSON_H__
 
 #ifndef JSON_API
 #define JSON_API
@@ -126,3 +127,5 @@ static inline bool JsonValidType(const Json json)
 }
 #endif
 /* * */
+
+#endif // __JSON_H__

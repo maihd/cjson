@@ -27,23 +27,17 @@ clean:
 lib:
 	@rm -f Json.h JsonEx.h
 
-	@echo "#ifndef __JSON_H__"				>> Json.h
-	@echo "#define __JSON_H__"				>> Json.h
 	@cat ./src/Json.h               		>> Json.h
-	@echo "#endif /* __JSON_H__ */" 		>> Json.h
 	@echo ""                        		>> Json.h
 	@echo "#ifdef JSON_IMPL"        		>> Json.h
-	@echo ""                        		>> Json.h	
+	@echo ""                        		>> Json.h
 	@cat ./src/Json.c               		>> Json.h
 	@echo ""                        		>> Json.h
 	@echo ""                        		>> Json.h
 	@echo "#endif /* JSON_IMPL */"  		>> Json.h
 	@echo ""                        		>> Json.h
 
-	@echo "#ifndef __JSON_UTILS_H__"		>> JsonUtils.h
-	@echo "#define __JSON_UTILS_H__"		>> JsonUtils.h
 	@cat ./src/JsonUtils.h             		>> JsonUtils.h
-	@echo "#endif /* __JSON_UTILS_H__ */" 	>> JsonUtils.h
 	@echo ""                        		>> JsonUtils.h
 	@echo "#ifdef JSON_UTILS_IMPL"        	>> JsonUtils.h
 	@echo ""                        		>> JsonUtils.h	

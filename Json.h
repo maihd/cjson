@@ -1,6 +1,5 @@
 #ifndef __JSON_H__
 #define __JSON_H__
-#pragma once
 
 #ifndef JSON_API
 #define JSON_API
@@ -12,11 +11,11 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-
-// Define boolean type
-#if !defined(__cplusplus)
 #include <stdbool.h>
-#endif
+
+// -------------------------------------------------------------------
+// Types
+// -------------------------------------------------------------------
 
 /// JSON type of json value
 typedef enum JsonType
@@ -94,9 +93,25 @@ struct JsonObjectMember
     Json                    value;
 };
 
+// -------------------------------------------------------------------
+// Constants
+// -------------------------------------------------------------------
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 static const Json JSON_NULL     = { JsonType_Null   , 0             };
 static const Json JSON_TRUE     = { JsonType_Boolean, 0, { true  }  };
 static const Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic warning "-Wmissing-field-initializers"
+#endif
+
+// -------------------------------------------------------------------
+// Main functions
+// -------------------------------------------------------------------
 
 JSON_API JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* outValue);
 JSON_API bool       JsonEquals(const Json a, const Json b);
@@ -112,13 +127,18 @@ static inline bool JsonValidType(const Json json)
 }
 #endif
 /* * */
-#endif /* __JSON_H__ */
+
+#endif // __JSON_H__
 
 #ifdef JSON_IMPL
 
 #ifndef __JSON_H__
 #include "Json.h"
 #endif // __JSON_H__
+
+// -------------------------------------------------------------------
+// Dependencies
+// -------------------------------------------------------------------
 
 #include <math.h>
 #include <ctype.h>
@@ -130,6 +150,14 @@ static inline bool JsonValidType(const Json json)
 #include <assert.h>
 #include <setjmp.h>
 #include <stdint.h>
+
+// -------------------------------------------------------------------
+// Compiler options
+// -------------------------------------------------------------------
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
 
 #ifndef JSON_INLINE
 #  if defined(_MSC_VER)
@@ -190,14 +218,19 @@ static void JsonAllocator_FreeLower(JsonAllocator* allocator, void* buffer, int3
     }
 }
 
-static void* JsonAllocator_AllocLower(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t size)
+static void* JsonAllocator_AllocLower(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t newSize)
 {
     JsonAllocator_FreeLower(allocator, oldBuffer, oldSize);
 
-    if (JsonAllocator_CanAlloc(allocator, size))
+    if (newSize <= 0)
+    {
+        return NULL;
+    }
+
+    if (JsonAllocator_CanAlloc(allocator, newSize))
     {
         void* result = allocator->lowerMarker;
-        allocator->lowerMarker += size;
+        allocator->lowerMarker += newSize;
         return result;
     }
 
@@ -216,6 +249,11 @@ static void JsonAllocator_FreeUpper(JsonAllocator* allocator, void* buffer, int3
 static void* JsonAllocator_AllocUpper(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t newSize)
 {
     JsonAllocator_FreeUpper(allocator, oldBuffer, oldSize);
+
+    if (newSize <= 0)
+    {
+        return NULL;
+    }
 
     if (JsonAllocator_CanAlloc(allocator, newSize))
     {
@@ -302,7 +340,7 @@ JsonTempArray: memory-wise array for containing parsing value
 
 #define JsonTempArray_Init(a)             { a, 0 }
 #define JsonTempArray_Free(a, alloc)      JsonArray_Free((a)->array, alloc)
-#define JsonTempArray_Push(a, v, alloc)   ((a)->count >= sizeof((a)->buffer) / sizeof((a)->buffer[0]) ? JsonArray_Push((a)->array, v, alloc) : ((a)->buffer[(a)->count++] = v, 1))
+#define JsonTempArray_Push(a, v, alloc)   ((a)->count >= (int32_t)(sizeof((a)->buffer) / sizeof((a)->buffer[0])) ? JsonArray_Push((a)->array, v, alloc) : ((a)->buffer[(a)->count++] = v, 1))
 #define JsonTempArray_GetCount(a)         ((a)->count + JsonArray_GetCount((a)->array))
 #define JsonTempArray_ToBuffer(a, alloc)  JsonTempArray_ToBufferFunc((a)->buffer, (a)->count, (a)->array, (int)sizeof((a)->buffer[0]), alloc)
 
@@ -424,23 +462,24 @@ static void JsonParser_Panic(JsonParser* parser, JsonType type, JsonError code, 
 }
 
 /* @funcdef: JsonParser_Init */
-static void JsonParser_Init(JsonParser* parser, const char* jsonCode, int32_t jsonLength, JsonAllocator allocator, JsonParseFlags flags)
+static bool JsonParser_Init(JsonParser* parser, const char* jsonCode, int32_t jsonLength, JsonAllocator allocator, JsonParseFlags flags)
 {
-    if (parser)
-    {
-        parser->flags        = flags;
+    JSON_ASSERT(parser, "parser mustnot be null");
 
-		parser->line         = 1;
-		parser->column       = 1;
-		parser->cursor       = 0;
-		parser->buffer       = jsonCode;
-		parser->length       = jsonLength;
+    parser->flags        = flags;
 
-		parser->errmsg       = "Success!";
-		parser->errnum       = JsonError_None;
+	parser->line         = 1;
+	parser->column       = 1;
+	parser->cursor       = 0;
+	parser->buffer       = jsonCode;
+	parser->length       = jsonLength;
 
-        parser->allocator    = allocator;
-    }
+	parser->errmsg       = "Success!";
+	parser->errnum       = JsonError_None;
+
+    parser->allocator    = allocator;
+
+    return true;
 }
 
 /* @funcdef: JsonParser_IsAtEnd */
@@ -717,7 +756,11 @@ static void JsonParser_ParseNumber(JsonParser* parser, Json* outValue)
                 }
             }
 
-            const Json value = { .type = JsonType_Number, .length = 0, .number = number };
+            Json value;
+            value.type = JsonType_Number;
+            value.length = 0;
+            value.number = sign * number;
+
             *outValue = value;
 		}
     }
@@ -1086,32 +1129,39 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
 {
     JSON_ASSERT(outValue, "outValue mustnot be null");
 
+    // Validate json input
     if (!jsonCode || jsonCodeLength <= 0)
     {
-        const JsonResult result = { JsonError_WrongFormat, "Json code is not valid", 0 };
-        return result;
-    }
-
-    if (!buffer || bufferSize < sizeof(JsonParser))
-    {
-        const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", 0 };
+        const JsonResult result = { JsonError_WrongFormat, "Json code is empty", 0 };
         return result;
     }
 
     // Aligned buffer for cache-friendly processing
     void* alignedBuffer = (uint8_t*)buffer + (((uint64_t)buffer) & (sizeof(Json) - 1));
     int32_t alignedBufferSize = bufferSize - ((uint8_t*)alignedBuffer - (uint8_t*)buffer);
+    
+    // Create new allocator
+    JsonAllocator allocator;
+    if (!JsonAllocator_Init(&allocator, alignedBuffer, alignedBufferSize))
+    {
+        const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", 0 };
+        return result;
+    }
 
-    JsonAllocator tempAllocator;
-    JsonAllocator_Init(&tempAllocator, alignedBuffer, alignedBufferSize);
-
+    // Create parser
     JsonParser parser;
-    JsonParser_Init(&parser, jsonCode, jsonCodeLength, tempAllocator, flags);
-
+    if (!JsonParser_Init(&parser, jsonCode, jsonCodeLength, allocator, flags))
+    {
+        const JsonResult result = { JsonError_InternalFatal, "Wrong behaviour when create new parser", 0 };
+        return result;
+    }
+    
+    // Parse the top level
     Json* value = JsonState_ParseTopLevel(&parser);
-
+    JSON_ASSERT(value, "value mustnot be null");
     *outValue = *value;
 
+    // Done!
     const JsonResult result = { parser.errnum, parser.errmsg, (int32_t)(parser.allocator.lowerMarker - parser.allocator.buffer) };
     return result;
 }
@@ -1209,6 +1259,14 @@ bool JsonFind(const Json parent, const char* name, Json* result)
     *result = JSON_NULL;
     return false;
 }
+
+// -------------------------------------------------------------------
+// Turn-off compiler options, because of single-header library
+// -------------------------------------------------------------------
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic warning "-Wmissing-field-initializers"
+#endif
 
 
 #endif /* JSON_IMPL */

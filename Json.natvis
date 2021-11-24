@@ -150,4 +150,80 @@
       </CustomListItems>
     </Expand>
   </Type>
+</AutoVisualizer><?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="JsonObjectMember">
+    <DisplayString>{name,sb} = {value}</DisplayString>
+    <Expand>
+      <Item Name="[name]">name,sb</Item>
+      <Item Name="[value]">value</Item>
+    </Expand>
+  </Type>
+  
+  <Type Name="Json">
+    <DisplayString Condition="type == JsonType_Null">[JsonNull]</DisplayString>
+    <DisplayString Condition="type == JsonType_Boolean">[JsonBoolean] {boolean}</DisplayString>
+    <DisplayString Condition="type == JsonType_Number">[JsonNumber] {number}</DisplayString>
+    <DisplayString Condition="type == JsonType_String">[JsonString] &quot;{string,sb}&quot;</DisplayString>
+    <DisplayString Condition="type == JsonType_Array">[JsonArray] [{length} Items]</DisplayString>
+    <DisplayString Condition="type == JsonType_Object">[JsonObject] [{length} Members] </DisplayString>
+    <DisplayString>Value is unitialized</DisplayString>
+    <Expand>
+      <Item Name="[type]">type</Item>
+      <Item Name="[length]">length</Item>
+      
+      <ArrayItems Condition="type == JsonType_Array">
+        <Size>length</Size>
+        <ValuePointer>array</ValuePointer>
+      </ArrayItems>
+
+      <CustomListItems Condition="type == JsonType_Object">
+        <Variable Name="index" InitialValue="0"/>
+        <Size>length</Size>
+        <Loop>
+          <Item Name="&quot;{object[index].name,sb}&quot;">object[index].value</Item>
+          <Break Condition="index >= length"/>
+          <Exec>index++</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+</AutoVisualizer><?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="JsonObjectMember">
+    <DisplayString>{name,sb} = {value}</DisplayString>
+    <Expand>
+      <Item Name="[name]">name,sb</Item>
+      <Item Name="[value]">value</Item>
+    </Expand>
+  </Type>
+  
+  <Type Name="Json">
+    <DisplayString Condition="type == JsonType_Null">[JsonNull]</DisplayString>
+    <DisplayString Condition="type == JsonType_Boolean">[JsonBoolean] {boolean}</DisplayString>
+    <DisplayString Condition="type == JsonType_Number">[JsonNumber] {number}</DisplayString>
+    <DisplayString Condition="type == JsonType_String">[JsonString] &quot;{string,sb}&quot;</DisplayString>
+    <DisplayString Condition="type == JsonType_Array">[JsonArray] [{length} Items]</DisplayString>
+    <DisplayString Condition="type == JsonType_Object">[JsonObject] [{length} Members] </DisplayString>
+    <DisplayString>Value is unitialized</DisplayString>
+    <Expand>
+      <Item Name="[type]">type</Item>
+      <Item Name="[length]">length</Item>
+      
+      <ArrayItems Condition="type == JsonType_Array">
+        <Size>length</Size>
+        <ValuePointer>array</ValuePointer>
+      </ArrayItems>
+
+      <CustomListItems Condition="type == JsonType_Object">
+        <Variable Name="index" InitialValue="0"/>
+        <Size>length</Size>
+        <Loop>
+          <Item Name="&quot;{object[index].name,sb}&quot;">object[index].value</Item>
+          <Break Condition="index >= length"/>
+          <Exec>index++</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
 </AutoVisualizer>

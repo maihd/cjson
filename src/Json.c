@@ -2,9 +2,9 @@
 #include "Json.h"
 #endif // __JSON_H__
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#endif
+// -------------------------------------------------------------------
+// Dependencies
+// -------------------------------------------------------------------
 
 #include <math.h>
 #include <ctype.h>
@@ -16,6 +16,14 @@
 #include <assert.h>
 #include <setjmp.h>
 #include <stdint.h>
+
+// -------------------------------------------------------------------
+// Compiler options
+// -------------------------------------------------------------------
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
 
 #ifndef JSON_INLINE
 #  if defined(_MSC_VER)
@@ -1117,6 +1125,10 @@ bool JsonFind(const Json parent, const char* name, Json* result)
     *result = JSON_NULL;
     return false;
 }
+
+// -------------------------------------------------------------------
+// Turn-off compiler options, because of single-header library
+// -------------------------------------------------------------------
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic warning "-Wmissing-field-initializers"
