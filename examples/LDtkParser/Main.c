@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#if defined(_MVC_VER)
 #pragma comment(lib, "winmm.lib")
+#endif
 
 int main(void)
 {

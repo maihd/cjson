@@ -27,7 +27,7 @@ static bool InitAllocator(Allocator* allocator, void* buffer, int32_t bufferSize
     return false;
 }
 
-static void* CanAlloc(Allocator* allocator, int32_t size)
+static bool CanAlloc(Allocator* allocator, int32_t size)
 {
     int32_t remain = (int32_t)(allocator->upperMarker - allocator->lowerMarker);
     return  remain >= size;
@@ -468,7 +468,7 @@ static LDtkError LDtkReadEntityDefs(const Json jsonDefs, Allocator* allocator, L
 
         const Json jsonHeight;
         JsonFind(jsonEntityDef, "height", (Json*)&jsonHeight);
-        entityDef->width = (int32_t)jsonHeight.number;
+        entityDef->height = (int32_t)jsonHeight.number;
 
         const Json jsonColor;
         JsonFind(jsonEntityDef, "color", (Json*)&jsonColor);
@@ -502,6 +502,182 @@ static LDtkError LDtkReadEntityDefs(const Json jsonDefs, Allocator* allocator, L
 
     world->entityDefCount = entityDefCount;
     world->entityDefs = entityDefs;
+
+    const LDtkError error = { LDtkErrorCode_None, "" };
+    return error;
+}
+
+static LDtkError LDtkReadLevel(const Json json, Allocator* allocator, LDtkLevel* level)
+{
+    const Json jsonUid;
+    JsonFind(json, "uid", (Json*)&jsonUid);
+    level->id = (int32_t)jsonUid.number;
+
+    const Json jsonIdentifier;
+    JsonFind(json, "identifier", (Json*)&jsonIdentifier);
+    level->name = jsonIdentifier.string;
+
+    const Json jsonWorldX;
+    JsonFind(json, "worldX", (Json*)&jsonWorldX);
+    level->worldX = (int32_t)jsonWorldX.number;
+
+    const Json jsonWorldY;
+    JsonFind(json, "worldY", (Json*)&jsonWorldY);
+    level->worldY = (int32_t)jsonWorldY.number;
+
+    const Json jsonPxWid;
+    JsonFind(json, "pxWid", (Json*)&jsonPxWid);
+    level->width = (int32_t)jsonPxWid.number;
+
+    const Json jsonPxHei;
+    JsonFind(json, "pxHei", (Json*)&jsonPxHei);
+    level->height = (int32_t)jsonPxHei.number;
+
+    // Reading background fields
+
+    const Json jsonColor;
+    JsonFind(json, "__bgColor", (Json*)&jsonColor);
+    level->bgColor = LDtkColorFromString(jsonColor.string);
+
+    const Json jsonBgRelPath;
+    JsonFind(json, "bgRelPath", (Json*)&jsonBgRelPath);
+    level->bgPath = jsonBgRelPath.string;
+
+    const Json jsonBgPivotX;
+    JsonFind(json, "bgPivotX", (Json*)&jsonBgPivotX);
+    level->bgPivotX = (int32_t)jsonBgPivotX.number;
+
+    const Json jsonBgPivotY;
+    JsonFind(json, "bgPivotY", (Json*)&jsonBgPivotY);
+    level->bgPivotY = (int32_t)jsonBgPivotY.number;
+
+    const Json jsonBgPosMeta;
+    if (JsonFind(json, "__bgPos", (Json*)&jsonBgPosMeta))
+    {
+        const Json jsonTopLeftPx;
+        JsonFind(jsonBgPosMeta, "topLeftPx", (Json*)&jsonTopLeftPx);
+        level->bgPosX = (int32_t)jsonTopLeftPx.array[0].number;
+        level->bgPosY = (int32_t)jsonTopLeftPx.array[1].number;
+
+        const Json jsonScale;
+        JsonFind(jsonBgPosMeta, "scale", (Json*)&jsonScale);
+        level->bgScaleX = (float)jsonScale.array[0].number;
+        level->bgScaleY = (float)jsonScale.array[1].number;
+
+        const Json jsonCropRect;
+        JsonFind(jsonBgPosMeta, "cropRect", (Json*)&jsonCropRect);
+        level->bgCropX      = (float)jsonCropRect.array[0].number;
+        level->bgCropY      = (float)jsonCropRect.array[1].number;
+        level->bgCropWidth  = (float)jsonCropRect.array[2].number;
+        level->bgCropHeight = (float)jsonCropRect.array[3].number;
+    }
+
+    // Reading neighbours
+
+    memset(&level->neigbourCount, 0, sizeof(level->neigbourCount));
+    memset(&level->neigbourIds, 0, sizeof(level->neigbourIds));
+
+    const Json jsonNeighbours;
+    if (JsonFind(json, "__neighbours", (Json*)&jsonNeighbours))
+    {
+        for (int32_t i = 0; i < jsonNeighbours.length; i++)
+        {
+            const Json jsonNeighbour = jsonNeighbours.array[i];
+
+            const Json jsonDir;
+            if (!JsonFind(jsonNeighbour, "dir", (Json*)&jsonDir) || jsonDir.type != JsonType_String)
+            {
+                const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'neighbour.dir' is missing" };
+                return error;
+            }
+
+            const char* directionName = jsonDir.string;
+
+            LDtkDirection direction;
+            if (strcmp(directionName, "e") == 0)
+            {
+                direction = LDtkDirection_East;
+            }
+            else if (strcmp(directionName, "w") == 0)
+            {
+                direction = LDtkDirection_West;
+            }
+            else if (strcmp(directionName, "s") == 0)
+            {
+                direction = LDtkDirection_South;
+            }
+            else if (strcmp(directionName, "n") == 0)
+            {
+                direction = LDtkDirection_North;
+            }
+            else
+            {
+                const LDtkError error = { LDtkErrorCode_InvalidWorldProperties, "'neighbour.dir' value is unknown" };
+                return error;
+            }
+
+            const Json jsonLevelUid;
+            if (!JsonFind(jsonNeighbour, "levelUid", (Json*)&jsonLevelUid))
+            {
+                const LDtkError error = { LDtkErrorCode_InvalidWorldProperties, "'neighbour.layerUid' value is unknown" };
+                return error;
+            }
+
+            level->neigbourIds[(int32_t)direction][level->neigbourCount[(int32_t)direction]++] = (int32_t)jsonLevelUid.number;
+        }
+    }
+
+    // Reading field instances
+    const Json jsonFieldInstances;
+    if (!JsonFind(json, "fieldInstances", (Json*)&jsonFieldInstances))
+    {
+        const LDtkError error = { LDtkErrorCode_InvalidWorldProperties, "'fieldInstances' is missing" };
+        return error;
+    }
+
+    // Reading layer instances
+    const Json jsonLayerInstances;
+    if (!JsonFind(json, "layerInstances", (Json*)&jsonLayerInstances))
+    {
+        const LDtkError error = { LDtkErrorCode_InvalidWorldProperties, "'layerInstances' is missing" };
+        return error;
+    }
+
+    const int32_t layerCount = (int32_t)jsonLayerInstances.length;
+    for (int32_t i = 0; i < layerCount; i++)
+    {
+
+    }
+
+    const LDtkError error = { LDtkErrorCode_None, "" };
+    return error;
+}
+
+static LDtkError LDtkReadLevels(const Json json, Allocator* allocator, LDtkWorld* world)
+{
+    const Json jsonLevels;
+    if (!JsonFind(json, "levels", (Json*)&jsonLevels))
+    {
+        const LDtkError error = { LDtkErrorCode_MissingWorldProperties, "'levels' is not found" };
+        return error;
+    }
+
+    const int32_t   levelCount = (int32_t)jsonLevels.length;
+    LDtkLevel*      levels = (LDtkLevel*)AllocLower(allocator, NULL, 0, sizeof(LDtkLevel) * levelCount);
+    for (int32_t i = 0; i < levelCount; i++)
+    {
+        LDtkLevel* level        = &levels[i];
+        const Json jsonLevel    = jsonLevels.array[i];
+
+        const LDtkError readError = LDtkReadLevel(jsonLevel, allocator, level);
+        if (readError.code != LDtkErrorCode_None)
+        {
+            return readError;
+        }
+    }
+
+    world->levelCount = levelCount;
+    world->levels = levels;
 
     const LDtkError error = { LDtkErrorCode_None, "" };
     return error;
@@ -561,6 +737,12 @@ LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, in
     if (readDefsError.code != LDtkErrorCode_None)
     {
         return readDefsError;
+    }
+
+    const LDtkError readLevelsError = LDtkReadLevels(json, &allocator, world);
+    if (readLevelsError.code != LDtkErrorCode_None)
+    {
+        return readLevelsError;
     }
 
     const Json jsonLevel;

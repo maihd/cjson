@@ -170,15 +170,27 @@ typedef struct LDtkEntityLayer
 
 typedef struct LDtkLevel
 {
+    int32_t             id;
     const char*         name;
 
-    const char*         bgImagePath;
-    int32_t             bgImageX;
-    int32_t             bgImageY;
-    int32_t             bgImageCropX;
-    int32_t             bgImageCropY;
-    float               bgImageScaleX;
-    float               bgImageScaleY;
+    int32_t             width;
+    int32_t             height;
+
+    int32_t             worldX;
+    int32_t             worldY;
+
+    LDtkColor           bgColor;
+    const char*         bgPath;
+    int32_t             bgPosX;
+    int32_t             bgPosY;
+    float               bgCropX;
+    float               bgCropY;
+    float               bgCropWidth;
+    float               bgCropHeight;
+    float               bgScaleX;
+    float               bgScaleY;
+    float               bgPivotX;
+    float               bgPivotY;
 
     int32_t             tileLayerCount;
     LDtkTileLayer*      tileLayers;
@@ -189,8 +201,8 @@ typedef struct LDtkLevel
     int32_t             entityLayerCount;
     LDtkEntityLayer*    entityLayers;
 
-    int32_t             neigbourIds;
-    struct LDtkLevel*   neigbours;
+    int32_t             neigbourCount[4];
+    int32_t             neigbourIds[4][16];
 } LDtkLevel;
 
 typedef enum LDtkLayerType

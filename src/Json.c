@@ -2,6 +2,10 @@
 #include "Json.h"
 #endif // __JSON_H__
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 #include <math.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -194,7 +198,7 @@ JsonTempArray: memory-wise array for containing parsing value
 
 #define JsonTempArray_Init(a)             { a, 0 }
 #define JsonTempArray_Free(a, alloc)      JsonArray_Free((a)->array, alloc)
-#define JsonTempArray_Push(a, v, alloc)   ((a)->count >= sizeof((a)->buffer) / sizeof((a)->buffer[0]) ? JsonArray_Push((a)->array, v, alloc) : ((a)->buffer[(a)->count++] = v, 1))
+#define JsonTempArray_Push(a, v, alloc)   ((a)->count >= (int32_t)(sizeof((a)->buffer) / sizeof((a)->buffer[0])) ? JsonArray_Push((a)->array, v, alloc) : ((a)->buffer[(a)->count++] = v, 1))
 #define JsonTempArray_GetCount(a)         ((a)->count + JsonArray_GetCount((a)->array))
 #define JsonTempArray_ToBuffer(a, alloc)  JsonTempArray_ToBufferFunc((a)->buffer, (a)->count, (a)->array, (int)sizeof((a)->buffer[0]), alloc)
 
@@ -610,7 +614,11 @@ static void JsonParser_ParseNumber(JsonParser* parser, Json* outValue)
                 }
             }
 
-            const Json value = { .type = JsonType_Number, .length = 0, .number = number };
+            Json value;
+            value.type = JsonType_Number;
+            value.length = 0;
+            value.number = sign * number;
+
             *outValue = value;
 		}
     }
@@ -1109,3 +1117,7 @@ bool JsonFind(const Json parent, const char* name, Json* result)
     *result = JSON_NULL;
     return false;
 }
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic warning "-Wmissing-field-initializers"
+#endif

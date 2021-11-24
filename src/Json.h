@@ -12,6 +12,10 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
+// -------------------------------------------------------------------
+// Types
+// -------------------------------------------------------------------
+
 /// JSON type of json value
 typedef enum JsonType
 {
@@ -88,9 +92,25 @@ struct JsonObjectMember
     Json                    value;
 };
 
+// -------------------------------------------------------------------
+// Constants
+// -------------------------------------------------------------------
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 static const Json JSON_NULL     = { JsonType_Null   , 0             };
 static const Json JSON_TRUE     = { JsonType_Boolean, 0, { true  }  };
 static const Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic warning "-Wmissing-field-initializers"
+#endif
+
+// -------------------------------------------------------------------
+// Main functions
+// -------------------------------------------------------------------
 
 JSON_API JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* outValue);
 JSON_API bool       JsonEquals(const Json a, const Json b);
