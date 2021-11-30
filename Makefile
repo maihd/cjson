@@ -25,7 +25,7 @@ clean:
 	rm -rf *.o *.exe
 
 lib:
-	@rm -f Json.h JsonEx.h
+	@rm -f Json.h JsonUtils.h
 
 	@cat ./src/Json.h               		>> Json.h
 	@echo ""                        		>> Json.h
