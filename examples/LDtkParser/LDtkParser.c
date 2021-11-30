@@ -635,6 +635,12 @@ static LDtkError LDtkReadLevel(const Json json, Allocator* allocator, LDtkLevel*
         return error;
     }
 
+    const int32_t fieldCount = jsonFieldInstances.length;
+    for (int32_t i = 0; i < fieldCount; i++)
+    {
+        
+    }
+
     // Reading layer instances
     const Json jsonLayerInstances;
     if (!JsonFind(json, "layerInstances", (Json*)&jsonLayerInstances))
@@ -643,10 +649,10 @@ static LDtkError LDtkReadLevel(const Json json, Allocator* allocator, LDtkLevel*
         return error;
     }
 
-    const int32_t layerCount = (int32_t)jsonLayerInstances.length;
+    const int32_t layerCount = jsonLayerInstances.length;
     for (int32_t i = 0; i < layerCount; i++)
     {
-
+        
     }
 
     const LDtkError error = { LDtkErrorCode_None, "" };
@@ -662,7 +668,7 @@ static LDtkError LDtkReadLevels(const Json json, Allocator* allocator, LDtkWorld
         return error;
     }
 
-    const int32_t   levelCount = (int32_t)jsonLevels.length;
+    const int32_t   levelCount = jsonLevels.length;
     LDtkLevel*      levels = (LDtkLevel*)AllocLower(allocator, NULL, 0, sizeof(LDtkLevel) * levelCount);
     for (int32_t i = 0; i < levelCount; i++)
     {
@@ -743,13 +749,6 @@ LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, in
     if (readLevelsError.code != LDtkErrorCode_None)
     {
         return readLevelsError;
-    }
-
-    const Json jsonLevel;
-    if (!JsonFind(json, "levels", (Json*)&jsonLevel))
-    {
-        const LDtkError error = { LDtkErrorCode_MissingLevels, "'levels' is not found" };
-        return error;
     }
 
     const LDtkError error = { LDtkErrorCode_None, "" };

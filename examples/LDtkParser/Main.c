@@ -43,11 +43,19 @@ int main(void)
         return -1;
     }
 
-    free(tempBuffer);
-    free(json);
-
     Texture texture = LoadTexture("../../examples/LDtkParser/assets/N2D - SpaceWallpaper1280x448.png");
     SetWindowSize(texture.width * 2, texture.height * 2);
+
+    Texture levelBgTextures[32];
+    for (int32_t i = 0; i < world.levelCount; i++)
+    {
+        char texturePath[2048];
+        sprintf(texturePath, "../../examples/LDtkParser/assets/%s", world.levels[i].bgPath);
+        printf("texturePath: %s\n", texturePath);
+        levelBgTextures[i] = LoadTexture(texturePath);
+    }
+
+    int32_t currentLevelIndex = 2;
 
     while (!WindowShouldClose())
     {
@@ -55,10 +63,13 @@ int main(void)
         {
             ClearBackground(BLACK);
 
-            DrawTextureEx(texture, (Vector2){0, 0}, 0.0f, 2.0f, WHITE);
+            DrawTextureEx(levelBgTextures[currentLevelIndex], (Vector2){0, 0}, 0.0f, 2.0f, WHITE);
         }
         EndDrawing();
     }
+
+    free(tempBuffer);
+    free(json);
 
     CloseWindow();
     return 0;
