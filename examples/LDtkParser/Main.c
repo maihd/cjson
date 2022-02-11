@@ -1,10 +1,12 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "raylib.h"
 #include "LDtkParser.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#if defined(_MVC_VER)
+#if defined(_MSC_VER)
 #pragma comment(lib, "winmm.lib")
 #endif
 

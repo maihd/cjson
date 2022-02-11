@@ -652,7 +652,7 @@ static LDtkError LDtkReadLevel(const Json json, Allocator* allocator, LDtkLevel*
     const int32_t layerCount = jsonLayerInstances.length;
     for (int32_t i = 0; i < layerCount; i++)
     {
-        
+		const Json layerJson = jsonLayerInstances.array[i];
     }
 
     const LDtkError error = { LDtkErrorCode_None, "" };
