@@ -16,7 +16,7 @@ Simple JSON parser written in C99
 - Robust error handling, no pointer-as-object.
 - Single responsibility: when work with json in C, we only need parse the json string to C value. Json stringify is easy to implement in C.
 - No memory allocations, linear memory layout, cache friendly.
-- Well-tested eith some real-world examples.
+- Well-tested with some real-world examples.
 - Visual Studio Natvis
 
 ## Examples
