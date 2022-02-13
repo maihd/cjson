@@ -181,3 +181,6 @@ const char* JsonifyEntity(Entity entity)
 
 ### I don't like CamelCase!!!
 Just rename, update, change what you not like with your code editor.
+
+### What about licenses
+This repo use UNLICENSE but the source code you generate from `make` can be your license of choice.
