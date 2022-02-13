@@ -173,7 +173,7 @@ const char* JsonifyEntity(Entity entity)
 {
     static char buffer[256];
     snprintf(buffer, sizeof(buffer), 
-        "{\"id\":%d,\"name\":\"%s\"}", entity.id, entity.name
+        "{\"id\":%u,\"name\":\"%s\"}", entity.id, entity.name
     );
     return buffer;
 }
