@@ -3,7 +3,7 @@
 # cjson ![Build Status](https://github.com/maihd/cjson/actions/workflows/unit-tests.yml/badge.svg) [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 Simple JSON parser written in C99
 
-## Category
+## Table of Contents
 - [Features](#features)
 - [Examples](#examples)
 - [API](#api)
@@ -161,7 +161,23 @@ When I first read an article about common mistake of c libraries are do much dyn
 In the first version there is a custom allocator interface. But after the long run, I found the memory of Json was throw away at one, so dynamic allocators are expensive for that. Now we just given a temporary buffer to parser, and there is a linear allocator in internal. So no dynamic allocations.
 
 ### Where stringify/serialize functions?
-It easy to write an JsonStringify version, but the real problem in C is not that simple. You need to create Json value, create Json may need memory, so we need to care about memory allocation. That headache! Fortunately, C is static type language, so we can easily convert out data structure/object to json easily base on its types.
+It easy to write an JsonStringify version, but the real problem in C is not that simple. You need to create Json value, create Json may need memory, so we need to care about memory allocation. That headache! Fortunately, C is static type language, so we can easily convert out data structure/object to json easily base on its types. See example below:
+```C
+typedef struct Entity
+{
+    uint32_t    id;
+    const char* name;
+} Entity;
+
+const char* JsonifyEntity(Entity entity)
+{
+    static char buffer[256];
+    snprintf(buffer, sizeof(buffer), 
+        "{\"id\":%d,\"name\":\"%s\"}", entity.id, entity.name
+    );
+    return buffer;
+}
+```
 
 ### I don't like CamelCase!!!
 Just rename, update, change what you not like with your code editor.
