@@ -1,3 +1,6 @@
+#define _CRT_SECURE_NO_WARNINGS
+
+#include <stdio.h>
 #include <string.h>
 
 #include "LDtkParser.h"
@@ -14,8 +17,19 @@ typedef struct Allocator
 
 static bool InitAllocator(Allocator* allocator, void* buffer, int32_t bufferSize)
 {
+	const int32_t alignment = 16;
+	const int32_t mask = alignment - 1;
+
     if (buffer && bufferSize > 0)
     {
+		const uintptr_t address = (uintptr_t)buffer;
+		const int32_t	misalign = address & mask;
+		const int32_t	adjustment = alignment - misalign;
+
+		buffer = (void*)(address + adjustment);
+		bufferSize = bufferSize - adjustment;
+		bufferSize = bufferSize - (alignment - (bufferSize & mask));
+		
         allocator->buffer       = (uint8_t*)buffer;
         allocator->bufferSize   = bufferSize;
         allocator->lowerMarker  = (uint8_t*)buffer;
@@ -27,15 +41,20 @@ static bool InitAllocator(Allocator* allocator, void* buffer, int32_t bufferSize
     return false;
 }
 
+static int32_t AllocatorRemainSize(Allocator* allocator)
+{
+	int32_t remain = (int32_t)(allocator->upperMarker - allocator->lowerMarker);
+	return  remain;
+}
+
 static bool CanAlloc(Allocator* allocator, int32_t size)
 {
-    int32_t remain = (int32_t)(allocator->upperMarker - allocator->lowerMarker);
-    return  remain >= size;
+    return AllocatorRemainSize(allocator) >= size;
 }
 
 static void DeallocLower(Allocator* allocator, void* buffer, int32_t size)
 {
-    void* lastBuffer = allocator->lowerMarker;
+    void* lastBuffer = allocator->lowerMarker - size;
     if (lastBuffer == buffer)
     {
         allocator->lowerMarker -= size;
@@ -507,7 +526,7 @@ static LDtkError LDtkReadEntityDefs(const Json jsonDefs, Allocator* allocator, L
     return error;
 }
 
-static LDtkError LDtkReadLevel(const Json json, Allocator* allocator, LDtkLevel* level)
+static LDtkError LDtkReadLevel(const Json json, const char* levelDirectory, Allocator* allocator, LDtkReadFileFn* readFileFn, LDtkLevel* level)
 {
     const Json jsonUid;
     JsonFind(json, "uid", (Json*)&jsonUid);
@@ -642,12 +661,73 @@ static LDtkError LDtkReadLevel(const Json json, Allocator* allocator, LDtkLevel*
     }
 
     // Reading layer instances
-    const Json jsonLayerInstances;
-    if (!JsonFind(json, "layerInstances", (Json*)&jsonLayerInstances))
+    Json jsonLayerInstances;
+    if (!JsonFind(json, "layerInstances", &jsonLayerInstances))
     {
         const LDtkError error = { LDtkErrorCode_InvalidWorldProperties, "'layerInstances' is missing" };
         return error;
     }
+
+	if (jsonLayerInstances.type == JsonType_Null)
+	{
+		const Json jsonExternalRelPath;
+		if (!JsonFind(json, "externalRelPath", (Json*)&jsonExternalRelPath))
+		{
+			const LDtkError error = { LDtkErrorCode_MissingLayerDefProperties, "'externalRelPath' is missing" };
+			return error;
+		}
+
+		if (jsonExternalRelPath.type != JsonType_String)
+		{
+			const LDtkError error = { LDtkErrorCode_InvalidLayerDefProperties, "'externalRelPath' must be string" };
+			return error;
+		}
+
+		char filePath[1024];
+		sprintf(filePath, "%s/%s", levelDirectory, jsonExternalRelPath.string);
+		
+		int32_t fileSize;
+		if (!readFileFn(filePath, NULL, &fileSize))
+		{
+			const LDtkError error = { LDtkErrorCode_MissingLevelExternalFile, "cannot read file from ..." };
+			return error;
+		}
+
+		void* buffer = AllocUpper(allocator, NULL, 0, fileSize + 1);
+		if (!buffer)
+		{
+			const LDtkError error = { LDtkErrorCode_OutOfMemory, "Cannot read more memory" };
+			return error;
+		}
+
+		if (!readFileFn(filePath, buffer, &fileSize))
+		{
+			const LDtkError error = { LDtkErrorCode_InternalError, "Cannot read more memory" };
+			return error;
+		}
+
+		int32_t contentLength = fileSize;
+		char* content = (char*)buffer;
+		content[contentLength] = 0;
+
+		Json jsonLevelFile;
+		const JsonResult result = JsonParse(content, contentLength, JsonParseFlags_Default, allocator->lowerMarker, AllocatorRemainSize(allocator), &jsonLevelFile);
+		if (result.error != JsonError_None)
+		{
+			const LDtkError error = { LDtkErrorCode_InternalError, "Cannot read more memory" };
+			return error;
+		}
+		
+		// Move forward
+		AllocLower(allocator, NULL, 0, result.memoryUsage);
+
+		// File layer instances
+		if (!JsonFind(json, "layerInstances", &jsonLayerInstances))
+		{
+			const LDtkError error = { LDtkErrorCode_InvalidWorldProperties, "'layerInstances' is missing" };
+			return error;
+		}
+	}
 
     const int32_t layerCount = jsonLayerInstances.length;
     for (int32_t i = 0; i < layerCount; i++)
@@ -659,7 +739,7 @@ static LDtkError LDtkReadLevel(const Json json, Allocator* allocator, LDtkLevel*
     return error;
 }
 
-static LDtkError LDtkReadLevels(const Json json, Allocator* allocator, LDtkWorld* world)
+static LDtkError LDtkReadLevels(const Json json, const char* ldtkPath, Allocator* allocator, LDtkReadFileFn* readFileFn, LDtkWorld* world)
 {
     const Json jsonLevels;
     if (!JsonFind(json, "levels", (Json*)&jsonLevels))
@@ -668,6 +748,12 @@ static LDtkError LDtkReadLevels(const Json json, Allocator* allocator, LDtkWorld
         return error;
     }
 
+	char levelDirectory[1024];
+	int32_t levelDirectoryLength = strlen(ldtkPath);
+	while (ldtkPath[levelDirectoryLength] != '/' && levelDirectoryLength > 0) { levelDirectoryLength--; };
+	memcpy(levelDirectory, ldtkPath, levelDirectoryLength);
+	levelDirectory[levelDirectoryLength] = 0;
+
     const int32_t   levelCount = jsonLevels.length;
     LDtkLevel*      levels = (LDtkLevel*)AllocLower(allocator, NULL, 0, sizeof(LDtkLevel) * levelCount);
     for (int32_t i = 0; i < levelCount; i++)
@@ -675,7 +761,7 @@ static LDtkError LDtkReadLevels(const Json json, Allocator* allocator, LDtkWorld
         LDtkLevel* level        = &levels[i];
         const Json jsonLevel    = jsonLevels.array[i];
 
-        const LDtkError readError = LDtkReadLevel(jsonLevel, allocator, level);
+        const LDtkError readError = LDtkReadLevel(jsonLevel, levelDirectory, allocator, readFileFn, level);
         if (readError.code != LDtkErrorCode_None)
         {
             return readError;
@@ -689,8 +775,22 @@ static LDtkError LDtkReadLevels(const Json json, Allocator* allocator, LDtkWorld
     return error;
 }
 
-LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, int32_t bufferSize, LDtkWorld* world)
+LDtkError LDtkParse(const char* ldtkPath, LDtkContext context, LDtkWorld* world)
 {
+	LDtkReadFileFn* readFileFn = context.readFileFn;
+
+	char* content = (char*)context.buffer;
+	int32_t contentLength = context.bufferSize;
+	if (!readFileFn(ldtkPath, content, &contentLength))
+	{
+		const LDtkError error = { LDtkErrorCode_ParseJsonFailed, "" };
+		return error;
+	}
+	content[contentLength] = 0;
+
+	void* buffer = content + contentLength + 1;
+	int32_t bufferSize = context.bufferSize - contentLength - 1;
+
     const Json json;
     const JsonResult jsonResult = JsonParse(content, contentLength, JsonParseFlags_Default, buffer, bufferSize, (Json*)&json);
     if (jsonResult.error != JsonError_None)
@@ -745,7 +845,7 @@ LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, in
         return readDefsError;
     }
 
-    const LDtkError readLevelsError = LDtkReadLevels(json, &allocator, world);
+    const LDtkError readLevelsError = LDtkReadLevels(json, ldtkPath, &allocator, readFileFn, world);
     if (readLevelsError.code != LDtkErrorCode_None)
     {
         return readLevelsError;
@@ -753,4 +853,44 @@ LDtkError LDtkParse(const char* content, int32_t contentLength, void* buffer, in
 
     const LDtkError error = { LDtkErrorCode_None, "" };
     return error;
+}
+
+bool LDtkReadFileStdC(const char* fileName, void* buffer, int32_t* bufferSize)
+{
+	FILE* file = fopen(fileName, "r");
+	if (!file)
+	{
+		return false;
+	}
+
+	fseek(file, 0, SEEK_END);
+	int32_t fileSize = (int32_t)ftell(file);
+	fseek(file, 0, SEEK_SET);
+
+	if (buffer)
+	{
+		if (*bufferSize < fileSize)
+		{
+			fclose(file);
+			return false;
+		}
+
+		fread(buffer, 1, fileSize, file);
+	}
+	
+	*bufferSize = fileSize;
+
+	fclose(file);
+	return true;
+}
+
+LDtkContext LDtkContextStdC(void* buffer, int32_t bufferSize)
+{
+	LDtkContext result = {
+		.buffer = buffer,
+		.bufferSize = bufferSize,
+		.readFileFn = LDtkReadFileStdC
+	};
+
+	return result;
 }

@@ -16,29 +16,14 @@ int main(void)
 
     SetTargetFPS(60);
 
-    FILE* file;
-    errno_t fileError = fopen_s(&file, "../../examples/LDtkParser/assets/sample.ldtk", "r"); // This path is hardcode, rewrite if needed 
-    if (!file || fileError != 0)
-    {
-        fprintf(stderr, "Can not load sample file, maybe path is wrong!\n");
-        return -1;
-    }
+	const char* ldtkPath = "../../examples/LDtkParser/assets/sample.ldtk";
 
-    fseek(file, 0, SEEK_END);
-    int32_t fileSize = (int32_t)ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    char* json = (char*)malloc(fileSize + 1);
-    fread(json, 1, fileSize, file);
-    json[fileSize] = 0;
-
-    fclose(file);
-
-    int32_t tempBufferSize = 1024 * 1024;
+    int32_t tempBufferSize = 20 * 1024 * 1024;
     void* tempBuffer = malloc((size_t)tempBufferSize);
+	LDtkContext context = LDtkContextStdC(tempBuffer, tempBufferSize);
 
     LDtkWorld world;
-    LDtkError error = LDtkParse(json, fileSize, tempBuffer, tempBufferSize, &world);
+    LDtkError error = LDtkParse(ldtkPath, context, &world);
     if (error.code != LDtkErrorCode_None)
     {
         fprintf(stderr, "Parse ldtk sample content failed!: %s\n", error.message);
@@ -71,7 +56,6 @@ int main(void)
     }
 
     free(tempBuffer);
-    free(json);
 
     CloseWindow();
     return 0;

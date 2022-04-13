@@ -1,9 +1,11 @@
 #pragma once
 
 #include <stdint.h>
-
-#ifndef __cplusplus
 #include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C"
+{
 #endif
 
 typedef enum LDtkDirection
@@ -291,7 +293,11 @@ typedef enum LDtkErrorCode
     LDtkErrorCode_MissingLayerDefProperties,
     LDtkErrorCode_InvalidLayerDefProperties,
 
-    LDtkErrorCode_OutOfMemory
+	LDtkErrorCode_MissingLevelExternalFile,
+	LDtkErrorCode_InvalidLevelExternalFile,
+
+    LDtkErrorCode_OutOfMemory,
+	LDtkErrorCode_InternalError,
 } LDtkErrorCode;
 
 typedef struct LDtkError
@@ -300,4 +306,20 @@ typedef struct LDtkError
     const char*     message;
 } LDtkError;
 
-LDtkError LDtkParse(const char* json, int32_t jsonLength, void* buffer, int32_t bufferSize, LDtkWorld* world);
+typedef bool LDtkReadFileFn(const char* fileName, void* buffer, int32_t* bufferSize);
+
+typedef struct LDtkContext
+{
+	void*			buffer;
+	int32_t			bufferSize;
+
+	LDtkReadFileFn*	readFileFn;
+} LDtkContext;
+
+LDtkContext		LDtkContextStdC(void* buffer, int32_t bufferSize);
+
+LDtkError		LDtkParse(const char* ldtkPath, LDtkContext context, LDtkWorld* world);
+
+#ifdef __cplusplus
+}
+#endif
