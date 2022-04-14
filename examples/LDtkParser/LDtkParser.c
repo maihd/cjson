@@ -1,6 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "LDtkParser.h"
@@ -722,7 +723,7 @@ static LDtkError LDtkReadLevel(const Json json, const char* levelDirectory, Allo
 		AllocLower(allocator, NULL, 0, result.memoryUsage);
 
 		// File layer instances
-		if (!JsonFind(json, "layerInstances", &jsonLayerInstances))
+		if (!JsonFind(jsonLevelFile, "layerInstances", &jsonLayerInstances))
 		{
 			const LDtkError error = { LDtkErrorCode_InvalidWorldProperties, "'layerInstances' is missing" };
 			return error;

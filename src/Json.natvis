@@ -18,7 +18,11 @@
     <DisplayString>Value is unitialized</DisplayString>
     <Expand>
       <Item Name="[type]">type</Item>
-      <Item Name="[length]">length</Item>
+      <Item Name="[length]" 
+            Condition="type == JsonType_String || type == JsonType_Array || type == JsonType_Object"
+            >
+        length
+      </Item>
       
       <ArrayItems Condition="type == JsonType_Array">
         <Size>length</Size>
