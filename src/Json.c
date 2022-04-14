@@ -54,6 +54,14 @@ typedef struct JsonAllocator
     uint8_t*        upperMarker;
 } JsonAllocator;
 
+static int32_t JsonAllocator_BlockSize(int32_t size)
+{
+	int32_t alignment = sizeof(Json);
+	int32_t misalign = size & (alignment - 1);
+	int32_t adjustment = (misalign != 0) * (alignment - misalign);
+	return size + adjustment;
+}
+
 static bool JsonAllocator_Init(JsonAllocator* allocator, void* buffer, int32_t bufferSize)
 {
     if (buffer && bufferSize > 0)
@@ -71,7 +79,6 @@ static bool JsonAllocator_Init(JsonAllocator* allocator, void* buffer, int32_t b
 
 		buffer = (void*)(address + adjustment);
 		bufferSize = JsonAllocator_BlockSize(bufferSize - adjustment);
-		bufferSize = bufferSize - (alignment - (bufferSize & mask));
 
         allocator->lowerMarker = (uint8_t*)buffer;
         allocator->upperMarker = (uint8_t*)buffer + bufferSize;
@@ -80,14 +87,6 @@ static bool JsonAllocator_Init(JsonAllocator* allocator, void* buffer, int32_t b
     }
 
     return false;
-}
-
-static int32_t JsonAllocator_BlockSize(int32_t size)
-{
-	int32_t alignment	= sizeof(Json);
-	int32_t misalign	= size & (alignment - 1);
-	int32_t adjustment	= (misalign != 0) * (alignment - misalign);
-	return size + adjustment;
 }
 
 static int32_t JsonAllocator_RemainSize(JsonAllocator* allocator)
@@ -1058,7 +1057,7 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
 	JsonResult result;
 	result.error = parser.errnum;
 	result.message = parser.errmsg;
-	result.memoryUsage = (int32_t)(parser.allocator.lowerMarker - buffer);
+	result.memoryUsage = (int32_t)(parser.allocator.lowerMarker - (uint8_t*)buffer);
     return result;
 }
 
