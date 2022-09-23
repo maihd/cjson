@@ -856,7 +856,7 @@ LDtkError LDtkParse(const char* ldtkPath, LDtkContext context, LDtkWorld* world)
     return error;
 }
 
-bool LDtkReadFileStdC(const char* fileName, void* buffer, int32_t* bufferSize)
+static bool LDtkReadFileStdC(const char* fileName, void* buffer, int32_t* bufferSize)
 {
 	FILE* file = fopen(fileName, "r");
 	if (!file)
@@ -865,7 +865,7 @@ bool LDtkReadFileStdC(const char* fileName, void* buffer, int32_t* bufferSize)
 	}
 
 	fseek(file, 0, SEEK_END);
-	int32_t fileSize = (int32_t)ftell(file);
+	size_t fileSize = (size_t)ftell(file);
 	fseek(file, 0, SEEK_SET);
 
 	if (buffer)
@@ -876,10 +876,10 @@ bool LDtkReadFileStdC(const char* fileName, void* buffer, int32_t* bufferSize)
 			return false;
 		}
 
-		fread(buffer, 1, fileSize, file);
+		fileSize = fread(buffer, 1, fileSize, *bufferSize);
 	}
 	
-	*bufferSize = fileSize;
+	*bufferSize = (int32_t)fileSize;
 
 	fclose(file);
 	return true;
@@ -895,3 +895,49 @@ LDtkContext LDtkContextStdC(void* buffer, int32_t bufferSize)
 
 	return result;
 }
+
+#ifdef _WIN32
+#define VC_EXTRA_CLEAN
+#define WIN32_CLEAN_AND_MEAN
+#include <Windows.h>
+
+static bool LDtkReadFileWindows(const char* fileName, void* buffer, int32_t* bufferSize)
+{
+	//TCHAR tFileName[MAX_PATH];
+	//WideCharToMultiByte(CP_UTF8, 0, tFileName, sizeof(tFileName), fileName, 0, NULL, NULL);
+
+	HANDLE file = CreateFileA(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (!file)
+	{
+		//return false;
+	}
+
+	DWORD fileSize = GetFileSize(file, NULL);
+	if (buffer)
+	{
+		if (*bufferSize < fileSize)
+		{
+			CloseHandle(file);
+			return false;
+		}
+
+		ReadFile(file, buffer, fileSize, NULL, NULL);
+	}
+
+	*bufferSize = (int32_t)fileSize;
+
+	CloseHandle(file);
+	return true;
+}
+
+LDtkContext LDtkContextWindows(void* buffer, int32_t bufferSize)
+{
+	LDtkContext result = {
+		.buffer = buffer,
+		.bufferSize = bufferSize,
+		.readFileFn = LDtkReadFileWindows
+	};
+
+	return result;
+}
+#endif

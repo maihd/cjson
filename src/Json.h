@@ -47,6 +47,10 @@ typedef enum JsonError
     JsonError_UnexpectedToken,
     JsonError_UnsupportedToken,
 
+    /* Finding error */
+    JsonError_MissingField,
+    JsonError_WrongType,
+
     /* Runtime error */
 
     JsonError_OutOfMemory,
@@ -121,7 +125,9 @@ JSON_CONST Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
 
 JSON_API JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* outValue);
 JSON_API bool       JsonEquals(const Json a, const Json b);
-JSON_API bool       JsonFind(const Json parent, const char* name, Json* result);
+
+JSON_API bool       JsonFind(const Json parent, const char* name, Json* outResult);
+JSON_API JsonError  JsonFindWithType(const Json parent, const char* name, JsonType type, Json* outResult);
 
 static inline bool JsonValidType(const Json json)
 {

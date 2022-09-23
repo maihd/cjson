@@ -318,6 +318,10 @@ typedef struct LDtkContext
 
 LDtkContext		LDtkContextStdC(void* buffer, int32_t bufferSize);
 
+#ifdef _WIN32
+LDtkContext		LDtkContextWindows(void* buffer, int32_t bufferSize);
+#endif
+
 LDtkError		LDtkParse(const char* ldtkPath, LDtkContext context, LDtkWorld* world);
 
 #ifdef __cplusplus

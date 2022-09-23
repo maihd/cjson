@@ -1129,9 +1129,9 @@ bool JsonEquals(const Json a, const Json b)
 }
 
 /* @funcdef: JsonFind */
-bool JsonFind(const Json parent, const char* name, Json* result)
+bool JsonFind(const Json parent, const char* name, Json* outResult)
 {
-    JSON_ASSERT(result, "result mustnot be null");
+    JSON_ASSERT(outResult, "outResult mustnot be null");
     JSON_ASSERT(JsonValidType(parent), "invalid json type");
     JSON_ASSERT(name, "Attempt using nullptr as string");
 
@@ -1145,14 +1145,41 @@ bool JsonFind(const Json parent, const char* name, Json* result)
 
             if (strncmp(name, member->name, nameLength) == 0)
             {
-                *result = member->value;
+                *outResult = member->value;
                 return true;
             }
         }
     }
 
-    *result = JSON_NULL;
+    *outResult = JSON_NULL;
     return false;
+}
+
+/* @funcdef: JsonFindWithType */
+JsonError JsonFindWithType(const Json parent, const char* name, JsonType type, Json* outResult)
+{
+    JSON_ASSERT(outResult, "outResult mustnot be null");
+    JSON_ASSERT(JsonValidType(parent), "invalid json type");
+    JSON_ASSERT(name, "Attempt using nullptr as string");
+
+    if (parent.type == JsonType_Object)
+    {
+        const int32_t nameLength = (int32_t)strlen(name);
+        for (int32_t i = 0, n = parent.length; i < n; i++)
+        {
+            const JsonObjectMember* member = &parent.object[i];
+            JSON_ASSERT(member && JsonValidType(member->value), "invalid json type");
+
+            if (strncmp(name, member->name, nameLength) == 0)
+            {
+                *outResult = member->value;
+                return member->value.type == type ? JsonError_None : JsonError_WrongType;
+            }
+        }
+    }
+
+    *outResult = JSON_NULL;
+    return JsonError_MissingField;
 }
 
 // -------------------------------------------------------------------
