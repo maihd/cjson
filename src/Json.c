@@ -1189,3 +1189,5 @@ JsonError JsonFindWithType(const Json parent, const char* name, JsonType type, J
 #if defined(__GNUC__)
 #pragma GCC diagnostic warning "-Wmissing-field-initializers"
 #endif
+
+//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++

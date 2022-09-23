@@ -47,6 +47,10 @@ typedef enum JsonError
     JsonError_UnexpectedToken,
     JsonError_UnsupportedToken,
 
+    /* Finding error */
+    JsonError_MissingField,
+    JsonError_WrongType,
+
     /* Runtime error */
 
     JsonError_OutOfMemory,
@@ -121,7 +125,9 @@ JSON_CONST Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
 
 JSON_API JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* outValue);
 JSON_API bool       JsonEquals(const Json a, const Json b);
-JSON_API bool       JsonFind(const Json parent, const char* name, Json* result);
+
+JSON_API bool       JsonFind(const Json parent, const char* name, Json* outResult);
+JSON_API JsonError  JsonFindWithType(const Json parent, const char* name, JsonType type, Json* outResult);
 
 static inline bool JsonValidType(const Json json)
 {
@@ -1271,9 +1277,9 @@ bool JsonEquals(const Json a, const Json b)
 }
 
 /* @funcdef: JsonFind */
-bool JsonFind(const Json parent, const char* name, Json* result)
+bool JsonFind(const Json parent, const char* name, Json* outResult)
 {
-    JSON_ASSERT(result, "result mustnot be null");
+    JSON_ASSERT(outResult, "outResult mustnot be null");
     JSON_ASSERT(JsonValidType(parent), "invalid json type");
     JSON_ASSERT(name, "Attempt using nullptr as string");
 
@@ -1287,14 +1293,41 @@ bool JsonFind(const Json parent, const char* name, Json* result)
 
             if (strncmp(name, member->name, nameLength) == 0)
             {
-                *result = member->value;
+                *outResult = member->value;
                 return true;
             }
         }
     }
 
-    *result = JSON_NULL;
+    *outResult = JSON_NULL;
     return false;
+}
+
+/* @funcdef: JsonFindWithType */
+JsonError JsonFindWithType(const Json parent, const char* name, JsonType type, Json* outResult)
+{
+    JSON_ASSERT(outResult, "outResult mustnot be null");
+    JSON_ASSERT(JsonValidType(parent), "invalid json type");
+    JSON_ASSERT(name, "Attempt using nullptr as string");
+
+    if (parent.type == JsonType_Object)
+    {
+        const int32_t nameLength = (int32_t)strlen(name);
+        for (int32_t i = 0, n = parent.length; i < n; i++)
+        {
+            const JsonObjectMember* member = &parent.object[i];
+            JSON_ASSERT(member && JsonValidType(member->value), "invalid json type");
+
+            if (strncmp(name, member->name, nameLength) == 0)
+            {
+                *outResult = member->value;
+                return member->value.type == type ? JsonError_None : JsonError_WrongType;
+            }
+        }
+    }
+
+    *outResult = JSON_NULL;
+    return JsonError_MissingField;
 }
 
 // -------------------------------------------------------------------
@@ -1305,6 +1338,10 @@ bool JsonFind(const Json parent, const char* name, Json* result)
 #pragma GCC diagnostic warning "-Wmissing-field-initializers"
 #endif
 
+//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++
+
 
 #endif /* JSON_IMPL */
+
+//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++
 

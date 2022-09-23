@@ -159,3 +159,5 @@ void JsonPrint(const Json value, FILE* out)
 
 #endif /* JSON_UTILS_IMPL */
 
+//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++
+

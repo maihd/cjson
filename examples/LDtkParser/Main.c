@@ -21,11 +21,7 @@ int main(void)
     int32_t tempBufferSize = 20 * 1024 * 1024;
     void* tempBuffer = malloc((size_t)tempBufferSize);
 
-#ifdef _WIN32
-	LDtkContext context = LDtkContextWindows(tempBuffer, tempBufferSize);
-#else
-	LDtkContext context = LDtkContextStdC(tempBuffer, tempBufferSize);
-#endif
+	LDtkContext context = LDtkContextDefault(tempBuffer, tempBufferSize);
 
     LDtkWorld world;
     LDtkError error = LDtkParse(ldtkPath, context, &world);

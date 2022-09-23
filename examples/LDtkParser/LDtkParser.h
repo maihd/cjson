@@ -317,8 +317,11 @@ typedef struct LDtkContext
 } LDtkContext;
 
 LDtkContext		LDtkContextStdC(void* buffer, int32_t bufferSize);
+LDtkContext		LDtkContextDefault(void* buffer, int32_t bufferSize);
 
-#ifdef _WIN32
+#if defined(__GNUC__)
+LDtkContext		LDtkContextLinux(void* buffer, int32_t bufferSize);
+#elif defined(_WIN32)
 LDtkContext		LDtkContextWindows(void* buffer, int32_t bufferSize);
 #endif
 
@@ -327,3 +330,5 @@ LDtkError		LDtkParse(const char* ldtkPath, LDtkContext context, LDtkWorld* world
 #ifdef __cplusplus
 }
 #endif
+
+//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++

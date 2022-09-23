@@ -669,6 +669,9 @@ static LDtkError LDtkReadLevel(const Json json, const char* levelDirectory, Allo
         return error;
     }
 
+	// Something unclear here
+	// Why we donot have a field to specify that
+	// Layer instances are define in other files
 	if (jsonLayerInstances.type == JsonType_Null)
 	{
 		const Json jsonExternalRelPath;
@@ -734,6 +737,10 @@ static LDtkError LDtkReadLevel(const Json json, const char* levelDirectory, Allo
     for (int32_t i = 0; i < layerCount; i++)
     {
 		const Json layerJson = jsonLayerInstances.array[i];
+		if (layerJson.type != JsonType_Null)
+		{
+
+		}
     }
 
     const LDtkError error = { LDtkErrorCode_None, "" };
@@ -856,6 +863,17 @@ LDtkError LDtkParse(const char* ldtkPath, LDtkContext context, LDtkWorld* world)
     return error;
 }
 
+LDtkContext LDtkContextDefault(void* buffer, int32_t bufferSize)
+{
+#if defined(__GNUC__)
+	return LDtkContextLinux(buffer, bufferSize);
+#elif defined(_WIN32)
+	return LDtkContextWindows(buffer, bufferSize);
+#else
+	return LDtkContextStdC(buffer, bufferSize);
+#endif
+}
+
 static bool LDtkReadFileStdC(const char* fileName, void* buffer, int32_t* bufferSize)
 {
 	FILE* file = fopen(fileName, "r");
@@ -870,13 +888,13 @@ static bool LDtkReadFileStdC(const char* fileName, void* buffer, int32_t* buffer
 
 	if (buffer)
 	{
-		if (*bufferSize < fileSize)
+		if (*bufferSize < (int32_t)fileSize)
 		{
 			fclose(file);
 			return false;
 		}
 
-		fileSize = fread(buffer, 1, fileSize, *bufferSize);
+		fileSize = fread(buffer, 1, fileSize, file);
 	}
 	
 	*bufferSize = (int32_t)fileSize;
@@ -896,7 +914,53 @@ LDtkContext LDtkContextStdC(void* buffer, int32_t bufferSize)
 	return result;
 }
 
-#ifdef _WIN32
+#if defined(__GNUC__)
+#include <fcntl.h>
+#include <unistd.h>
+
+static bool LDtkReadFileLinux(const char* fileName, void* buffer, int32_t* bufferSize)
+{
+	bool result = false;
+
+	int file = open(fileName, O_RDONLY);
+	if (file == -1)
+	{
+		return false;
+	}
+
+	lseek(file, 0, SEEK_END);
+	off_t fileSize = tell(file);
+	lseek(file, 0, SEEK_SET);
+
+	if (buffer)
+	{
+		if (*bufferSize < (int32_t)fileSize)
+		{
+			close(file);
+			return false;
+		}
+
+		ssize_t readBytes = read(file, buffer, (size_t)fileSize);
+		result = (readBytes != -1);
+	}
+
+	*bufferSize = (int32_t)fileSize;
+
+	close(file);
+	return result;
+}
+
+LDtkContext LDtkContextLinux(void* buffer, int32_t bufferSize)
+{
+	LDtkContext result = {
+		.buffer = buffer,
+		.bufferSize = bufferSize,
+		.readFileFn = LDtkReadFileLinux
+	};
+
+	return result;
+}
+#elif defined(_WIN32)
 #define VC_EXTRA_CLEAN
 #define WIN32_CLEAN_AND_MEAN
 #include <Windows.h>
@@ -907,9 +971,9 @@ static bool LDtkReadFileWindows(const char* fileName, void* buffer, int32_t* buf
 	//WideCharToMultiByte(CP_UTF8, 0, tFileName, sizeof(tFileName), fileName, 0, NULL, NULL);
 
 	HANDLE file = CreateFileA(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (!file)
+	if (file == INVALID_HANDLE_VALUE)
 	{
-		//return false;
+		return false;
 	}
 
 	DWORD fileSize = GetFileSize(file, NULL);
@@ -941,3 +1005,5 @@ LDtkContext LDtkContextWindows(void* buffer, int32_t bufferSize)
 	return result;
 }
 #endif
+
+//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++

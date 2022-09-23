@@ -27,25 +27,29 @@ clean:
 lib:
 	@rm -f Json.h JsonUtils.h Json.natvis
 
-	@cat ./src/Json.h               		>> Json.h
-	@echo ""                        		>> Json.h
-	@echo "#ifdef JSON_IMPL"        		>> Json.h
-	@echo ""                        		>> Json.h
-	@cat ./src/Json.c               		>> Json.h
-	@echo ""                        		>> Json.h
-	@echo ""                        		>> Json.h
-	@echo "#endif /* JSON_IMPL */"  		>> Json.h
-	@echo ""                        		>> Json.h
+	@cat ./src/Json.h               							>> Json.h
+	@echo ""                        							>> Json.h
+	@echo "#ifdef JSON_IMPL"        							>> Json.h
+	@echo ""                        							>> Json.h
+	@cat ./src/Json.c               							>> Json.h
+	@echo ""                        							>> Json.h
+	@echo ""                        							>> Json.h
+	@echo "#endif /* JSON_IMPL */"  							>> Json.h
+	@echo ""                        							>> Json.h
+	@echo "//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++"	>> Json.h
+	@echo ""                        							>> Json.h
 
-	@cat ./src/JsonUtils.h             		>> JsonUtils.h
-	@echo ""                        		>> JsonUtils.h
-	@echo "#ifdef JSON_UTILS_IMPL"        	>> JsonUtils.h
-	@echo ""                        		>> JsonUtils.h	
-	@cat ./src/JsonUtils.c               	>> JsonUtils.h
-	@echo ""                        		>> JsonUtils.h
-	@echo ""                        		>> JsonUtils.h
-	@echo "#endif /* JSON_UTILS_IMPL */"	>> JsonUtils.h
-	@echo ""                        		>> JsonUtils.h
+	@cat ./src/JsonUtils.h             							>> JsonUtils.h
+	@echo ""                        							>> JsonUtils.h
+	@echo "#ifdef JSON_UTILS_IMPL"        						>> JsonUtils.h
+	@echo ""                        							>> JsonUtils.h	
+	@cat ./src/JsonUtils.c               						>> JsonUtils.h
+	@echo ""                        							>> JsonUtils.h
+	@echo ""                        							>> JsonUtils.h
+	@echo "#endif /* JSON_UTILS_IMPL */"						>> JsonUtils.h
+	@echo ""                        							>> JsonUtils.h
+	@echo "//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++"	>> JsonUtils.h
+	@echo ""                        							>> JsonUtils.h
 
 	@cat ./src/Json.natvis					>> Json.natvis
 
