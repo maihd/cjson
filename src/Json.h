@@ -5,6 +5,12 @@
 #define JSON_API
 #endif
 
+#ifdef __cplusplus
+#define JSON_CONST constexpr
+#else
+#define JSON_CONST static const
+#endif
+
 /* START OF EXTERN "C" */
 #ifdef __cplusplus
 extern "C" {
@@ -101,9 +107,9 @@ struct JsonObjectMember
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-static const Json JSON_NULL     = { JsonType_Null   , 0             };
-static const Json JSON_TRUE     = { JsonType_Boolean, 0, { true  }  };
-static const Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
+JSON_CONST Json JSON_NULL     = { JsonType_Null   , 0             };
+JSON_CONST Json JSON_TRUE     = { JsonType_Boolean, 0, { true  }  };
+JSON_CONST Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic warning "-Wmissing-field-initializers"
@@ -129,3 +135,5 @@ static inline bool JsonValidType(const Json json)
 /* * */
 
 #endif // __JSON_H__
+
+//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++

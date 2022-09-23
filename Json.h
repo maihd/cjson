@@ -5,6 +5,12 @@
 #define JSON_API
 #endif
 
+#ifdef __cplusplus
+#define JSON_CONST constexpr
+#else
+#define JSON_CONST static const
+#endif
+
 /* START OF EXTERN "C" */
 #ifdef __cplusplus
 extern "C" {
@@ -101,9 +107,9 @@ struct JsonObjectMember
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-static const Json JSON_NULL     = { JsonType_Null   , 0             };
-static const Json JSON_TRUE     = { JsonType_Boolean, 0, { true  }  };
-static const Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
+JSON_CONST Json JSON_NULL     = { JsonType_Null   , 0             };
+JSON_CONST Json JSON_TRUE     = { JsonType_Boolean, 0, { true  }  };
+JSON_CONST Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic warning "-Wmissing-field-initializers"
@@ -129,6 +135,8 @@ static inline bool JsonValidType(const Json json)
 /* * */
 
 #endif // __JSON_H__
+
+//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++
 
 #ifdef JSON_IMPL
 
@@ -188,14 +196,34 @@ typedef struct JsonAllocator
     uint8_t*        upperMarker;
 } JsonAllocator;
 
-static bool JsonAllocator_Init(JsonAllocator* allocator, void* buffer, int32_t length)
+static int32_t JsonAllocator_BlockSize(int32_t size)
 {
-    if (buffer && length > 0)
+	int32_t alignment = sizeof(Json);
+	int32_t misalign = size & (alignment - 1);
+	int32_t adjustment = (misalign != 0) * (alignment - misalign);
+	return size + adjustment;
+}
+
+static bool JsonAllocator_Init(JsonAllocator* allocator, void* buffer, int32_t bufferSize)
+{
+    if (buffer && bufferSize > 0)
     {
-        allocator->buffer       = (uint8_t*)buffer;
-        allocator->length       = length;
-        allocator->lowerMarker  = (uint8_t*)buffer;
-        allocator->upperMarker  = (uint8_t*)buffer + length;
+		allocator->buffer = (uint8_t*)buffer;
+		allocator->length = bufferSize;
+
+		// Aligned buffer for cache-friendly processing
+		const int32_t	alignment	= sizeof(Json);
+		const int32_t	mask		= alignment - 1;
+
+		const uintptr_t address		= (uintptr_t)buffer;
+		const int32_t	misalign	= address & mask;
+		const int32_t	adjustment	= (misalign != 0) * (alignment - misalign);
+
+		buffer = (void*)(address + adjustment);
+		bufferSize = JsonAllocator_BlockSize(bufferSize - adjustment);
+
+        allocator->lowerMarker = (uint8_t*)buffer;
+        allocator->upperMarker = (uint8_t*)buffer + bufferSize;
 
         return true;
     }
@@ -203,19 +231,26 @@ static bool JsonAllocator_Init(JsonAllocator* allocator, void* buffer, int32_t l
     return false;
 }
 
+static int32_t JsonAllocator_RemainSize(JsonAllocator* allocator)
+{
+	int32_t remain = (int32_t)(allocator->upperMarker - allocator->lowerMarker);
+	return  remain;
+}
+
 static bool JsonAllocator_CanAlloc(JsonAllocator* allocator, int32_t size)
 {
-    int32_t remain = (int32_t)(allocator->upperMarker - allocator->lowerMarker);
+    int32_t remain = JsonAllocator_RemainSize(allocator);
     return  remain >= size;
 }
 
 static void JsonAllocator_FreeLower(JsonAllocator* allocator, void* buffer, int32_t size)
 {
-    void* lastBuffer = allocator->lowerMarker;
-    if (lastBuffer == buffer)
-    {
-        allocator->lowerMarker -= size;
-    }
+	const int32_t blockSize = JsonAllocator_BlockSize(size);
+	void* lastBuffer = allocator->lowerMarker - blockSize;
+	if (lastBuffer == buffer)
+	{
+		allocator->lowerMarker = lastBuffer;
+	}
 }
 
 static void* JsonAllocator_AllocLower(JsonAllocator* allocator, void* oldBuffer, int32_t oldSize, int32_t newSize)
@@ -227,10 +262,11 @@ static void* JsonAllocator_AllocLower(JsonAllocator* allocator, void* oldBuffer,
         return NULL;
     }
 
-    if (JsonAllocator_CanAlloc(allocator, newSize))
+	const int32_t blockSize = JsonAllocator_BlockSize(newSize);
+    if (JsonAllocator_CanAlloc(allocator, blockSize))
     {
         void* result = allocator->lowerMarker;
-        allocator->lowerMarker += newSize;
+        allocator->lowerMarker += blockSize;
         return result;
     }
 
@@ -242,7 +278,8 @@ static void JsonAllocator_FreeUpper(JsonAllocator* allocator, void* buffer, int3
     void* lastBuffer = allocator->upperMarker;
     if (lastBuffer == buffer)
     {
-        allocator->upperMarker += size;
+		const int32_t blockSize = JsonAllocator_BlockSize(size);
+        allocator->upperMarker += blockSize;
     }
 }
 
@@ -255,9 +292,10 @@ static void* JsonAllocator_AllocUpper(JsonAllocator* allocator, void* oldBuffer,
         return NULL;
     }
 
-    if (JsonAllocator_CanAlloc(allocator, newSize))
+	const int32_t blockSize = JsonAllocator_BlockSize(newSize);
+    if (JsonAllocator_CanAlloc(allocator, blockSize))
     {
-        allocator->upperMarker -= newSize;
+        allocator->upperMarker -= blockSize;
         return allocator->upperMarker;
     }
 
@@ -311,7 +349,7 @@ JSON_INLINE void* JsonArray_Grow(void* array, int32_t reqsize, int32_t elemsize,
     JsonArray* newArray = (JsonArray*)JsonAllocator_AllocUpper(allocator, raw, sizeof(JsonArray) + size * elemsize, sizeof(JsonArray) + newSize * elemsize);
     if (newArray)
     {
-        newArray->size  = size;
+        newArray->size  = newSize;
         newArray->count = count;
 
         if (raw && count > 0)
@@ -1135,14 +1173,10 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
         const JsonResult result = { JsonError_WrongFormat, "Json code is empty", 0 };
         return result;
     }
-
-    // Aligned buffer for cache-friendly processing
-    void* alignedBuffer = (uint8_t*)buffer + (((uint64_t)buffer) & (sizeof(Json) - 1));
-    int32_t alignedBufferSize = bufferSize - ((uint8_t*)alignedBuffer - (uint8_t*)buffer);
     
     // Create new allocator
     JsonAllocator allocator;
-    if (!JsonAllocator_Init(&allocator, alignedBuffer, alignedBufferSize))
+    if (!JsonAllocator_Init(&allocator, buffer, bufferSize))
     {
         const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", 0 };
         return result;
@@ -1162,7 +1196,10 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
     *outValue = *value;
 
     // Done!
-    const JsonResult result = { parser.errnum, parser.errmsg, (int32_t)(parser.allocator.lowerMarker - parser.allocator.buffer) };
+	JsonResult result;
+	result.error = parser.errnum;
+	result.message = parser.errmsg;
+	result.memoryUsage = (int32_t)(parser.allocator.lowerMarker - (uint8_t*)buffer);
     return result;
 }
 
@@ -1242,13 +1279,13 @@ bool JsonFind(const Json parent, const char* name, Json* result)
 
     if (parent.type == JsonType_Object)
     {
-        const int32_t len = (int32_t)strlen(name);
+        const int32_t nameLength = (int32_t)strlen(name);
         for (int32_t i = 0, n = parent.length; i < n; i++)
         {
             const JsonObjectMember* member = &parent.object[i];
-            JSON_ASSERT(JsonValidType(member->value), "invalid json type");
+            JSON_ASSERT(member && JsonValidType(member->value), "invalid json type");
 
-            if (strncmp(name, member->name, len) == 0)
+            if (strncmp(name, member->name, nameLength) == 0)
             {
                 *result = member->value;
                 return true;
