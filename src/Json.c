@@ -1176,10 +1176,14 @@ JsonError JsonFindWithType(const Json parent, const char* name, JsonType type, J
                 return member->value.type == type ? JsonError_None : JsonError_WrongType;
             }
         }
+
+
+        *outResult = JSON_NULL;
+        return JsonError_MissingField;
     }
 
     *outResult = JSON_NULL;
-    return JsonError_MissingField;
+    return JsonError_WrongType;
 }
 
 // -------------------------------------------------------------------
