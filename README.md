@@ -22,6 +22,8 @@ Simple JSON parser written in C99
 
 ## Limits
 - No scientific number
+- Not use state machine for parsing
+- Not the best, the fastest json parser
 
 ## Examples
 Belove code from Json_TokenTest.c:
