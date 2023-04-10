@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "LDtkParser.h"
 #include "../../src/Json.h"
@@ -312,6 +313,7 @@ static LDtkError LDtkReadTilesets(const Json jsonDefs, Allocator* allocator, LDt
         const Json jsonUid;
         JsonFind(jsonTileset, "uid", (Json*)&jsonUid);
         tileset->id = (int32_t)jsonUid.number;
+		tileset->index = i;
 
         const Json jsonIdentifier;
         JsonFind(jsonTileset, "identifier", (Json*)&jsonIdentifier);
@@ -448,6 +450,50 @@ static LDtkError LDtkReadLayerDefs(const Json jsonDefs, Allocator* allocator, LD
             const LDtkError error = { LDtkErrorCode_InvalidLayerDefProperties, "'tilesetDefId' is invalid" };
             return error;
         }
+
+		const Json jsonIntGridValues;
+		if (JsonFindWithType(jsonLayerDef, "intGridValues", JsonType_Array, (Json*)&jsonIntGridValues) != JsonError_None)
+		{
+			const LDtkError error = { LDtkErrorCode_InvalidLayerDefProperties, "'intGridValues' is invalid" };
+			return error;
+		}
+
+		int32_t intGridValueCount = jsonIntGridValues.length;
+		LDtkIntGridValue* intGridValues = (LDtkIntGridValue*)AllocLower(allocator, NULL, 0, intGridValueCount * sizeof(LDtkIntGridValue));
+		for (int32_t i = 0; i < intGridValueCount; i++)
+		{
+			Json jsonIntGridValue = jsonIntGridValues.array[i];
+
+			Json jsonIdentifier;
+			if (!JsonFind(jsonIntGridValue, "identifier", &jsonIdentifier))
+			{
+				const LDtkError error = { LDtkErrorCode_InvalidLayerDefProperties, "'identifier' is invalid" };
+				return error;
+			}
+
+			Json jsonColor;
+			if (JsonFindWithType(jsonIntGridValue, "color", JsonType_String, &jsonColor) != JsonError_None)
+			{
+				const LDtkError error = { LDtkErrorCode_InvalidLayerDefProperties, "'color' is invalid" };
+				return error;
+			}
+
+			Json jsonValue;
+			if (JsonFindWithType(jsonIntGridValue, "value", JsonType_Number, &jsonValue) != JsonError_None)
+			{
+				const LDtkError error = { LDtkErrorCode_InvalidLayerDefProperties, "'color' is invalid" };
+				return error;
+			}
+
+			LDtkIntGridValue* intGridValue = &intGridValues[i];
+
+			intGridValue->name = jsonIdentifier.string;
+			intGridValue->value = (int32_t)jsonValue.number;
+			intGridValue->color = LDtkColorFromString(jsonColor.string);
+		}
+
+		layerDef->intGridValueCount = intGridValueCount;
+		layerDef->intGridValues = intGridValues;
     }
 
     world->layerDefCount = layerDefCount;
@@ -527,7 +573,458 @@ static LDtkError LDtkReadEntityDefs(const Json jsonDefs, Allocator* allocator, L
     return error;
 }
 
-static LDtkError LDtkReadLevel(const Json json, const char* levelDirectory, Allocator* allocator, LDtkReadFileFn* readFileFn, LDtkLevel* level)
+static LDtkError LDtkReadLayer(const Json json, Allocator* allocator, LDtkLevel* level, LDtkWorld* world)
+{
+	LDtkLayer* layer = &level->layers[level->layerCount++];
+
+	// Name & type
+
+	Json jsonIdentifier;
+	if (JsonFindWithType(json, "__identifier", JsonType_String, &jsonIdentifier) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+	layer->name = jsonIdentifier.string;
+
+	Json type;
+	if (JsonFindWithType(json, "__type", JsonType_String, &type) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+
+	if (strcmp(type.string, "Tiles") == 0)
+	{
+		layer->type = LDtkLayerType_Tiles;
+	}
+	else if (strcmp(type.string, "Entities") == 0)
+	{
+		layer->type = LDtkLayerType_Entities;
+	}
+	else if (strcmp(type.string, "IntGrid") == 0)
+	{
+		layer->type = LDtkLayerType_IntGrid;
+	}
+	else if (strcmp(type.string, "AutoLayer") == 0)
+	{
+		layer->type = LDtkLayerType_AutoLayer;
+	}
+	else
+	{
+		const LDtkError error = { LDtkErrorCode_UnknownLayerType, "" };
+		return error;
+	}
+
+	// Meta ids
+
+	Json jsonLevelId;
+	if (JsonFindWithType(json, "levelId", JsonType_Number, &jsonLevelId) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+	layer->levelId = (int32_t)jsonLevelId.number;
+
+	Json jsonLayerDefUid;
+	if (JsonFindWithType(json, "layerDefUid", JsonType_Number, &jsonLayerDefUid) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+	layer->layerDefId = (int32_t)jsonLayerDefUid.number;
+
+	// Base properties
+
+	Json jsonCWid;
+	if (JsonFindWithType(json, "__cWid", JsonType_Number, &jsonCWid) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+	layer->rows = (int32_t)jsonCWid.number;
+
+	Json jsonCHei;
+	if (JsonFindWithType(json, "__cHei", JsonType_Number, &jsonCHei) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+	layer->cols = (int32_t)jsonCHei.number;
+
+	Json jsonGridSize;
+	if (JsonFindWithType(json, "__gridSize", JsonType_Number, &jsonGridSize) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+	layer->tileSize = (int32_t)jsonGridSize.number;
+
+	Json jsonOpacity;
+	if (JsonFindWithType(json, "__opacity", JsonType_Number, &jsonOpacity) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+	layer->opacity = (float)jsonOpacity.number;
+
+	Json jsonPxTotalOffsetX;
+	if (JsonFindWithType(json, "__pxTotalOffsetX", JsonType_Number, &jsonPxTotalOffsetX) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+	layer->offsetX = (int32_t)jsonPxTotalOffsetX.number;
+
+	Json jsonPxTotalOffsetY;
+	if (JsonFindWithType(json, "__pxTotalOffsetY", JsonType_Number, &jsonPxTotalOffsetY) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+	layer->offsetY = (int32_t)jsonPxTotalOffsetY.number;
+
+	Json jsonVisible;
+	if (JsonFindWithType(json, "visible", JsonType_Boolean, &jsonVisible) != JsonError_None)
+	{
+		const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+		return error;
+	}
+	layer->visible = jsonVisible.boolean;
+
+	if (layer->type != LDtkLayerType_Entities)
+	{
+		Json jsonTilesetDefUid;
+		if (JsonFindWithType(json, "__tilesetDefUid", JsonType_Number, &jsonTilesetDefUid) != JsonError_None)
+		{
+			const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+			return error;
+		}
+
+		Json jsonTilesetRelPath;
+		if (JsonFindWithType(json, "__tilesetRelPath", JsonType_String, &jsonTilesetRelPath) != JsonError_None)
+		{
+			const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+			return error;
+		}
+
+		int32_t tilesetIndex = -1;
+        const uint32_t tilesetId = (int32_t)jsonTilesetDefUid.number;
+        for (int32_t i = 0; i < world->tilesetCount; i++)
+        {
+            if (world->tilesets[i].id == tilesetId)
+            {
+                tilesetIndex = i;
+                break;
+            }
+        }
+
+        if (tilesetIndex == -1)
+        {
+            const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+            return error;
+        }
+
+        const LDtkTileset tileset = world->tilesets[tilesetIndex];
+		assert(strcmp(tileset.path, jsonTilesetRelPath.string) == 0);
+		layer->tileset = tileset;
+	}
+    else
+    {
+        layer->tileset = (LDtkTileset){ 0 };
+    }
+
+    // Read Tiles
+
+	const char* gridTilesFieldName = "gridTiles";
+	if (layer->type == LDtkLayerType_IntGrid || layer->type == LDtkLayerType_AutoLayer)
+	{
+		gridTilesFieldName = "autoLayerTiles";
+	}
+
+	const int32_t coordIdIndex = layer->type == LDtkLayerType_IntGrid || layer->type == LDtkLayerType_AutoLayer;
+
+	Json jsonGridTiles;
+	if (JsonFindWithType(json, gridTilesFieldName, JsonType_Array, &jsonGridTiles) == JsonError_None)
+	{
+        int32_t tileCount = jsonGridTiles.length;
+	    LDtkTile* tiles = (LDtkTile*)AllocLower(allocator, NULL, 0, tileCount * sizeof(LDtkTile));
+	    for (int32_t i = 0; i < tileCount; i++)
+	    {
+		    const Json jsonTile = jsonGridTiles.array[i];
+
+            // Read Tile fields
+
+		    Json jsonTileId;
+		    if (JsonFindWithType(jsonTile, "t", JsonType_Number, &jsonTileId) != JsonError_None)
+		    {
+			    const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+			    return error;
+		    }
+		    int32_t tileId = (int32_t)jsonTileId.number;
+
+		    Json jsonD;
+		    if (JsonFindWithType(jsonTile, "d", JsonType_Array, &jsonD) != JsonError_None)
+		    {
+			    const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+			    return error;
+		    }
+
+		    Json jsonCoordId = jsonD.array[coordIdIndex];
+		    if (jsonCoordId.type != JsonType_Number)
+		    {
+			    const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+			    return error;
+		    }
+		    int32_t coordId = (int32_t)jsonCoordId.number;
+
+		    Json jsonPx;
+		    if (JsonFindWithType(jsonTile, "px", JsonType_Array, &jsonPx) != JsonError_None)
+		    {
+			    const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+			    return error;
+		    }
+
+            // Parse fields to create LDtkTile
+
+		    Json jsonX = jsonPx.array[0];
+		    Json jsonY = jsonPx.array[1];
+		    if (jsonX.type != JsonType_Number || jsonY.type != JsonType_Number)
+		    {
+			    const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+			    return error;
+		    }
+		    int32_t x = (int32_t)jsonX.number;
+		    int32_t y = (int32_t)jsonY.number;
+		    int32_t worldX = level->worldX + x;
+		    int32_t worldY = level->worldY + y;
+
+		    Json jsonSrc;
+		    if (JsonFindWithType(jsonTile, "src", JsonType_Array, &jsonSrc) != JsonError_None)
+		    {
+			    const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+			    return error;
+		    }
+
+		    Json jsonTextureX = jsonSrc.array[0];
+		    Json jsonTextureY = jsonSrc.array[1];
+		    if (jsonTextureX.type != JsonType_Number || jsonTextureY.type != JsonType_Number)
+		    {
+			    const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+			    return error;
+		    }
+		    int32_t textureX = (int32_t)jsonTextureX.number;
+		    int32_t textureY = (int32_t)jsonTextureY.number;
+
+		    Json jsonF;
+		    if (JsonFindWithType(jsonTile, "f", JsonType_Number, &jsonF) != JsonError_None)
+		    {
+			    const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+			    return error;
+		    }
+		    uint32_t flip = (uint32_t)jsonF.number;
+		    bool flipX = (flip  & 1u);
+		    bool flipY = (flip >> 1u) & 1u;
+
+		    const LDtkTile tile = {
+			    .id         = tileId,
+			    .coordId    = coordId,
+			    .x          = x,
+			    .y          = y,
+			    .worldX     = worldX,
+			    .worldY     = worldY,
+			    .textureX   = textureX,
+			    .textureY   = textureY,
+			    .flipX      = flipX,
+			    .flipY      = flipY
+		    };
+		    tiles[i] = tile;
+	    }
+	    layer->tileCount = tileCount;
+	    layer->tiles = tiles;
+	}
+    else
+    {
+        layer->tileCount = 0;
+        layer->tiles = NULL;
+    }
+
+    // Read IntGrid
+
+    LDtkLayerDef layerDef;
+    for (int32_t i = 0; i < world->layerDefCount; i++)
+    {
+        if (world->layerDefs[i].id == layer->layerDefId)
+        {
+            layerDef = world->layerDefs[i];
+            break;
+        }
+    }
+
+	Json jsonIntGrid;
+	if (JsonFindWithType(json, "intGridCsv", JsonType_Array, &jsonIntGrid) == JsonError_None)
+	{
+        int32_t intGridCount = jsonIntGrid.length;
+        LDtkIntGridValue* intGridValues = (LDtkIntGridValue*)AllocLower(allocator, NULL, 0, intGridCount * sizeof(LDtkIntGridValue));
+        for (int32_t i = 0; i < intGridCount; i++)
+        {
+            const Json jsonIntGridValueIndex = jsonIntGrid.array[i];
+            if (jsonIntGridValueIndex.type != JsonType_Number)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+
+            intGridValues[i] = layerDef.intGridValues[(int32_t)jsonIntGridValueIndex.number - 1];
+        }
+        layer->valueCount = intGridCount;
+        layer->values = intGridValues;
+	}
+    else if (JsonFindWithType(json, "intGrid", JsonType_Array, &jsonIntGrid) == JsonError_None)
+    {
+        int32_t intGridCount = jsonIntGrid.length;
+        LDtkIntGridValue* intGridValues = (LDtkIntGridValue*)AllocLower(allocator, NULL, 0, intGridCount * sizeof(LDtkIntGridValue));
+        for (int32_t i = 0; i < intGridCount; i++)
+        {
+            const Json jsonValuePair = jsonIntGrid.array[i];
+
+            Json jsonCoordId, jsonV;
+            if (JsonFindWithType(jsonValuePair, "coordId", JsonType_Number, &jsonCoordId) != JsonError_None
+               || JsonFindWithType(jsonValuePair, "v", JsonType_Number, &jsonV) != JsonError_None)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+
+            intGridValues[(int32_t)jsonCoordId.number] = layerDef.intGridValues[(int32_t)jsonV.number];
+        }
+        layer->valueCount = intGridCount;
+        layer->values = intGridValues;
+    }
+    else
+    {
+        layer->valueCount = 0;
+        layer->values = NULL;
+    }
+
+    // Read Entities
+
+	Json jsonEntityInstances;
+	if (JsonFindWithType(json, "entityInstances", JsonType_Array, &jsonEntityInstances) == JsonError_None)
+	{
+        int32_t entityCount = jsonEntityInstances.length;
+        LDtkEntity* entities = (LDtkEntity*)AllocLower(allocator, NULL, 0, entityCount * sizeof(*entities));
+        for (int32_t i = 0; i < entityCount; i++)
+        {
+            Json jsonEntity = jsonEntityInstances.array[i];
+            if (jsonEntity.type != JsonType_Object)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+
+            LDtkEntity* entity = &entities[i];
+
+            Json jsonIdentifier;
+            if (JsonFindWithType(jsonEntity, "__identifier", JsonType_String, &jsonIdentifier) != JsonError_None)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+            entity->name = jsonIdentifier.string;
+
+            Json jsonDefUid;
+            if (JsonFindWithType(jsonEntity, "defUid", JsonType_Number, &jsonDefUid) != JsonError_None)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+            entity->defId = (int32_t)jsonDefUid.number;
+
+            Json jsonWidth;
+            if (JsonFindWithType(jsonEntity, "width", JsonType_Number, &jsonWidth) != JsonError_None)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+            entity->width = (int32_t)jsonWidth.number;
+
+            Json jsonHeight;
+            if (JsonFindWithType(jsonEntity, "height", JsonType_Number, &jsonHeight) != JsonError_None)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+            entity->height = (int32_t)jsonHeight.number;
+
+            Json jsonPx;
+            if (JsonFindWithType(jsonEntity, "px", JsonType_Array, &jsonPx) != JsonError_None)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+
+            Json jsonX = jsonPx.array[0];
+            Json jsonY = jsonPx.array[1];
+            if (jsonX.type != JsonType_Number || jsonY.type != JsonType_Number)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+            entity->x = (int32_t)jsonX.number;
+            entity->y = (int32_t)jsonX.number;
+            entity->worldX = level->worldX + entity->x;
+            entity->worldY = level->worldY + entity->y;
+
+            Json jsonGrid;
+            if (JsonFindWithType(jsonEntity, "__grid", JsonType_Array, &jsonGrid) != JsonError_None)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+
+            Json jsonGridX = jsonGrid.array[0];
+            Json jsonGridY = jsonGrid.array[1];
+            if (jsonGridX.type != JsonType_Number || jsonGridY.type != JsonType_Number)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+            entity->gridX = (int32_t)jsonGridX.number;
+            entity->gridY = (int32_t)jsonGridX.number;
+
+            Json jsonPivot;
+            if (JsonFindWithType(jsonEntity, "__pivot", JsonType_Array, &jsonPivot) != JsonError_None)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+
+            Json jsonPivotX = jsonPivot.array[0];
+            Json jsonPivotY = jsonPivot.array[1];
+            if (jsonPivotX.type != JsonType_Number || jsonPivotY.type != JsonType_Number)
+            {
+                const LDtkError error = { LDtkErrorCode_UnnameError, "" };
+                return error;
+            }
+            entity->pivotX = (int32_t)jsonPivotX.number;
+            entity->pivotY = (int32_t)jsonPivotX.number;
+        }
+
+        layer->entityCount = entityCount;
+        layer->entities = entities;
+	}
+    else
+    {
+        layer->entityCount = 0;
+        layer->entities = NULL;
+    }
+
+	const LDtkError error = { LDtkErrorCode_None, "" };
+	return error;
+}
+
+static LDtkError LDtkReadLevel(const Json json, const char* levelDirectory, Allocator* allocator, LDtkReadFileFn* readFileFn, LDtkLevel* level, LDtkParseFlags flags, LDtkWorld* world)
 {
     const Json jsonUid;
     JsonFind(json, "uid", (Json*)&jsonUid);
@@ -733,21 +1230,36 @@ static LDtkError LDtkReadLevel(const Json json, const char* levelDirectory, Allo
 		}
 	}
 
-    const int32_t layerCount = jsonLayerInstances.length;
+	const int32_t layerCount = jsonLayerInstances.length;
+
+	level->layerCount = 0;
+	level->layers = (LDtkLayer*)AllocLower(allocator, NULL, 0, layerCount * sizeof(LDtkLayer));
+
     for (int32_t i = 0; i < layerCount; i++)
     {
 		const Json layerJson = jsonLayerInstances.array[i];
-		if (layerJson.type != JsonType_Null)
-		{
+		const LDtkError error = LDtkReadLayer(layerJson, allocator, level, world);
+        if (error.code != LDtkErrorCode_None)
+        {
+            return error;
+        }
+    }
 
-		}
+    if (flags & LDtkParseFlags_LayerReverseOrder)
+    {
+        for (int32_t i = 0, n = layerCount >> 1; i < n; i++)
+        {
+            const LDtkLayer tmp = level->layers[i];
+            level->layers[i] = level->layers[layerCount - i - 1];
+            level->layers[layerCount - i - 1] = tmp;
+        }
     }
 
     const LDtkError error = { LDtkErrorCode_None, "" };
     return error;
 }
 
-static LDtkError LDtkReadLevels(const Json json, const char* ldtkPath, Allocator* allocator, LDtkReadFileFn* readFileFn, LDtkWorld* world)
+static LDtkError LDtkReadLevels(const Json json, const char* ldtkPath, Allocator* allocator, LDtkReadFileFn* readFileFn, LDtkParseFlags flags, LDtkWorld* world)
 {
     const Json jsonLevels;
     if (!JsonFind(json, "levels", (Json*)&jsonLevels))
@@ -769,7 +1281,7 @@ static LDtkError LDtkReadLevels(const Json json, const char* ldtkPath, Allocator
         LDtkLevel* level        = &levels[i];
         const Json jsonLevel    = jsonLevels.array[i];
 
-        const LDtkError readError = LDtkReadLevel(jsonLevel, levelDirectory, allocator, readFileFn, level);
+        const LDtkError readError = LDtkReadLevel(jsonLevel, levelDirectory, allocator, readFileFn, level, flags, world);
         if (readError.code != LDtkErrorCode_None)
         {
             return readError;
@@ -783,7 +1295,7 @@ static LDtkError LDtkReadLevels(const Json json, const char* ldtkPath, Allocator
     return error;
 }
 
-LDtkError LDtkParse(const char* ldtkPath, LDtkContext context, LDtkWorld* world)
+LDtkError LDtkParse(const char* ldtkPath, LDtkContext context, LDtkParseFlags flags, LDtkWorld* world)
 {
 	LDtkReadFileFn* readFileFn = context.readFileFn;
 
@@ -853,7 +1365,7 @@ LDtkError LDtkParse(const char* ldtkPath, LDtkContext context, LDtkWorld* world)
         return readDefsError;
     }
 
-    const LDtkError readLevelsError = LDtkReadLevels(json, ldtkPath, &allocator, readFileFn, world);
+    const LDtkError readLevelsError = LDtkReadLevels(json, ldtkPath, &allocator, readFileFn, flags, world);
     if (readLevelsError.code != LDtkErrorCode_None)
     {
         return readLevelsError;

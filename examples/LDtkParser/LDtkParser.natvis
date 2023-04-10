@@ -30,4 +30,84 @@
       <Item Name="levels">levels,[levelCount]</Item>
     </Expand>
   </Type>
+
+  <Type Name="LDtkLayer">
+    <Expand>
+      <Item Name="name">name</Item>
+      <Item Name="type">type</Item>
+      
+      <Item Name="levelId">levelId</Item>
+      <Item Name="layerDefId">layerDefId</Item>
+
+      <Item Name="cols">cols</Item>
+      <Item Name="rows">rows</Item>
+      <Item Name="tileSize">tileSize</Item>
+
+      <Item Name="offsetX">offsetX</Item>
+      <Item Name="offsetY">offsetY</Item>
+
+      <Item Name="tilePivotX">tilePivotX</Item>
+      <Item Name="tilePivotY">tilePivotY</Item>
+
+      <Item Name="visible">visible</Item>
+      <Item Name="opacity">opacity</Item>
+      
+      <Item Name="tileset">tileset</Item>
+      
+      <!-- LDtkTile -->
+      <Item Name="tileCount">tileCount</Item>
+      <Item Name="tiles">tiles,[tileCount]</Item>
+
+      <!-- LDtkIntGridValue -->
+      <Item Name="valueCount">valueCount</Item>
+      <Item Name="values">values,[valueCount]</Item>
+
+      <!-- LDtkIntGridValue -->
+      <Item Name="entityCount">entityCount</Item>
+      <Item Name="entities">entities,[entityCount]</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="LDtkEnum">
+    <Expand>
+      <Item Name="id">id</Item>
+      <Item Name="name">name</Item>
+      <Item Name="tilesetId">tilesetId</Item>
+
+      <Item Name="externalPath">externalPath</Item>
+      <Item Name="externalChecksum">externalChecksum</Item>
+      
+      <Item Name="valueCount">valueCount</Item>
+      <Item Name="values">values,[valueCount]</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="LDtkLevel">
+    <Expand>
+      <Item Name="id">id</Item>
+      <Item Name="name">name</Item>
+
+      <Item Name="width">width</Item>
+      <Item Name="height">height</Item>
+
+      <Item Name="bgColor">bgColor</Item>
+      <Item Name="bgPath">bgPath</Item>
+      <Item Name="bgPosX">bgPosX</Item>
+      <Item Name="bgPosY">bgPosY</Item>
+      <Item Name="bgCropX">bgCropX</Item>
+      <Item Name="bgCropY">bgCropY</Item>
+      <Item Name="bgCropWidth">bgCropWidth</Item>
+      <Item Name="bgCropHeight">bgCropHeight</Item>
+      <Item Name="bgScaleX">bgScaleX</Item>
+      <Item Name="bgScaleY">bgScaleY</Item>
+      <Item Name="bgPivotX">bgPivotX</Item>
+      <Item Name="bgPivotY">bgPivotY</Item>
+
+      <Item Name="layerCount">layerCount</Item>
+      <Item Name="layers">layers,[layerCount]</Item>
+
+      <Item Name="neigbourCount">neigbourCount</Item>
+      <Item Name="neigbourIds">neigbourIds</Item>
+    </Expand>
+  </Type>
 </AutoVisualizer>

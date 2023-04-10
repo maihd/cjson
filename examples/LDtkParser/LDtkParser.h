@@ -54,7 +54,22 @@ typedef struct LDtkEnum
 
 typedef struct LDtkEntity
 {
-    const char* name;
+    const char*		name;
+	int32_t			defId;
+
+	int32_t			x;
+	int32_t			y;
+	int32_t			width;
+	int32_t			height;
+
+	int32_t			gridX;
+	int32_t			gridY;
+
+	int32_t			pivotX;
+	int32_t			pivotY;
+
+	int32_t			worldX;
+	int32_t			worldY;
 } LDtkEntity;
 
 typedef struct LDtkTile
@@ -84,7 +99,8 @@ typedef struct LDtkIntGridValue
 
 typedef struct LDtkTileset
 {
-    int32_t     id;
+    int32_t     id;		// Id define by LDtk
+	int32_t		index;	// Index in world
 
     const char* name;   // Name of tileset
     const char* path;   // Relative path to image file
@@ -99,76 +115,46 @@ typedef struct LDtkTileset
     int32_t     tagsEnumId;
 } LDtkTileset;
 
-typedef struct LDtkTileLayer
+typedef enum LDtkLayerType
 {
-    int32_t     id;
-    const char* name;
+	LDtkLayerType_Tiles,
+	LDtkLayerType_IntGrid,
+	LDtkLayerType_Entities,
+	LDtkLayerType_AutoLayer,
+} LDtkLayerType;
 
-    int32_t     cols;
-    int32_t     rows;
-    int32_t     tileSize;
+typedef struct LDtkLayer
+{
+    const char*			name;
+	LDtkLayerType		type;
 
-    int32_t     offsetX;
-    int32_t     offsetY;
+	int32_t				levelId;
+	int32_t				layerDefId;
 
-    float       tilePivotX;
-    float       tilePivotY;
+    int32_t				cols;
+    int32_t				rows;
+    int32_t				tileSize;
 
-    int32_t     order;
-    int32_t     visible : 1;
-    int32_t     opacity : 31;
+    int32_t				offsetX;
+    int32_t				offsetY;
 
-    LDtkTileset tileset;
+    float				tilePivotX;
+    float				tilePivotY;
+
+    int32_t				visible;
+    float				opacity;
+
+    LDtkTileset			tileset;
     
-    int32_t     tileCount;
-    LDtkTile*   tiles;
-} LDtkTileLayer;
+    int32_t				tileCount;
+    LDtkTile*			tiles;
 
-typedef struct LDtkIntGridLayer
-{
-    int32_t             id;
-    const char*         name;
+	int32_t             valueCount;
+	LDtkIntGridValue*   values;
 
-    int32_t             cols;
-    int32_t             rows;
-    int32_t             cellSize;
-
-    int32_t             offsetX;
-    int32_t             offsetY;
-
-    float               tilePivotX;
-    float               tilePivotY;
-
-    int32_t             order;
-    int32_t             visible : 1;
-    int32_t             opacity : 31;
-
-    int32_t             valueCount;
-    LDtkIntGridValue    values[];
-} LDtkIntGridLayer;
-
-typedef struct LDtkEntityLayer
-{
-    int32_t     id;
-    const char* name;
-
-    int32_t     cols;
-    int32_t     rows;
-    int32_t     cellSize;
-
-    int32_t     offsetX;
-    int32_t     offsetY;
-
-    float       tilePivotX;
-    float       tilePivotY;
-
-    int32_t     order;
-    int32_t     visible : 1;
-    int32_t     opacity : 31;
-
-    int32_t     entityCount;
-    LDtkEntity* entities;
-} LDtkEntityLayer;
+	int32_t				entityCount;
+	LDtkEntity*			entities;
+} LDtkLayer;
 
 typedef struct LDtkLevel
 {
@@ -194,26 +180,12 @@ typedef struct LDtkLevel
     float               bgPivotX;
     float               bgPivotY;
 
-    int32_t             tileLayerCount;
-    LDtkTileLayer*      tileLayers;
-
-    int32_t             intGridLayerCount;
-    LDtkIntGridLayer*   intGridLayers;
-
-    int32_t             entityLayerCount;
-    LDtkEntityLayer*    entityLayers;
+    int32_t             layerCount;
+	LDtkLayer*			layers;
 
     int32_t             neigbourCount[4];
     int32_t             neigbourIds[4][16];
 } LDtkLevel;
-
-typedef enum LDtkLayerType
-{
-    LDtkLayerType_Tiles,
-    LDtkLayerType_IntGrid,
-    LDtkLayerType_Entities,
-    LDtkLayerType_AutoLayer,
-} LDtkLayerType;
 
 typedef struct LDtkLayerDef
 {
@@ -296,6 +268,9 @@ typedef enum LDtkErrorCode
 	LDtkErrorCode_MissingLevelExternalFile,
 	LDtkErrorCode_InvalidLevelExternalFile,
 
+	LDtkErrorCode_UnknownLayerType,
+
+	LDtkErrorCode_UnnameError,
     LDtkErrorCode_OutOfMemory,
 	LDtkErrorCode_InternalError,
 } LDtkErrorCode;
@@ -316,6 +291,12 @@ typedef struct LDtkContext
 	LDtkReadFileFn*	readFileFn;
 } LDtkContext;
 
+typedef enum LDtkParseFlags
+{
+    LDtkParseFlags_None,
+    LDtkParseFlags_LayerReverseOrder,
+} LDtkParseFlags;
+
 LDtkContext		LDtkContextStdC(void* buffer, int32_t bufferSize);
 LDtkContext		LDtkContextDefault(void* buffer, int32_t bufferSize);
 
@@ -325,7 +306,7 @@ LDtkContext		LDtkContextLinux(void* buffer, int32_t bufferSize);
 LDtkContext		LDtkContextWindows(void* buffer, int32_t bufferSize);
 #endif
 
-LDtkError		LDtkParse(const char* ldtkPath, LDtkContext context, LDtkWorld* world);
+LDtkError		LDtkParse(const char* ldtkPath, LDtkContext context, LDtkParseFlags flags, LDtkWorld* world);
 
 #ifdef __cplusplus
 }
