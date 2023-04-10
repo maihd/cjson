@@ -778,13 +778,13 @@ static void JsonParser_ParseSingle(JsonParser* parser, Json* outValue)
     }
 }
 
-static char* JsonParser_ParseStringNoToken(JsonParser* parser, int* outLength)
+static char* JsonParser_ParseStringNoToken(JsonParser* parser, int32_t* outLength)
 {
     JsonParser_MatchChar(parser, JsonType_String, '"');
 
-    int i;
-    int c0, c1;
-    int length = 0;
+    int32_t i;
+    int32_t c0, c1;
+    int32_t length = 0;
 
     JsonTempArray(char, 2048) buffer = JsonTempArray_Init(NULL);
     while (!JsonParser_IsAtEnd(parser) && (c0 = JsonParser_PeekChar(parser)) != '"')
