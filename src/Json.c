@@ -784,6 +784,7 @@ static char* JsonParser_ParseStringNoToken(JsonParser* parser, int* outLength)
 
     int i;
     int c0, c1;
+    int length = 0;
 
     JsonTempArray(char, 2048) buffer = JsonTempArray_Init(NULL);
     while (!JsonParser_IsAtEnd(parser) && (c0 = JsonParser_PeekChar(parser)) != '"')
@@ -795,26 +796,32 @@ static char* JsonParser_ParseStringNoToken(JsonParser* parser, int* outLength)
             {
             case 'n':
                 JsonTempArray_Push(&buffer, '\n', &parser->allocator);
+                length++;
                 break;
 
             case 't':
                 JsonTempArray_Push(&buffer, '\t', &parser->allocator);
+                length++;
                 break;
 
             case 'r':
                 JsonTempArray_Push(&buffer, '\r', &parser->allocator);
+                length++;
                 break;
 
             case 'b':
                 JsonTempArray_Push(&buffer, '\b', &parser->allocator);
+                length++;
                 break;
 
             case '\\':
                 JsonTempArray_Push(&buffer, '\\', &parser->allocator);
+                length++;
                 break;
 
             case '"':
                 JsonTempArray_Push(&buffer, '\"', &parser->allocator);
+                length++;
                 break;
 
             case 'u':
@@ -862,6 +869,8 @@ static char* JsonParser_ParseStringNoToken(JsonParser* parser, int* outLength)
                     JsonTempArray_Push(&buffer, c4, &parser->allocator);
                     JsonTempArray_Push(&buffer, c5, &parser->allocator);
                 }
+                
+                length++;
                 break;
 
             default:
@@ -890,7 +899,7 @@ static char* JsonParser_ParseStringNoToken(JsonParser* parser, int* outLength)
     JsonParser_MatchChar(parser, JsonType_String, '"');
     if (buffer.count > 0)
     {
-        if (outLength) *outLength = JsonTempArray_GetCount(&buffer);
+        if (outLength) *outLength = length;
         JsonTempArray_Push(&buffer, 0, &parser->allocator);
 
         char* string = (char*)JsonTempArray_ToBuffer(&buffer, &parser->allocator);
