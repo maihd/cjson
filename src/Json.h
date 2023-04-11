@@ -64,6 +64,8 @@ typedef struct JsonResult
 {
     JsonError       error;
     const char*     message;
+
+    //JsonParser*     parser;
     int32_t         memoryUsage;
 } JsonResult;
 
@@ -78,12 +80,13 @@ typedef enum JsonParseFlags
 } JsonParseFlags;
 
 typedef struct Json             Json;
+//typedef struct JsonParser       JsonParser;
 typedef struct JsonObjectMember JsonObjectMember;
 
 struct Json
 {
     JsonType                type;       // Type of value: number, boolean, string, array, object
-    int32_t                 length;     // Length of value, always 1 on primitive types
+    int32_t                 length;     // Length of value, always 1 on primitive types, UTF8 string length
     union
     {
         double              number;
@@ -124,6 +127,8 @@ JSON_CONST Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
 // -------------------------------------------------------------------
 
 JSON_API JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* outValue);
+//JSON_API JsonResult JsonContinueParse(JsonParser* parser, Json* outValue);
+
 JSON_API bool       JsonEquals(const Json a, const Json b);
 
 JSON_API bool       JsonFind(const Json parent, const char* name, Json* outResult);

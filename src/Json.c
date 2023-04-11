@@ -1037,6 +1037,7 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
     // Validate json input
     if (!jsonCode || jsonCodeLength <= 0)
     {
+        //const JsonResult result = { JsonError_WrongFormat, "Json code is empty", NULL, 0 };
         const JsonResult result = { JsonError_WrongFormat, "Json code is empty", 0 };
         return result;
     }
@@ -1045,6 +1046,7 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
     JsonAllocator allocator;
     if (!JsonAllocator_Init(&allocator, buffer, bufferSize))
     {
+        //const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", NULL, 0 };
         const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", 0 };
         return result;
     }
@@ -1053,6 +1055,7 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
     JsonParser parser;
     if (!JsonParser_Init(&parser, jsonCode, jsonCodeLength, allocator, flags))
     {
+        //const JsonResult result = { JsonError_InternalFatal, "Wrong behaviour when create new parser", NULL, 0 };
         const JsonResult result = { JsonError_InternalFatal, "Wrong behaviour when create new parser", 0 };
         return result;
     }
@@ -1066,9 +1069,52 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
 	JsonResult result;
 	result.error = parser.errnum;
 	result.message = parser.errmsg;
+
+    //result.parser = NULL;
 	result.memoryUsage = (int32_t)(parser.allocator.lowerMarker - (uint8_t*)buffer);
     return result;
 }
+
+/* @funcdef: JsonContinueParse */
+//JsonResult JsonContinueParse(JsonParser* parser, Json* outValue)
+//{
+//    JSON_ASSERT(outValue, "outValue mustnot be null");
+//
+//    // Validate json input
+//    if (!jsonCode || jsonCodeLength <= 0)
+//    {
+//        const JsonResult result = { JsonError_WrongFormat, "Json code is empty", 0 };
+//        return result;
+//    }
+//
+//    // Create new allocator
+//    JsonAllocator allocator;
+//    if (!JsonAllocator_Init(&allocator, buffer, bufferSize))
+//    {
+//        const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", 0 };
+//        return result;
+//    }
+//
+//    // Create parser
+//    JsonParser parser;
+//    if (!JsonParser_Init(&parser, jsonCode, jsonCodeLength, allocator, flags))
+//    {
+//        const JsonResult result = { JsonError_InternalFatal, "Wrong behaviour when create new parser", 0 };
+//        return result;
+//    }
+//
+//    // Parse the top level
+//    Json* value = JsonState_ParseTopLevel(&parser);
+//    JSON_ASSERT(value, "value mustnot be null");
+//    *outValue = *value;
+//
+//    // Done!
+//    JsonResult result;
+//    result.error = parser.errnum;
+//    result.message = parser.errmsg;
+//    result.memoryUsage = (int32_t)(parser.allocator.lowerMarker - (uint8_t*)buffer);
+//    return result;
+//}
 
 /* @funcdef: JsonEquals */
 bool JsonEquals(const Json a, const Json b)
