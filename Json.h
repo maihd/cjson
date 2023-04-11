@@ -64,6 +64,8 @@ typedef struct JsonResult
 {
     JsonError       error;
     const char*     message;
+
+    //JsonParser*     parser;
     int32_t         memoryUsage;
 } JsonResult;
 
@@ -78,12 +80,13 @@ typedef enum JsonParseFlags
 } JsonParseFlags;
 
 typedef struct Json             Json;
+//typedef struct JsonParser       JsonParser;
 typedef struct JsonObjectMember JsonObjectMember;
 
 struct Json
 {
     JsonType                type;       // Type of value: number, boolean, string, array, object
-    int32_t                 length;     // Length of value, always 1 on primitive types
+    int32_t                 length;     // Length of value, always 1 on primitive types, UTF8 string length
     union
     {
         double              number;
@@ -124,6 +127,8 @@ JSON_CONST Json JSON_FALSE    = { JsonType_Boolean, 0, { false }  };
 // -------------------------------------------------------------------
 
 JSON_API JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlags flags, void* buffer, int32_t bufferSize, Json* outValue);
+//JSON_API JsonResult JsonContinueParse(JsonParser* parser, Json* outValue);
+
 JSON_API bool       JsonEquals(const Json a, const Json b);
 
 JSON_API bool       JsonFind(const Json parent, const char* name, Json* outResult);
@@ -926,12 +931,13 @@ static void JsonParser_ParseSingle(JsonParser* parser, Json* outValue)
     }
 }
 
-static char* JsonParser_ParseStringNoToken(JsonParser* parser, int* outLength)
+static char* JsonParser_ParseStringNoToken(JsonParser* parser, int32_t* outLength)
 {
     JsonParser_MatchChar(parser, JsonType_String, '"');
 
-    int i;
-    int c0, c1;
+    int32_t i;
+    int32_t c0, c1;
+    int32_t length = 0;
 
     JsonTempArray(char, 2048) buffer = JsonTempArray_Init(NULL);
     while (!JsonParser_IsAtEnd(parser) && (c0 = JsonParser_PeekChar(parser)) != '"')
@@ -943,26 +949,32 @@ static char* JsonParser_ParseStringNoToken(JsonParser* parser, int* outLength)
             {
             case 'n':
                 JsonTempArray_Push(&buffer, '\n', &parser->allocator);
+                length++;
                 break;
 
             case 't':
                 JsonTempArray_Push(&buffer, '\t', &parser->allocator);
+                length++;
                 break;
 
             case 'r':
                 JsonTempArray_Push(&buffer, '\r', &parser->allocator);
+                length++;
                 break;
 
             case 'b':
                 JsonTempArray_Push(&buffer, '\b', &parser->allocator);
+                length++;
                 break;
 
             case '\\':
                 JsonTempArray_Push(&buffer, '\\', &parser->allocator);
+                length++;
                 break;
 
             case '"':
                 JsonTempArray_Push(&buffer, '\"', &parser->allocator);
+                length++;
                 break;
 
             case 'u':
@@ -1010,6 +1022,8 @@ static char* JsonParser_ParseStringNoToken(JsonParser* parser, int* outLength)
                     JsonTempArray_Push(&buffer, c4, &parser->allocator);
                     JsonTempArray_Push(&buffer, c5, &parser->allocator);
                 }
+                
+                length++;
                 break;
 
             default:
@@ -1038,7 +1052,7 @@ static char* JsonParser_ParseStringNoToken(JsonParser* parser, int* outLength)
     JsonParser_MatchChar(parser, JsonType_String, '"');
     if (buffer.count > 0)
     {
-        if (outLength) *outLength = JsonTempArray_GetCount(&buffer);
+        if (outLength) *outLength = length;
         JsonTempArray_Push(&buffer, 0, &parser->allocator);
 
         char* string = (char*)JsonTempArray_ToBuffer(&buffer, &parser->allocator);
@@ -1176,6 +1190,7 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
     // Validate json input
     if (!jsonCode || jsonCodeLength <= 0)
     {
+        //const JsonResult result = { JsonError_WrongFormat, "Json code is empty", NULL, 0 };
         const JsonResult result = { JsonError_WrongFormat, "Json code is empty", 0 };
         return result;
     }
@@ -1184,6 +1199,7 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
     JsonAllocator allocator;
     if (!JsonAllocator_Init(&allocator, buffer, bufferSize))
     {
+        //const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", NULL, 0 };
         const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", 0 };
         return result;
     }
@@ -1192,6 +1208,7 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
     JsonParser parser;
     if (!JsonParser_Init(&parser, jsonCode, jsonCodeLength, allocator, flags))
     {
+        //const JsonResult result = { JsonError_InternalFatal, "Wrong behaviour when create new parser", NULL, 0 };
         const JsonResult result = { JsonError_InternalFatal, "Wrong behaviour when create new parser", 0 };
         return result;
     }
@@ -1205,9 +1222,52 @@ JsonResult JsonParse(const char* jsonCode, int32_t jsonCodeLength, JsonParseFlag
 	JsonResult result;
 	result.error = parser.errnum;
 	result.message = parser.errmsg;
+
+    //result.parser = NULL;
 	result.memoryUsage = (int32_t)(parser.allocator.lowerMarker - (uint8_t*)buffer);
     return result;
 }
+
+/* @funcdef: JsonContinueParse */
+//JsonResult JsonContinueParse(JsonParser* parser, Json* outValue)
+//{
+//    JSON_ASSERT(outValue, "outValue mustnot be null");
+//
+//    // Validate json input
+//    if (!jsonCode || jsonCodeLength <= 0)
+//    {
+//        const JsonResult result = { JsonError_WrongFormat, "Json code is empty", 0 };
+//        return result;
+//    }
+//
+//    // Create new allocator
+//    JsonAllocator allocator;
+//    if (!JsonAllocator_Init(&allocator, buffer, bufferSize))
+//    {
+//        const JsonResult result = { JsonError_OutOfMemory, "Buffer is too small", 0 };
+//        return result;
+//    }
+//
+//    // Create parser
+//    JsonParser parser;
+//    if (!JsonParser_Init(&parser, jsonCode, jsonCodeLength, allocator, flags))
+//    {
+//        const JsonResult result = { JsonError_InternalFatal, "Wrong behaviour when create new parser", 0 };
+//        return result;
+//    }
+//
+//    // Parse the top level
+//    Json* value = JsonState_ParseTopLevel(&parser);
+//    JSON_ASSERT(value, "value mustnot be null");
+//    *outValue = *value;
+//
+//    // Done!
+//    JsonResult result;
+//    result.error = parser.errnum;
+//    result.message = parser.errmsg;
+//    result.memoryUsage = (int32_t)(parser.allocator.lowerMarker - (uint8_t*)buffer);
+//    return result;
+//}
 
 /* @funcdef: JsonEquals */
 bool JsonEquals(const Json a, const Json b)
@@ -1324,10 +1384,14 @@ JsonError JsonFindWithType(const Json parent, const char* name, JsonType type, J
                 return member->value.type == type ? JsonError_None : JsonError_WrongType;
             }
         }
+
+
+        *outResult = JSON_NULL;
+        return JsonError_MissingField;
     }
 
     *outResult = JSON_NULL;
-    return JsonError_MissingField;
+    return JsonError_WrongType;
 }
 
 // -------------------------------------------------------------------
