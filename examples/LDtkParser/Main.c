@@ -56,11 +56,30 @@ int main(void)
 
 	int32_t currentLevelIndex = 0;
 	LDtkLevel currentLevel = world.levels[currentLevelIndex];
-
-    //SetWindowSize(currentLevel.width, currentLevel.height);
+    SetWindowSize(currentLevel.width, currentLevel.height);
 
     while (!WindowShouldClose())
     {
+        if (IsKeyPressed(KEY_LEFT))
+        {
+            if (currentLevelIndex > 0)
+            {
+                currentLevelIndex--;
+                currentLevel = world.levels[currentLevelIndex];
+                SetWindowSize(currentLevel.width, currentLevel.height);
+            }
+        }
+
+        if (IsKeyPressed(KEY_RIGHT))
+        {
+            if (currentLevelIndex < world.levelCount - 1)
+            {
+                currentLevelIndex++;
+                currentLevel = world.levels[currentLevelIndex];
+                SetWindowSize(currentLevel.width, currentLevel.height);
+            }
+        }
+
         BeginDrawing();
         {
             ClearBackground((Color){ world.backgroundColor.r, world.backgroundColor.g, world.backgroundColor.b, world.backgroundColor.a });
@@ -93,12 +112,10 @@ int main(void)
                         const float scaleX = tile.flipX ? -1.0f : 1.0f;
                         const float scaleY = tile.flipY ? -1.0f : 1.0f;
 
-						DrawTexturePro(
+                        DrawTextureRec(
 							tilesetTexture,
-							(Rectangle) { tile.textureX, tile.textureY, tileset.tileSize, tileset.tileSize },
-							(Rectangle) { tile.x, tile.y, tileset.tileSize * scaleX, tileset.tileSize * scaleY },
-							(Vector2) { 0.0f, 0.0f },
-                            0.0f,
+							(Rectangle) { tile.textureX, tile.textureY, tileset.tileSize * scaleX, tileset.tileSize * scaleY },
+							(Vector2) { tile.x, tile.y },
 							WHITE
 						);
 					}
@@ -113,6 +130,9 @@ int main(void)
 					}
 				}
 			}
+
+            DrawText("Left to previous level", 5, 5, 16, WHITE);
+            DrawText("Right to next level", 5, 25, 16, WHITE);
         }
         EndDrawing();
     }
