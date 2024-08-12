@@ -27,7 +27,7 @@ Simple JSON parser written in C99
 - No scientific number
 - Not use state machine for parsing
 - Not the best, the fastest json parser
-- Parsing require a preallocated large buffers (cannot detect buffer size requirement), buffer not an allocator (I dont often store the json value as persitent, just temp for parsing levels, game data)
+- Parsing require a preallocated large buffer (about kilobytes, based on file size, cannot detect buffer size requirement), buffer not an allocator (I dont often store the json value as persitent, just temp for parsing levels, game data)
 - Use longjmp to handling error, jump from error point to parse function call, which is have 2 disadvantages:
     - longjmp may works different over platforms
     - longjmp depends on stdlib, not work on freestanding platforms
