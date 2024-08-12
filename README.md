@@ -3,12 +3,14 @@
 # cjson ![Build Status](https://github.com/maihd/cjson/actions/workflows/unit-tests.yml/badge.svg) [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 Simple JSON parser written in C99
 
+
 ## Table of Contents
 - [Features](#features)
 - [Examples](#examples)
 - [API](#api)
 - [Build Instructions](#build-instructions)
 - [FAQs](#faqs)
+
 
 ## Features
 - Simple, small and easy to use, integration.
@@ -20,10 +22,16 @@ Simple JSON parser written in C99
 - Visual Studio Natvis.
 - String as UTF8.
 
+
 ## Limits
 - No scientific number
 - Not use state machine for parsing
 - Not the best, the fastest json parser
+- Parsing require a preallocated large buffers (cannot detect buffer size requirement), buffer not an allocator (I dont often store the json value as persitent, just temp for parsing levels, game data)
+- Use longjmp to handling error, jump from error point to parse function call, which is have 2 disadvantages:
+    - longjmp may works different over platforms
+    - longjmp depends on stdlib, not work on freestanding platforms
+
 
 ## Examples
 Belove code from Json_TokenTest.c:
