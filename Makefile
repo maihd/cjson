@@ -51,7 +51,7 @@ lib:
 	@echo "//! LEAVE AN EMPTY LINE HERE, REQUIRE BY GCC/G++"	>> JsonUtils.h
 	@echo ""                        							>> JsonUtils.h
 
-	@cat ./src/Json.natvis					>> Json.natvis
+	@cat ./src/Json.natvis										>> Json.natvis
 
 	@$(CC) -o json_build_test.exe json_build_test.c && rm json_build_test.exe 	\
 		&& echo "Make single header library success." 							\

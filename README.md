@@ -12,7 +12,7 @@ Simple JSON parser written in C99
 - [FAQs](#faqs)
 
 
-## Features
+## Features (Design Goals)
 - Simple, small and easy to use, integration.
 - Writing in C99: simple, small, portability.
 - Robust error handling, no pointer-as-object.
@@ -25,12 +25,28 @@ Simple JSON parser written in C99
 
 ## Limits
 - No scientific number
-- Not use state machine for parsing
+- Do not use state machine for parsing
 - Not the best, the fastest json parser
 - Parsing require a preallocated large buffer (about kilobytes, based on file size, cannot detect buffer size requirement), buffer not an allocator (I dont often store the json value as persitent, just temp for parsing levels, game data)
-- Use longjmp to handling error, jump from error point to parse function call, which is have 2 disadvantages:
-    - longjmp may works different over platforms
-    - longjmp depends on stdlib, not work on freestanding platforms
+- Use `longjmp` to handling error, jump from error point to parse function call, which is have disadvantages:
+    - `longjmp` may works different over platforms
+    - `longjmp` depends on stdlib, not work on freestanding platforms
+    - `longjmp` make call stack unpredictable, and must be unwind the call stack (which are overhead, and crash prone)
+
+
+## API design flaws
+After sometimes use this, I found that API have flaws of its own:
+- Too verbose, not just for good reasons
+- Too many params for function call, which can be better to combine as a struct
+- Allocator buffer, but cannot custom allocations
+- It's claimed cache-friendly, but the layout of data in memory after parsing usually un-ordered, un-lineared in hierarchy point-of-view (address of items of array come before the array itself)
+```plain
+[Items of a array] -> [Maybe items of other array] -> [Maybe other array JSON] -> [Array JSON] -> [... and some unpredictable value, and string/object come to the party]
+```
+- Continue to the above, reorder should help? Not exactly, how to reorder, how much reorder overhead, that too much works for simple parsing simple data format like JSON.
+- No big projects usage.
+- Parsing still too complex
+-> Decisioning to exploring some best practices from other parser, [MetaDesk](https://github.com/ryanfleury/metadesk) is good example. Linked list in one single arena of memory is good enough.
 
 
 ## Examples
@@ -169,10 +185,14 @@ make lib
 
 ## FAQs
 ### Why another json parser?
-When I first read an article about common mistake of c libraries are do much dynamic allocations and have no custom allocators. So I create this projects to learn to make good library in C.
+When I first read an article about common mistake of c libraries are do much dynamic allocations and have no custom allocators. So I create this project to learn to make good library in C.
+
+### Have no update after long time?
+Like I said above, I started this project mainly for learning purpose, how to design a good API for C. Have no purpose for compete with battle-tested library. When I have any ideas for better API design, I comeback and do some hacks. If you have ideas, just make a issue in this repo.
 
 ### You said custom allocators, but I donot find one?
-In the first version there is a custom allocator interface. But after the long run, I found the memory of Json was throw away at one, so dynamic allocators are expensive for that. Now we just given a temporary buffer to parser, and there is a linear allocator in internal. So no dynamic allocations.
+In the first version there is a custom allocator interface. But after the long run, I found the memory of Json was throw away at one, so dynamic allocators are expensive for that. Now we just given a temporary buffer to parser, and there is a linear allocator in internal. So no dynamic allocations. 
+_Note_: Next version will combine both, support passing allocator around, but have API to create one-time allocator from buffer. (Better API)
 
 ### Where stringify/serialize functions?
 It easy to write an JsonStringify version, but the real problem in C is not that simple. You need to create Json value, create Json may need memory, so we need to care about memory allocation. That headache! Fortunately, C is static type language, so we can easily convert out data structure/object to json easily base on its types. See example below:
@@ -194,7 +214,7 @@ const char* JsonifyEntity(Entity entity)
 ```
 
 ### I don't like CamelCase!!!
-Just rename, update, change what you not like with your code editor.
+Just rename, update, change what you do not like with your code editor.
 
 ### What about licenses
 This repo use UNLICENSE but the source code you generate from `make` can be your license of choice.
