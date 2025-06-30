@@ -85,7 +85,8 @@ typedef struct JsonObjectMember JsonObjectMember;
 
 struct Json
 {
-    JsonType                type;       // Type of value: number, boolean, string, array, object
+    JsonType                type;   // Type of value: number, boolean, string, array, object
+    // int32_t                 next : 24;  // Next item in array, object 
     int32_t                 length;     // Length of value, always 1 on primitive types, UTF8 string length
     union
     {
@@ -105,6 +106,12 @@ struct JsonObjectMember
     const char*             name;
     Json                    value;
 };
+
+#if 0
+#include <assert.h>
+static_assert(sizeof(Json) == 16, "");
+static_assert(alignof(Json) == 16, "");
+#endif
 
 // -------------------------------------------------------------------
 // Constants

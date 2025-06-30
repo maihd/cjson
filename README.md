@@ -46,7 +46,10 @@ After sometimes use this, I found that API have flaws of its own:
 - Continue to the above, reorder should help? Not exactly, how to reorder, how much reorder overhead, that too much works for simple parsing simple data format like JSON.
 - No big projects usage.
 - Parsing still too complex
--> Decisioning to exploring some best practices from other parser, [MetaDesk](https://github.com/ryanfleury/metadesk) is good example. Linked list in one single arena of memory is good enough.
+> _*Conclusion*_: 
+> - Decisioning to exploring some best practices from other parser, [MetaDesk](https://github.com/ryanfleury/metadesk) is good example. Linked list in one single arena of memory is good enough.
+> - For production code, we should use battle-tested library. Mai suggestion is [yyjson](https://github.com/ibireme/yyjson)
+> - Start new project call sjson (Simplified Json, but also mean Simplified Json Parser, more simple implementation)
 
 
 ## Examples
