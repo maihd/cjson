@@ -25,6 +25,7 @@ Simple JSON parser written in C99
 
 ## Limits
 - No scientific number
+- Parsing number is naive implemented
 - Do not use state machine for parsing
 - Not the best, the fastest json parser
 - Parsing require a preallocated large buffer (about kilobytes, based on file size, cannot detect buffer size requirement), buffer not an allocator (I dont often store the json value as persitent, just temp for parsing levels, game data)
@@ -46,7 +47,7 @@ After sometimes use this, I found that API have flaws of its own:
 - Continue to the above, reorder should help? Not exactly, how to reorder, how much reorder overhead, that too much works for simple parsing simple data format like JSON.
 - No big projects usage.
 - Parsing still too complex
-> _*Conclusion*_: 
+> _*Conclusion*_:
 > - Decisioning to exploring some best practices from other parser, [MetaDesk](https://github.com/ryanfleury/metadesk) is good example. Linked list in one single arena of memory is good enough.
 > - For production code, we should use battle-tested library. Mai suggestion is [yyjson](https://github.com/ibireme/yyjson)
 > - Start new project call sjson (Simplified Json, but also mean Simplified Json Parser, more simple implementation)
@@ -61,27 +62,27 @@ Belove code from Json_TokenTest.c:
 int main(int argc, char* argv[])
 {
     signal(SIGINT, _sighandler);
-    
+
     printf("JSON token testing prompt\n");
     printf("Type '.exit' to exit\n");
-    
+
     char input[1024];
     int allocatorCapacity = 1024 * 1024; // 1MB temp buffer
     void* allocatorBuffer = malloc(allocatorCapacity);
 
     while (1)
     {
-	    if (setjmp(jmpenv) == 0)
-	    {
-	        printf("> ");
-	        fgets(input, sizeof(input), stdin);
+        if (setjmp(jmpenv) == 0)
+        {
+            printf("> ");
+            fgets(input, sizeof(input), stdin);
 
-	        const char* json = strtrim_fast(input);
-	        if (strcmp(json, ".exit") == 0)
-	        {
+            const char* json = strtrim_fast(input);
+            if (strcmp(json, ".exit") == 0)
+            {
                 break;
-	        }
-	        else
+            }
+            else
             {
                 Json* value;
                 JsonError error = JsonParse(json, strlen(json), JsonFlags_NoStrictTopLevel, allocatorBuffer, allocatorCapacity, &value);
@@ -94,8 +95,8 @@ int main(int argc, char* argv[])
                 {
                     JsonPrint(value, stdout); printf("\n");
                 }
-	        }
-	    }
+            }
+        }
     }
 
     free(allocatorBuffer);
@@ -147,10 +148,10 @@ struct Json
 {
     JsonType                type;
     int                     length;
-    union 
+    union
     {
         double              number;
-        bool                boolean;   
+        bool                boolean;
         const char*         string;
         Json*               array;
 
@@ -194,7 +195,7 @@ When I first read an article about common mistake of c libraries are do much dyn
 Like I said above, I started this project mainly for learning purpose, how to design a good API for C. Have no purpose for compete with battle-tested library. When I have any ideas for better API design, I comeback and do some hacks. If you have ideas, just make a issue in this repo.
 
 ### You said custom allocators, but I donot find one?
-In the first version there is a custom allocator interface. But after the long run, I found the memory of Json was throw away at one, so dynamic allocators are expensive for that. Now we just given a temporary buffer to parser, and there is a linear allocator in internal. So no dynamic allocations. 
+In the first version there is a custom allocator interface. But after the long run, I found the memory of Json was throw away at one, so dynamic allocators are expensive for that. Now we just given a temporary buffer to parser, and there is a linear allocator in internal. So no dynamic allocations.
 _Note_: Next version will combine both, support passing allocator around, but have API to create one-time allocator from buffer. (Better API)
 
 ### Where stringify/serialize functions?
@@ -209,7 +210,7 @@ typedef struct Entity
 const char* JsonifyEntity(Entity entity)
 {
     static char buffer[256];
-    snprintf(buffer, sizeof(buffer), 
+    snprintf(buffer, sizeof(buffer),
         "{\"id\":%u,\"name\":\"%s\"}", entity.id, entity.name
     );
     return buffer;
